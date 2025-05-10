@@ -2,7 +2,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { reactStartCookies } from "better-auth/react-start";
 
-import { db } from "./db";
+import { db } from "~/lib/db";
 
 export const auth = betterAuth({
   baseURL: process.env.VITE_BASE_URL,
@@ -11,6 +11,7 @@ export const auth = betterAuth({
   }),
 
   // https://www.better-auth.com/docs/integrations/tanstack#usage-tips
+  // make sure this is the last plugin in the array
   plugins: [reactStartCookies()],
 
   // https://www.better-auth.com/docs/concepts/session-management#session-caching

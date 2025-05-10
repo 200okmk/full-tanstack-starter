@@ -1,6 +1,6 @@
-# [React TanStarter](https://github.com/dotnize/react-tanstarter)
+# [React Tanstack Starter]()
 
-A minimal starter template for 🏝️ TanStack Start. [→ Preview here](https://tanstarter.nize.ph/)
+A minimal starter template for 🏝️ TanStack Start.
 
 - [React 19](https://react.dev) + [React Compiler](https://react.dev/learn/react-compiler)
 - TanStack [Start](https://tanstack.com/start/latest) + [Router](https://tanstack.com/router/latest) + [Query](https://tanstack.com/query/latest)
