@@ -12,7 +12,9 @@ export const postsTable = pgTable("posts", {
   title: text("title").notNull(),
   content: text("content").notNull(),
   // if user is deleted, all posts of that user are deleted (cascade)
-  userId: text("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => usersTable.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
