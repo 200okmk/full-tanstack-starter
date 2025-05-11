@@ -5,7 +5,7 @@ import { neon } from "@neondatabase/serverless";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
 
-import * as schema from "./schema";
+import * as schema from "./schemas";
 
 // DBの型定義
 type Database = PostgresJsDatabase<typeof schema> | NeonHttpDatabase<typeof schema>;
