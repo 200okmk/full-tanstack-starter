@@ -1,17 +1,5 @@
-import { boolean, pgTable, text, timestamp } from "drizzle-orm/pg-core";
-
-export const usersTable = pgTable("users", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  email: text("email").notNull().unique(),
-  emailVerified: boolean("email_verified").notNull(),
-  image: text("image"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow()
-    .$onUpdateFn(() => new Date()),
-});
+import { pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { usersTable } from "./public.schema";
 
 export const sessionsTable = pgTable("sessions", {
   id: text("id").primaryKey(),

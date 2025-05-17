@@ -1,0 +1,60 @@
+name: マイグレーションファイルを生成したかチェック
+
+on:
+  pull_request:
+    branches: [develop]
+
+jobs:
+  check-migrations:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+          run_install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check schema changes
+        run: |
+          # スキーマファイルの変更を検出
+          SCHEMA_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} -- "src/lib/db/schemas/")
+
+          if [ -n "$SCHEMA_FILES" ]; then
+            # 内容ベースのフィルタリング - 実際のスキーマ変更を検出
+            SCHEMA_CHANGES=$(git diff ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} -- $SCHEMA_FILES | grep -E '(pgTable|varchar|integer|text|boolean|date|timestamp|serial|primaryKey|references|unique|notNull|default)' || true)
+
+            if [ -n "$SCHEMA_CHANGES" ]; then
+              echo "スキーマ定義の変更が検出されました"
+
+              # マイグレーションファイルの存在を確認
+              MIGRATION_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} -- "drizzle/")
+
+              if [ -z "$MIGRATION_FILES" ]; then
+                echo "::error::スキーマの変更が検出されましたが、マイグレーションファイルが見つかりません"
+                echo "マイグレーションファイルを生成してください: npx drizzle-kit generate"
+                echo "変更が検出されました:"
+                echo "$SCHEMA_CHANGES"
+                exit 1
+              else
+                echo "マイグレーションファイルが見つかりました: $MIGRATION_FILES"
+              fi
+            else
+              echo "スキーマ定義の変更が検出されませんでした、マイグレーションのチェックをスキップします"
+            fi
+          else
+            echo "スキーマファイルが変更されていません、マイグレーションのチェックをスキップします"
+          fi
