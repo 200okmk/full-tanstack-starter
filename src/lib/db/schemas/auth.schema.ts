@@ -1,9 +1,7 @@
-import { pgSchema, text, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { usersTable } from "./public.schema";
 
-const authSchema = pgSchema("auth");
-
-export const sessionsTable = authSchema.table("sessions", {
+export const sessionsTable = pgTable("sessions", {
   id: text("id").primaryKey(),
   expiresAt: timestamp("expires_at").notNull(),
   token: text("token").notNull().unique(),
@@ -19,8 +17,8 @@ export const sessionsTable = authSchema.table("sessions", {
     .references(() => usersTable.id, { onDelete: "cascade" }),
 });
 
-export const accountsTable = authSchema.table("accounts", {
-  id: text("id").primaryKey(), 
+export const accountsTable = pgTable("accounts", {
+  id: text("id").primaryKey(),
   accountId: text("account_id").notNull(),
   providerId: text("provider_id").notNull(),
   userId: text("user_id")
@@ -40,7 +38,7 @@ export const accountsTable = authSchema.table("accounts", {
     .$onUpdateFn(() => new Date()),
 });
 
-export const verificationTokensTable = authSchema.table("verification_tokens", {
+export const verificationTokensTable = pgTable("verification_tokens", {
   id: text("id").primaryKey(),
   identifier: text("identifier").notNull(),
   value: text("value").notNull(),
