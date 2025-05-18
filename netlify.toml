@@ -4,8 +4,9 @@
 
 [build.environment]
   NODE_VERSION = "22"
-  # Netlifyリモート環境はビルド時に各環境ごとの動的なベースURLを"URL"変数に格納してくれる。アプリコードから統一的にVITE_BASE_URLという変数名でそれにアクセスする。
-  VITE_BASE_URL = "$URL"
+  # URLはNetlifyがビルド時に提供する環境変数なので、変数展開ではなく固定の文字列として設定する
+  # 実際の値はNetlifyが環境ごとに設定する
+  VITE_BASE_URL = "URL"
   # このnetlify.tomlはGit管理するため、シークレットはダッシュボードから登録する！
 
 # Production context
