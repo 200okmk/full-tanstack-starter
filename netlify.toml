@@ -4,9 +4,7 @@
 
 [build.environment]
   NODE_VERSION = "22"
-  # URLはNetlifyがビルド時に提供する環境変数なので、変数展開ではなく固定の文字列として設定する
-  # 実際の値はNetlifyが環境ごとに設定する
-  VITE_BASE_URL = "URL"
+
   # このnetlify.tomlはGit管理するため、シークレットはダッシュボードから登録する！
 
 # Production context
