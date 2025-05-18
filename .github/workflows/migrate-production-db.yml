@@ -1,12 +1,9 @@
-name: プレビュー用DBにマイグレーションを適用する
+name: 本番環境DBにマイグレーションを適用する
 
 on:
   push:
     branches:
-      - develop
-  pull_request:
-    branches:
-      - develop
+      - main
 
 jobs:
   check-migrations:
@@ -34,20 +31,11 @@ jobs:
 
       - name: スキーマ変更のチェック
         run: |
-          # イベントタイプに応じて比較対象を設定
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            # PRの場合: baseとheadの差分をチェック
-            BASE_SHA="${{ github.event.pull_request.base.sha }}"
-            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
-            EVENT_TYPE="PR"
-          else
-            # Pushの場合: 現在のコミットと直前のコミットの差分をチェック
-            HEAD_SHA="${{ github.sha }}"
-            BASE_SHA=$(git rev-parse HEAD~1)
-            EVENT_TYPE="Push"
-          fi
+          # 直前のコミットと現在のコミットの差分をチェック
+          HEAD_SHA="${{ github.sha }}"
+          BASE_SHA=$(git rev-parse HEAD~1)
 
-          echo "🔍 ${EVENT_TYPE}イベント: ${BASE_SHA} と ${HEAD_SHA} の差分をチェックします"
+          echo "🔍 本番環境マイグレーション: ${BASE_SHA} と ${HEAD_SHA} の差分をチェックします"
 
           # スキーマファイルの変更を検出
           SCHEMA_FILES=$(git diff --name-only $BASE_SHA $HEAD_SHA -- "src/lib/db/schemas/")
@@ -78,10 +66,10 @@ jobs:
             echo "ℹ️ スキーマファイルが変更されていません、マイグレーションのチェックをスキップします"
           fi
 
-  migrate-preview-db:
+  migrate-production-db:
     needs: check-migrations
-    environment: preview
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - name: リポジトリをチェックアウト
         uses: actions/checkout@v4
@@ -103,8 +91,8 @@ jobs:
 
       - name: マイグレーション実行
         env:
-          DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
         run: |
-          echo "🚀 プレビュー用DBへのマイグレーションを開始します"
+          echo "🚀 本番環境DBへのマイグレーションを開始します"
           pnpm drizzle-kit migrate
           echo "✅ マイグレーションが完了しました"
