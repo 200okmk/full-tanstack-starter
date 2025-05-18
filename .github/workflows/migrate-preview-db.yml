@@ -1,0 +1,106 @@
+name: プレビュー用DBにマイグレーションを適用する
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+    branches:
+      - develop
+
+jobs:
+  check-migrations:
+    runs-on: ubuntu-latest
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Node.js セットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: pnpm インストール
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10
+          run_install: false
+
+      - name: 依存関係インストール
+        run: pnpm install
+
+      - name: スキーマ変更のチェック
+        run: |
+          # イベントタイプに応じて比較対象を設定
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # PRの場合: baseとheadの差分をチェック
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+            EVENT_TYPE="PR"
+          else
+            # Pushの場合: 現在のコミットと直前のコミットの差分をチェック
+            HEAD_SHA="${{ github.sha }}"
+            BASE_SHA=$(git rev-parse HEAD~1)
+            EVENT_TYPE="Push"
+          fi
+
+          echo "🔍 ${EVENT_TYPE}イベント: ${BASE_SHA} と ${HEAD_SHA} の差分をチェックします"
+
+          # スキーマファイルの変更を検出
+          SCHEMA_FILES=$(git diff --name-only $BASE_SHA $HEAD_SHA -- "src/lib/db/schemas/")
+
+          if [ -n "$SCHEMA_FILES" ]; then
+            # 内容ベースのフィルタリング - 実際のスキーマ変更を検出
+            SCHEMA_CHANGES=$(git diff $BASE_SHA $HEAD_SHA -- $SCHEMA_FILES | grep -E '(pgTable|varchar|integer|text|boolean|date|timestamp|serial|primaryKey|references|unique|notNull|default)' || true)
+
+            if [ -n "$SCHEMA_CHANGES" ]; then
+              echo "✅ スキーマ定義の変更が検出されました"
+
+              # マイグレーションファイルの存在を確認
+              MIGRATION_FILES=$(git diff --name-only $BASE_SHA $HEAD_SHA -- "drizzle/")
+
+              if [ -z "$MIGRATION_FILES" ]; then
+                echo "::error::スキーマの変更が検出されましたが、マイグレーションファイルが見つかりません"
+                echo "マイグレーションファイルを生成してください: npx drizzle-kit generate"
+                echo "変更が検出されました:"
+                echo "$SCHEMA_CHANGES"
+                exit 1
+              else
+                echo "✅ マイグレーションファイルが見つかりました: $MIGRATION_FILES"
+              fi
+            else
+              echo "ℹ️ スキーマ定義の変更が検出されませんでした、マイグレーションのチェックをスキップします"
+            fi
+          else
+            echo "ℹ️ スキーマファイルが変更されていません、マイグレーションのチェックをスキップします"
+          fi
+
+  migrate-preview-db:
+    needs: check-migrations
+    runs-on: ubuntu-latest
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: Node.js セットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: pnpm インストール
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10
+          run_install: false
+
+      - name: 依存関係インストール
+        run: pnpm install
+
+      - name: マイグレーション実行
+        env:
+          DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL }}
+        run: pnpm drizzle-kit migrate
