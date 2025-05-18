@@ -17,17 +17,17 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Node.js セットアップ
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'pnpm'
-
       - name: pnpm インストール
         uses: pnpm/action-setup@v2
         with:
           version: 10
           run_install: false
+
+      - name: Node.js セットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
 
       - name: 依存関係インストール
         run: pnpm install
