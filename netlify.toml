@@ -10,17 +10,17 @@
 # Production context
 # 本番環境
 [context.production.environment]
-  VITE_BASE_URL = URL
+  VITE_BASE_URL = "${URL}"
   NODE_ENV = "production"
 
 # Deploy Preview context
 # 毎PR作成時にビルドされる一時的なプレビュー環境
 [context.deploy-preview.environment]
-  VITE_BASE_URL = DEPLOY_PRIME_URL
+  VITE_BASE_URL = "${DEPLOY_PRIME_URL}"
   NODE_ENV = "production"
 
 # Branch Deploy context
 # main以外のブランチにpushしたときに自動でデプロイされるプレビュー環境
 [context.branch-deploy.environment]
-  VITE_BASE_URL = DEPLOY_PRIME_URL
+  VITE_BASE_URL = "${DEPLOY_PRIME_URL}"
   NODE_ENV = "production"
