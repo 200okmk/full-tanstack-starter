@@ -6,28 +6,32 @@
   NODE_VERSION = "22"
 
   # このnetlify.tomlはGit管理するため、シークレットはダッシュボードから登録する
+  # BASE_URL, VITE_BASE_URLをダッシュボードから以下のように定義する。netlify.tomlでは静的な値のみ設定可能なので動的な環境変数展開は使用できないため。
+  # Key: BASE_URL
+    # Production: ${URL}
+    # Deploy Previews: ${DEPLOY_PRIME_URL}
+    # Branch deploys: ${DEPLOY_PRIME_URL}
+    # Scopes: Builds, Functions, Runtime
+  # Key: VITE_BASE_URL
+    # Production: ${URL}
+    # Deploy Previews: ${DEPLOY_PRIME_URL}
+    # Branch deploys: ${DEPLOY_PRIME_URL}
+    # Scopes: Builds, Functions, Runtime
 
 # Production context
 # 本番環境
 [context.production.environment]
   NODE_ENV = "production"
-  # Netlifyリモート環境用設定：Netlifyはビルド時に各環境ごとの動的なベースURLを$URLという変数に自動で格納するため、ダッシュボードから環境変数VITE_BASE_URLを作成し、値を${URL}にする
-  BASE_URL = "${URL}"
-  VITE_BASE_URL = "${URL}"
 
 # Deploy Preview context
 # 毎PR作成時にビルドされる一時的なプレビュー環境
 [context.deploy-preview.environment]
   NODE_ENV = "production"
-  BASE_URL = "${DEPLOY_PRIME_URL}"
-  VITE_BASE_URL = "${DEPLOY_PRIME_URL}"
 
 # Branch Deploy context
 # main以外のブランチにpushしたときに自動でデプロイされるプレビュー環境
 [context.branch-deploy.environment]
   NODE_ENV = "production"
-  BASE_URL = "${DEPLOY_PRIME_URL}"
-  VITE_BASE_URL = "${DEPLOY_PRIME_URL}"
 
 # Development context
 # ローカル開発環境（netlify dev使用時）
