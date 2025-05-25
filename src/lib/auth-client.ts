@@ -1,7 +1,7 @@
 import { createAuthClient } from "better-auth/react";
 
 // TanStack StartでのbaseURL解決（SSR/クライアント両対応）
-function getClientBaseURL(): string {
+function getClientBaseURL(): string | undefined {
   // 1. ブラウザ環境では現在のoriginを使用（最も確実）
   if (typeof window !== 'undefined') {
     const baseURL = window.location.origin;
@@ -46,44 +46,21 @@ function getClientBaseURL(): string {
     }
   }
 
-  // 3. 最終フォールバック
-  // SSR時にbaseURLが解決できない場合は相対パスを使用
-  // クライアントサイドでハイドレーション時に正しいoriginが設定される
-  console.log('Auth Client BaseURL (SSR - fallback): empty string (relative paths)');
-  return '';
+  // 3. SSR環境での最終フォールバック
+  // undefinedを返してBetterAuthに相対パスを使用させる
+  console.log('Auth Client BaseURL (SSR - fallback): undefined (relative paths)');
+  return undefined;
 }
 
-// 動的にAuthClientを作成する関数
-function createDynamicAuthClient() {
-  const baseURL = getClientBaseURL();
+// AuthClientを作成
+const baseURL = getClientBaseURL();
 
-  // デバッグ用ログ
-  console.log('=== Auth Client Configuration ===');
-  console.log('Environment:', typeof window !== 'undefined' ? 'browser' : 'server');
-  console.log('Final BaseURL:', baseURL);
+console.log('=== Auth Client Configuration ===');
+console.log('Environment:', typeof window !== 'undefined' ? 'browser' : 'server');
+console.log('Final BaseURL:', baseURL);
 
-  return createAuthClient({
-    baseURL: baseURL,
-  });
-}
-
-// 初期化時にAuthClientを作成
-const authClient = createDynamicAuthClient();
-
-// ブラウザ環境でのハイドレーション後に再初期化
-if (typeof window !== 'undefined') {
-  // ハイドレーション後にbaseURLを再確認
-  const currentOrigin = window.location.origin;
-  console.log('Browser hydration - current origin:', currentOrigin);
-
-  // もしSSR時とブラウザ時でbaseURLが異なる場合は警告
-  const ssrBaseURL = getClientBaseURL();
-  if (ssrBaseURL && ssrBaseURL !== currentOrigin) {
-    console.warn('BaseURL mismatch between SSR and browser:', {
-      ssr: ssrBaseURL,
-      browser: currentOrigin
-    });
-  }
-}
+const authClient = createAuthClient({
+  baseURL: baseURL,
+});
 
 export default authClient;
