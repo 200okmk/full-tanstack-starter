@@ -56,19 +56,26 @@ function getBaseURL(): string {
 
     // Deploy Preview環境の場合
     if (process.env.CONTEXT === 'deploy-preview' || process.env.CONTEXT === 'branch-deploy') {
-      baseURL = process.env.DEPLOY_PRIME_URL;
-      console.log("Using DEPLOY_PRIME_URL:", baseURL);
+      const deployPrimeURL = process.env.DEPLOY_PRIME_URL;
+      // 環境変数が正しく展開されている場合のみ使用
+      if (deployPrimeURL && !deployPrimeURL.includes('${')) {
+        baseURL = deployPrimeURL;
+        console.log("Using DEPLOY_PRIME_URL:", baseURL);
+      }
     } else if (process.env.CONTEXT === 'production') {
-      baseURL = process.env.URL;
-      console.log("Using URL:", baseURL);
+      const productionURL = process.env.URL;
+      if (productionURL && !productionURL.includes('${')) {
+        baseURL = productionURL;
+        console.log("Using URL:", baseURL);
+      }
     } else {
       // CONTEXTが設定されていない場合、URLから推測
       const currentURL = process.env.URL;
-      if (currentURL && currentURL.includes('--')) {
+      if (currentURL && currentURL.includes('--') && !currentURL.includes('${')) {
         // プレビュー環境のURL形式の場合
         baseURL = currentURL;
         console.log("Inferred preview URL:", baseURL);
-      } else if (currentURL) {
+      } else if (currentURL && !currentURL.includes('${')) {
         // 本番環境のURL
         baseURL = currentURL;
         console.log("Using production URL:", baseURL);
