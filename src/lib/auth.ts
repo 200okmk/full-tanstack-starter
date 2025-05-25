@@ -5,10 +5,13 @@ import { reactStartCookies } from "better-auth/react-start";
 import { db } from "~/lib/db";
 
 export const auth = betterAuth({
-  baseURL: process.env.BASE_URL,
   database: drizzleAdapter(db, {
     provider: "pg",
   }),
+  // このファイルでは省略可能。デプロイしたプラットフォームのダッシュボードには設定必須
+  baseURL: process.env.BETTER_AUTH_URL,
+  // このファイルでは省略可能。デプロイしたプラットフォームのダッシュボードには設定必須
+  secret: process.env.BETTER_AUTH_SECRET,
 
   // https://www.better-auth.com/docs/integrations/tanstack#usage-tips
   // make sure this is the last plugin in the array
