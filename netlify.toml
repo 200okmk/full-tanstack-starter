@@ -5,34 +5,21 @@
 [build.environment]
   NODE_VERSION = "22"
 
-  # 環境変数はNetlifyダッシュボードから設定してください
-  # netlify.tomlの環境変数はダッシュボードの設定を上書きするため、
-  # 動的な環境変数展開（${URL}, ${DEPLOY_PRIME_URL}）が正しく動作しません
-  #
-  # Netlifyダッシュボード → Project configuration → Environment variables で以下を設定：
-  # Key: BASE_URL
-  # Values:
-  #   Production: ${URL}
-  #   Deploy Previews: ${DEPLOY_PRIME_URL}
-  #   Branch deploys: ${DEPLOY_PRIME_URL}
-  # Scopes: All Scope (無料プランではこれのみ選択可能)
-
-# Production context
-# 本番環境
-[context.production.environment]
-  NODE_ENV = "production"
-
-# Deploy Preview context
-# 毎PR作成時にビルドされる一時的なプレビュー環境
-[context.deploy-preview.environment]
-  NODE_ENV = "production"
-
-# Branch Deploy context
-# main以外のブランチにpushしたときに自動でデプロイされるプレビュー環境
-[context.branch-deploy.environment]
-  NODE_ENV = "production"
-
-# Development context
-# ローカル開発環境（netlify dev使用時）
-[context.dev.environment]
-  NODE_ENV = "development"
+# 環境変数はNetlifyダッシュボードから設定してください
+# netlify.tomlの環境変数はダッシュボードの設定を上書きするため、
+# 動的な環境変数展開（${URL}, ${DEPLOY_PRIME_URL}）が正しく動作しません
+#
+# Netlifyダッシュボード → Project configuration → Environment variables で以下を設定：
+# Key: BASE_URL
+# Values:
+#   Production: ${URL}
+#   Deploy Previews: ${DEPLOY_PRIME_URL}
+#   Branch deploys: ${DEPLOY_PRIME_URL}
+# Scopes: All Scope (無料プランではこれのみ選択可能)
+#
+# Key: VITE_BASE_URL (クライアントサイド用)
+# Values:
+#   Production: ${URL}
+#   Deploy Previews: ${DEPLOY_PRIME_URL}
+#   Branch deploys: ${DEPLOY_PRIME_URL}
+# Scopes: All Scope (無料プランではこれのみ選択可能)
