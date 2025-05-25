@@ -5,18 +5,17 @@
 [build.environment]
   NODE_VERSION = "22"
 
-  # このnetlify.tomlはGit管理するため、シークレットはダッシュボードから登録する
-  # BASE_URL, VITE_BASE_URLをダッシュボードから以下のように定義する。netlify.tomlでは静的な値のみ設定可能なので動的な環境変数展開は使用できないため。
+  # 環境変数はNetlifyダッシュボードから設定してください
+  # netlify.tomlの環境変数はダッシュボードの設定を上書きするため、
+  # 動的な環境変数展開（${URL}, ${DEPLOY_PRIME_URL}）が正しく動作しません
+  #
+  # Netlifyダッシュボード → Project configuration → Environment variables で以下を設定：
   # Key: BASE_URL
-    # Production: ${URL}
-    # Deploy Previews: ${DEPLOY_PRIME_URL}
-    # Branch deploys: ${DEPLOY_PRIME_URL}
-    # Scopes: Builds, Functions, Runtime
-  # Key: VITE_BASE_URL
-    # Production: ${URL}
-    # Deploy Previews: ${DEPLOY_PRIME_URL}
-    # Branch deploys: ${DEPLOY_PRIME_URL}
-    # Scopes: Builds, Functions, Runtime
+  # Values:
+  #   Production: ${URL}
+  #   Deploy Previews: ${DEPLOY_PRIME_URL}
+  #   Branch deploys: ${DEPLOY_PRIME_URL}
+  # Scopes: All Scope (無料プランではこれのみ選択可能)
 
 # Production context
 # 本番環境
@@ -37,5 +36,3 @@
 # ローカル開発環境（netlify dev使用時）
 [context.dev.environment]
   NODE_ENV = "development"
-  BASE_URL = "http://localhost:3000"
-  VITE_BASE_URL = "http://localhost:3000"
