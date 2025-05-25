@@ -4,13 +4,17 @@ import { reactStartCookies } from "better-auth/react-start";
 
 import { db } from "~/lib/db";
 
+// デバッグ用：環境変数の値を確認
+console.log("BASE_URL:", process.env.BASE_URL);
+console.log("NODE_ENV:", process.env.NODE_ENV);
+
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
   }),
-  // このファイルでは省略可能。デプロイしたプラットフォームのダッシュボードには設定必須
-  baseURL: process.env.BETTER_AUTH_URL,
-  // このファイルでは省略可能。デプロイしたプラットフォームのダッシュボードには設定必須
+  // BASE_URL環境変数を使用（Netlifyダッシュボードで設定）
+  baseURL: process.env.BASE_URL,
+  // BETTER_AUTH_SECRET環境変数を使用（Netlifyダッシュボードで設定）
   secret: process.env.BETTER_AUTH_SECRET,
 
   // https://www.better-auth.com/docs/integrations/tanstack#usage-tips
