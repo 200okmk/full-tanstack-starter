@@ -10,8 +10,6 @@ function getClientBaseURL(): string {
   }
 
   // 2. SSR環境での処理
-  // TanStack StartのSSR時は、リクエストコンテキストから取得するのが理想的だが、
-  // auth-clientは静的に初期化されるため、環境変数から推測する必要がある
   if (typeof process !== 'undefined' && process.env) {
     console.log('Auth Client SSR environment variables:');
     console.log('  CONTEXT:', process.env.CONTEXT);
@@ -55,15 +53,37 @@ function getClientBaseURL(): string {
   return '';
 }
 
-const baseURL = getClientBaseURL();
+// 動的にAuthClientを作成する関数
+function createDynamicAuthClient() {
+  const baseURL = getClientBaseURL();
 
-// デバッグ用ログ
-console.log('=== Auth Client Configuration ===');
-console.log('Environment:', typeof window !== 'undefined' ? 'browser' : 'server');
-console.log('Final BaseURL:', baseURL);
+  // デバッグ用ログ
+  console.log('=== Auth Client Configuration ===');
+  console.log('Environment:', typeof window !== 'undefined' ? 'browser' : 'server');
+  console.log('Final BaseURL:', baseURL);
 
-const authClient = createAuthClient({
-  baseURL: baseURL,
-});
+  return createAuthClient({
+    baseURL: baseURL,
+  });
+}
+
+// 初期化時にAuthClientを作成
+const authClient = createDynamicAuthClient();
+
+// ブラウザ環境でのハイドレーション後に再初期化
+if (typeof window !== 'undefined') {
+  // ハイドレーション後にbaseURLを再確認
+  const currentOrigin = window.location.origin;
+  console.log('Browser hydration - current origin:', currentOrigin);
+
+  // もしSSR時とブラウザ時でbaseURLが異なる場合は警告
+  const ssrBaseURL = getClientBaseURL();
+  if (ssrBaseURL && ssrBaseURL !== currentOrigin) {
+    console.warn('BaseURL mismatch between SSR and browser:', {
+      ssr: ssrBaseURL,
+      browser: currentOrigin
+    });
+  }
+}
 
 export default authClient;
