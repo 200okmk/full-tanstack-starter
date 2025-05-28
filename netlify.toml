@@ -4,22 +4,3 @@
 
 [build.environment]
   NODE_VERSION = "22"
-
-# 環境変数はNetlifyダッシュボードから設定してください
-# netlify.tomlの環境変数はダッシュボードの設定を上書きするため、
-# 動的な環境変数展開（${URL}, ${DEPLOY_PRIME_URL}）が正しく動作しません
-#
-# Netlifyダッシュボード → Project configuration → Environment variables で以下を設定：
-# Key: BASE_URL
-# Values:
-#   Production: ${URL}
-#   Deploy Previews: ${DEPLOY_PRIME_URL}
-#   Branch deploys: ${DEPLOY_PRIME_URL}
-# Scopes: All Scope (無料プランではこれのみ選択可能)
-#
-# Key: VITE_BASE_URL (クライアントサイド用)
-# Values:
-#   Production: ${URL}
-#   Deploy Previews: ${DEPLOY_PRIME_URL}
-#   Branch deploys: ${DEPLOY_PRIME_URL}
-# Scopes: All Scope (無料プランではこれのみ選択可能)
