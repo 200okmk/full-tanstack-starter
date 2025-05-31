@@ -1,29 +1,24 @@
-name: プレビュー用DBにマイグレーションを適用する
+name: プレビュー環境マイグレーション
 
 on:
   push:
-    branches:
-      - develop
+    branches: [develop]
   pull_request:
-    branches:
-      - develop
+    branches: [develop]
 
 jobs:
-  migrate-preview-db:
+  migrate-preview:
     environment: preview
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - name: リポジトリをチェックアウト
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: pnpm インストール
-        uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v2
         with:
           version: 10
-          run_install: false
 
-      - name: Node.js セットアップ
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: "pnpm"
@@ -31,69 +26,43 @@ jobs:
       - name: 依存関係インストール
         run: pnpm install
 
-      - name: データベース初期化
+      - name: 環境検証
         env:
           DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL }}
         run: |
-          echo "🔧 データベースの初期化を行います"
-
-          # PostgreSQLクライアントをインストール
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
-
-          # publicスキーマの確認と作成
-          psql "$DATABASE_URL" -c "CREATE SCHEMA IF NOT EXISTS public;"
-          psql "$DATABASE_URL" -c "GRANT ALL ON SCHEMA public TO public;"
-
-          # drizzleスキーマの確認と作成（マイグレーション管理テーブル用）
-          psql "$DATABASE_URL" -c "CREATE SCHEMA IF NOT EXISTS drizzle;"
-          psql "$DATABASE_URL" -c "GRANT ALL ON SCHEMA drizzle TO public;"
-
-          echo "✅ データベース初期化完了"
-
-      - name: マイグレーション状態の確認と同期
-        env:
-          DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL }}
-        run: |
-          echo "🔍 マイグレーション状態を確認します"
-
-          # 既存のマイグレーションファイルをチェック
-          if [ -d "./src/lib/db/migrations" ] && [ "$(ls -A ./src/lib/db/migrations)" ]; then
-            echo "📁 既存のマイグレーションファイルが見つかりました"
-
-            # 既存のマイグレーションを適用
-            echo "🚀 既存マイグレーションを適用します"
-            pnpm drizzle-kit migrate
-            echo "✅ 既存マイグレーション適用完了"
-          else
-            echo "📝 マイグレーションファイルが存在しません"
-
-            # スキーマの現在状態をベースラインとして設定
-            echo "🔄 スキーマ同期を実行します"
-            pnpm drizzle-kit push
-            echo "✅ スキーマ同期完了"
+          if [ -z "$DATABASE_URL" ]; then
+            echo "❌ DATABASE_URL が設定されていません"
+            exit 1
           fi
 
-      - name: 新しい変更の検出と適用
+          if [[ ! "$DATABASE_URL" =~ ^postgres(ql)?:// ]]; then
+            echo "❌ DATABASE_URL の形式が正しくありません"
+            exit 1
+          fi
+
+          echo "✅ 環境変数検証完了"
+
+      - name: マイグレーション処理
         env:
           DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL }}
         run: |
-          echo "🔧 新しいスキーマ変更をチェックします"
+          echo "🔧 マイグレーション生成・適用を実行します"
 
-          # 新しいマイグレーションを生成（変更がある場合のみ）
+          # 既存マイグレーション数をカウント
+          before_count=$(find ./src/lib/db/migrations -name "*.sql" 2>/dev/null | wc -l)
+
+          # マイグレーション生成
+          echo "🔧 マイグレーション生成中..."
           pnpm drizzle-kit generate
 
-          # 生成されたマイグレーションファイルを確認
-          if [ -n "$(find ./src/lib/db/migrations -name '*.sql' -newer ./src/lib/db/migrations/.timestamp 2>/dev/null || echo '')" ]; then
-            echo "🆕 新しいマイグレーションが生成されました"
+          # 新規マイグレーション数をカウント
+          after_count=$(find ./src/lib/db/migrations -name "*.sql" 2>/dev/null | wc -l)
 
-            # 新しいマイグレーションを適用
+          # 変更がある場合のみ適用
+          if [ $after_count -gt $before_count ]; then
+            echo "✅ プレビュー環境に新しいマイグレーションを適用します"
             pnpm drizzle-kit migrate
-            echo "✅ 新しいマイグレーション適用完了"
+            echo "✅ マイグレーション適用完了"
           else
-            echo "ℹ️ 適用する新しい変更はありません"
+            echo "ℹ️ 適用する変更はありません"
           fi
-
-          # タイムスタンプファイルを更新
-          mkdir -p ./src/lib/db/migrations
-          touch ./src/lib/db/migrations/.timestamp
