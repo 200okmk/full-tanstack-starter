@@ -6,8 +6,9 @@ bun.lock
 
 # misc
 routeTree.gen.ts
-drizzle/
-.drizzle/
+
+#migrations
+src/lib/db/migrations/
 
 # build outputs
 .vercel

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import authClient from "~/lib/auth/auth-client";
+import { signIn } from "~/lib/auth-client";
 
 export const Route = createFileRoute("/(auth)/login")({
   component: LoginForm,
@@ -29,7 +29,7 @@ function LoginForm() {
     setIsLoading(true);
     setErrorMessage("");
 
-    authClient.signIn.email(
+    signIn.email(
       {
         email,
         password,
@@ -104,7 +104,7 @@ function LoginForm() {
               type="button"
               disabled={isLoading}
               onClick={() =>
-                authClient.signIn.social(
+                signIn.social(
                   {
                     provider: "github",
                     callbackURL: redirectUrl,
@@ -136,7 +136,7 @@ function LoginForm() {
               type="button"
               disabled={isLoading}
               onClick={() =>
-                authClient.signIn.social(
+                signIn.social(
                   {
                     provider: "google",
                     callbackURL: redirectUrl,

@@ -1,7 +1,7 @@
 import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
 import ThemeToggle from "~/components/ThemeToggle";
 import { Button } from "~/components/ui/button";
-import authClient from "~/lib/auth/auth-client";
+import { signOut } from "~/lib/auth-client";
 
 export const Route = createFileRoute("/")({
   component: Home,
@@ -42,7 +42,7 @@ function Home() {
 
           <Button
             onClick={async () => {
-              await authClient.signOut();
+              await signOut();
               await queryClient.invalidateQueries({ queryKey: ["user"] });
               await router.invalidate();
             }}

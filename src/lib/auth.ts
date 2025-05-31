@@ -4,25 +4,22 @@ import { reactStartCookies } from "better-auth/react-start";
 
 import { db } from "~/lib/db";
 
+console.log("=== Auth Configuration ===");
+console.log("URL:", process.env.URL);
+console.log("NODE_ENV:", process.env.NODE_ENV);
+
+
+// 静的なauth設定
 export const auth = betterAuth({
-  baseURL: process.env.VITE_BASE_URL,
   database: drizzleAdapter(db, {
     provider: "pg",
   }),
-
-  // https://www.better-auth.com/docs/integrations/tanstack#usage-tips
-  // make sure this is the last plugin in the array
-  plugins: [reactStartCookies()],
-
-  // https://www.better-auth.com/docs/concepts/session-management#session-caching
-  session: {
-    cookieCache: {
-      enabled: true,
-      maxAge: 5 * 60, // 5 minutes
-    },
+  // process.env.URLを使用（Netlifyランタイムで安定して利用可能）
+  baseURL: process.env.URL || "http://localhost:3000",
+  secret: process.env.BETTER_AUTH_SECRET!,
+  emailAndPassword: {
+    enabled: true,
   },
-
-  // https://www.better-auth.com/docs/concepts/oauth
   socialProviders: {
     github: {
       clientId: process.env.GITHUB_CLIENT_ID!,
@@ -33,9 +30,7 @@ export const auth = betterAuth({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     },
   },
-
-  // https://www.better-auth.com/docs/authentication/email-password
-  emailAndPassword: {
-    enabled: true,
-  },
+  plugins: [
+    reactStartCookies(), // For TanStack Start Cookie support
+  ],
 });

@@ -1,0 +1,68 @@
+name: プレビュー環境マイグレーション
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    branches: [develop]
+
+jobs:
+  migrate-preview:
+    environment: preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: 依存関係インストール
+        run: pnpm install
+
+      - name: 環境検証
+        env:
+          DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "❌ DATABASE_URL が設定されていません"
+            exit 1
+          fi
+
+          if [[ ! "$DATABASE_URL" =~ ^postgres(ql)?:// ]]; then
+            echo "❌ DATABASE_URL の形式が正しくありません"
+            exit 1
+          fi
+
+          echo "✅ 環境変数検証完了"
+
+      - name: マイグレーション処理
+        env:
+          DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL }}
+        run: |
+          echo "🔧 マイグレーション生成・適用を実行します"
+
+          # 既存マイグレーション数をカウント
+          before_count=$(find ./src/lib/db/migrations -name "*.sql" 2>/dev/null | wc -l)
+
+          # マイグレーション生成
+          echo "🔧 マイグレーション生成中..."
+          pnpm drizzle-kit generate
+
+          # 新規マイグレーション数をカウント
+          after_count=$(find ./src/lib/db/migrations -name "*.sql" 2>/dev/null | wc -l)
+
+          # 変更がある場合のみ適用
+          if [ $after_count -gt $before_count ]; then
+            echo "✅ プレビュー環境に新しいマイグレーションを適用します"
+            pnpm drizzle-kit migrate
+            echo "✅ マイグレーション適用完了"
+          else
+            echo "ℹ️ 適用する変更はありません"
+          fi
