@@ -37,5 +37,5 @@
   "editor.formatOnSave": true,
 
   // format on save mode
-  "editor.formatOnSaveMode": "modifications",
+  "editor.formatOnSaveMode": "modifications"
 }
