@@ -2,5 +2,22 @@
   command = "pnpm run build"
   publish = "dist"
 
-[build.environment]
-  NODE_VERSION = "22"
+# Netlifyダッシュボードで以下の環境変数を設定してください：
+#
+# DATABASE_URL:
+#   Production: [Neon Production URL]
+#   Deploy Previews: [Neon Preview URL]
+#   Branch deploys: [Neon Preview URL]
+#   Scopes: All Scope
+#
+# BETTER_AUTH_SECRET:
+#   All contexts: [Strong secret key]
+#   Scopes: All Scope
+#
+# GITHUB_CLIENT_ID & GITHUB_CLIENT_SECRET:
+#   All contexts: [GitHub OAuth credentials]
+#   Scopes: All Scope
+#
+# GOOGLE_CLIENT_ID & GOOGLE_CLIENT_SECRET:
+#   All contexts: [Google OAuth credentials]
+#   Scopes: All Scope
