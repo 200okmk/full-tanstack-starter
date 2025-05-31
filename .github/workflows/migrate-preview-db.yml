@@ -10,7 +10,7 @@ jobs:
   migrate-preview:
     environment: preview
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
 
@@ -42,27 +42,16 @@ jobs:
 
           echo "✅ 環境変数検証完了"
 
-      - name: マイグレーション処理
+      - name: マイグレーション実行
         env:
           DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL }}
         run: |
-          echo "🔧 マイグレーション生成・適用を実行します"
-
-          # 既存マイグレーション数をカウント
-          before_count=$(find ./src/lib/db/migrations -name "*.sql" 2>/dev/null | wc -l)
+          echo "🔧 マイグレーション処理を開始します"
 
           # マイグレーション生成
-          echo "🔧 マイグレーション生成中..."
           pnpm drizzle-kit generate
 
-          # 新規マイグレーション数をカウント
-          after_count=$(find ./src/lib/db/migrations -name "*.sql" 2>/dev/null | wc -l)
+          # マイグレーション適用（冪等性により安全）
+          pnpm drizzle-kit migrate
 
-          # 変更がある場合のみ適用
-          if [ $after_count -gt $before_count ]; then
-            echo "✅ プレビュー環境に新しいマイグレーションを適用します"
-            pnpm drizzle-kit migrate
-            echo "✅ マイグレーション適用完了"
-          else
-            echo "ℹ️ 適用する変更はありません"
-          fi
+          echo "✅ マイグレーション完了"
