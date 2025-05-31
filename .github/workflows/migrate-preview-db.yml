@@ -44,12 +44,10 @@ jobs:
           # publicスキーマの確認と作成
           psql "$DATABASE_URL" -c "CREATE SCHEMA IF NOT EXISTS public;"
           psql "$DATABASE_URL" -c "GRANT ALL ON SCHEMA public TO public;"
-          psql "$DATABASE_URL" -c "GRANT ALL ON SCHEMA public TO postgres;"
 
           # drizzleスキーマの確認と作成（マイグレーション管理テーブル用）
           psql "$DATABASE_URL" -c "CREATE SCHEMA IF NOT EXISTS drizzle;"
           psql "$DATABASE_URL" -c "GRANT ALL ON SCHEMA drizzle TO public;"
-          psql "$DATABASE_URL" -c "GRANT ALL ON SCHEMA drizzle TO postgres;"
 
           echo "✅ データベース初期化完了"
 

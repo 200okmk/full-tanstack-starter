@@ -20,4 +20,15 @@ export default {
   dbCredentials: {
     url: process.env.DATABASE_URL as string,
   },
+
+  // マイグレーション関連の設定
+  migrations: {
+    // マイグレーション履歴を記録するテーブル名
+    table: "__drizzle_migrations",
+    // マイグレーションテーブルを作成するスキーマ
+    schema: "drizzle",
+  },
+
+  // 操作対象スキーマのフィルタ（将来のauth、user、publicなど複数スキーマ対応のため削除）
+  // schemaFilter: "public", // コメントアウト：マルチスキーマ対応のため
 } satisfies Config;
