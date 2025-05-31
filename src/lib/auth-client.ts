@@ -6,21 +6,12 @@ console.log("NODE_ENV:", process.env.NODE_ENV);
 
 // ローカル開発環境での baseURL 決定
 const getClientBaseURL = (): string | undefined => {
-  // サーバーサイドレンダリング時
-  if (typeof window === "undefined") {
-    if (process.env.NODE_ENV === "development") {
-      return process.env.URL || "http://localhost:3000";
-    }
-    // SSR時はundefinedを返し、相対パスでAPIにアクセス
-    return undefined;
-  }
-
-  // クライアントサイド時
+  // 開発環境では明示的なURL指定
   if (process.env.NODE_ENV === "development") {
-    return process.env.VITE_BASE_URL || "http://localhost:3000";
+    return "http://localhost:3000";
   }
 
-  // 本番環境のクライアントサイドでは相対パス
+  // 本番環境では相対パス（undefinedを返す）
   return undefined;
 };
 
