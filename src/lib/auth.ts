@@ -8,17 +8,6 @@ console.log("=== Auth Configuration ===");
 console.log("URL:", process.env.URL);
 console.log("NODE_ENV:", process.env.NODE_ENV);
 
-// Netlify Functions環境変数の詳細デバッグ
-console.log("=== Netlify Functions Debug ===");
-console.log("SITE_NAME:", process.env.SITE_NAME);
-console.log("SITE_ID:", process.env.SITE_ID);
-console.log("All env keys:", Object.keys(process.env).filter(key =>
-  key.includes('URL') ||
-  key.includes('DEPLOY') ||
-  key.includes('NETLIFY') ||
-  key.includes('CONTEXT') ||
-  key.includes('SITE')
-));
 
 // 静的なauth設定
 export const auth = betterAuth({

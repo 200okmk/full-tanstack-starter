@@ -28,6 +28,28 @@ jobs:
       - name: 依存関係インストール
         run: pnpm install
 
+      - name: データベース初期化
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        run: |
+          echo "🔧 本番データベースの初期化を行います"
+
+          # PostgreSQLクライアントをインストール
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+          # publicスキーマの確認と作成
+          psql "$DATABASE_URL" -c "CREATE SCHEMA IF NOT EXISTS public;"
+          psql "$DATABASE_URL" -c "GRANT ALL ON SCHEMA public TO public;"
+          psql "$DATABASE_URL" -c "GRANT ALL ON SCHEMA public TO postgres;"
+
+          # drizzleスキーマの確認と作成（マイグレーション管理テーブル用）
+          psql "$DATABASE_URL" -c "CREATE SCHEMA IF NOT EXISTS drizzle;"
+          psql "$DATABASE_URL" -c "GRANT ALL ON SCHEMA drizzle TO public;"
+          psql "$DATABASE_URL" -c "GRANT ALL ON SCHEMA drizzle TO postgres;"
+
+          echo "✅ 本番データベース初期化完了"
+
       - name: マイグレーション状態の確認と同期
         env:
           DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
