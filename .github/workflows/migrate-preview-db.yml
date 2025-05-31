@@ -31,18 +31,49 @@ jobs:
       - name: 依存関係インストール
         run: pnpm install
 
-      - name: マイグレーションファイル生成
+      - name: マイグレーション状態の確認と同期
         env:
           DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL }}
         run: |
-          echo "🔧 マイグレーションファイルを生成します"
-          pnpm drizzle-kit generate
-          echo "✅ マイグレーションファイル生成完了"
+          echo "🔍 マイグレーション状態を確認します"
 
-      - name: マイグレーション実行
+          # 既存のマイグレーションファイルをチェック
+          if [ -d "./src/lib/db/migrations" ] && [ "$(ls -A ./src/lib/db/migrations)" ]; then
+            echo "📁 既存のマイグレーションファイルが見つかりました"
+
+            # 既存のマイグレーションを適用
+            echo "🚀 既存マイグレーションを適用します"
+            pnpm drizzle-kit migrate
+            echo "✅ 既存マイグレーション適用完了"
+          else
+            echo "📝 マイグレーションファイルが存在しません"
+
+            # スキーマの現在状態をベースラインとして設定
+            echo "🔄 スキーマ同期を実行します"
+            pnpm drizzle-kit push
+            echo "✅ スキーマ同期完了"
+          fi
+
+      - name: 新しい変更の検出と適用
         env:
           DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL }}
         run: |
-          echo "🚀 プレビュー用DBへのマイグレーションを開始します"
-          pnpm drizzle-kit migrate
-          echo "✅ マイグレーションが完了しました"
+          echo "🔧 新しいスキーマ変更をチェックします"
+
+          # 新しいマイグレーションを生成（変更がある場合のみ）
+          pnpm drizzle-kit generate
+
+          # 生成されたマイグレーションファイルを確認
+          if [ -n "$(find ./src/lib/db/migrations -name '*.sql' -newer ./src/lib/db/migrations/.timestamp 2>/dev/null || echo '')" ]; then
+            echo "🆕 新しいマイグレーションが生成されました"
+
+            # 新しいマイグレーションを適用
+            pnpm drizzle-kit migrate
+            echo "✅ 新しいマイグレーション適用完了"
+          else
+            echo "ℹ️ 適用する新しい変更はありません"
+          fi
+
+          # タイムスタンプファイルを更新
+          mkdir -p ./src/lib/db/migrations
+          touch ./src/lib/db/migrations/.timestamp

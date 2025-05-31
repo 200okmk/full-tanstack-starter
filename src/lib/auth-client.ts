@@ -16,11 +16,9 @@ const getClientBaseURL = (): string => {
   return baseURL;
 };
 
-const clientBaseURL = getClientBaseURL();
-console.log("clientBaseURL:", clientBaseURL);
 
 export const authClient = createAuthClient({
-  baseURL: clientBaseURL,
+  baseURL: getClientBaseURL(),
 });
 
 export const { signIn, signUp, signOut, useSession, getSession } = authClient;
