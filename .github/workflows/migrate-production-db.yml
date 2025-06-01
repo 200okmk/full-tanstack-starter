@@ -48,9 +48,11 @@ jobs:
 
 
           # マイグレーション生成
+          echo "🔧 マイグレーション生成中..."
           pnpm drizzle-kit generate
 
           # マイグレーション適用（冪等性により安全）
+          echo "🔧 マイグレーション適用中..."
           pnpm drizzle-kit migrate
 
           echo "✅ 本番環境マイグレーション完了"
