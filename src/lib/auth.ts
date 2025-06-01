@@ -3,6 +3,12 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { reactStartCookies } from "better-auth/react-start";
 
 import { db } from "~/lib/db";
+import { usersTable } from "~/lib/db/schemas/public.schema";
+import {
+  sessionsTable,
+  accountsTable,
+  verificationTokensTable
+} from "~/lib/db/schemas/auth.schema";
 
 console.log("=== Auth Configuration ===");
 console.log("URL:", process.env.URL);
@@ -13,6 +19,12 @@ console.log("NODE_ENV:", process.env.NODE_ENV);
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
+    schema: {
+      user: usersTable,
+      session: sessionsTable,
+      account: accountsTable,
+      verification: verificationTokensTable,
+    },
   }),
   // process.env.URLを使用（Netlifyランタイムで安定して利用可能）
   baseURL: process.env.URL || "http://localhost:3000",
