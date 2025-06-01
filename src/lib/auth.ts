@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { reactStartCookies } from "better-auth/react-start";
+import { oAuthProxy } from "better-auth/plugins";
 
 import { db } from "~/lib/db";
 import { usersTable } from "~/lib/db/schemas/public.schema";
@@ -9,11 +10,13 @@ import {
   accountsTable,
   verificationTokensTable
 } from "~/lib/db/schemas/auth.schema";
+import { getOAuthRedirectURL, getProductionURL } from "~/lib/utils";
 
 console.log("=== Auth Configuration ===");
 console.log("URL:", process.env.URL);
 console.log("NODE_ENV:", process.env.NODE_ENV);
 
+const productionURL = getProductionURL();
 
 // 静的なauth設定
 export const auth = betterAuth({
@@ -36,13 +39,16 @@ export const auth = betterAuth({
     github: {
       clientId: process.env.GITHUB_CLIENT_ID!,
       clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+      redirectURL: getOAuthRedirectURL("github", productionURL),
     },
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      redirectURL: getOAuthRedirectURL("google", productionURL),
     },
   },
   plugins: [
+    oAuthProxy(), // Netlifyプレビュー環境の動的URL上からもOAuth認証を可能にするために本番のURLへリダイレクトする
     reactStartCookies(), // For TanStack Start Cookie support
   ],
 });
