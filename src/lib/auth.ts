@@ -39,11 +39,13 @@ export const auth = betterAuth({
     github: {
       clientId: process.env.GITHUB_CLIENT_ID!,
       clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+      // Netlifyが自動ビルドしたプレビュー環境の場合は本番のURLへリダイレクトする
       redirectURL: getOAuthRedirectURL("github", productionURL),
     },
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      // Netlifyが自動ビルドしたプレビュー環境の場合は本番のURLへリダイレクトする
       redirectURL: getOAuthRedirectURL("google", productionURL),
     },
   },
