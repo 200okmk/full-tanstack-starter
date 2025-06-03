@@ -6,7 +6,7 @@
     "dev": "vinxi dev",
     "build": "vinxi build",
     "start": "vinxi start",
-    "lint": "eslint .",
+    "lint": "eslint . --fix",
     "format": "prettier --write .",
     "db": "drizzle-kit",
     "deps": "pnpm dlx npm-check-updates@latest --interactive --format group",

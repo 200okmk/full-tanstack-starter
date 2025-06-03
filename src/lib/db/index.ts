@@ -12,14 +12,14 @@ type Database = PostgresJsDatabase<typeof schema> | NeonHttpDatabase<typeof sche
 
 // ローカル開発環境用のDB接続
 const createLocalDb = (): PostgresJsDatabase<typeof schema> => {
-  const pgDriver = postgres(process.env.DATABASE_URL as string);
+  const pgDriver = postgres(process.env.DATABASE_URL!);
   console.log("local docker db connected!");
   return drizzlePg({ client: pgDriver, schema, casing: "snake_case" });
 };
 
 // プレビュー/本番環境用のDB接続
 const createNeonDb = (): NeonHttpDatabase<typeof schema> => {
-  const sql = neon(process.env.DATABASE_URL as string);
+  const sql = neon(process.env.DATABASE_URL!);
   console.log("preview/production neon db connected!");
   return drizzleNeon({ client: sql, schema, casing: "snake_case" });
 };
