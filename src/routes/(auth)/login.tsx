@@ -29,7 +29,7 @@ function LoginForm() {
     setIsLoading(true);
     setErrorMessage("");
 
-    signIn.email(
+    void signIn.email(
       {
         email,
         password,
@@ -42,7 +42,7 @@ function LoginForm() {
         },
         onSuccess: async () => {
           await queryClient.invalidateQueries({ queryKey: ["user"] });
-          navigate({ to: redirectUrl });
+          await navigate({ to: redirectUrl });
         },
       },
     );
@@ -103,8 +103,8 @@ function LoginForm() {
               className="w-full"
               type="button"
               disabled={isLoading}
-              onClick={() =>
-                signIn.social(
+              onClick={() => {
+                void signIn.social(
                   {
                     provider: "github",
                     callbackURL: redirectUrl,
@@ -119,8 +119,8 @@ function LoginForm() {
                       setErrorMessage(ctx.error.message);
                     },
                   },
-                )
-              }
+                );
+              }}
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                 <path
@@ -135,8 +135,8 @@ function LoginForm() {
               className="w-full"
               type="button"
               disabled={isLoading}
-              onClick={() =>
-                signIn.social(
+              onClick={() => {
+                void signIn.social(
                   {
                     provider: "google",
                     callbackURL: redirectUrl,
@@ -151,8 +151,8 @@ function LoginForm() {
                       setErrorMessage(ctx.error.message);
                     },
                   },
-                )
-              }
+                );
+              }}
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                 <path

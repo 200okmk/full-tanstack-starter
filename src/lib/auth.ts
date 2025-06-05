@@ -12,10 +12,6 @@ import {
 } from "~/lib/db/schemas/auth.schema";
 import { getOAuthRedirectURL, getProductionURL } from "~/lib/utils";
 
-console.log("=== Auth Configuration ===");
-console.log("URL:", process.env.URL);
-console.log("NODE_ENV:", process.env.NODE_ENV);
-
 const productionURL = getProductionURL();
 
 // 静的なauth設定
@@ -30,7 +26,7 @@ export const auth = betterAuth({
     },
   }),
   // process.env.URLを使用（Netlifyランタイムで安定して利用可能）
-  baseURL: process.env.URL || "http://localhost:3000",
+  baseURL: process.env.URL ?? "http://localhost:3000",
   secret: process.env.BETTER_AUTH_SECRET!,
   emailAndPassword: {
     enabled: true,

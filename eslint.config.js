@@ -57,6 +57,8 @@ export default tseslint.config(
       },
     },
     rules: {
+      // === Tanstack カスタムルール ===
+
       // === React Hooks ルール ===
       ...reactHooks.configs.recommended.rules, // React Hooksの推奨ルール
       "react-hooks/exhaustive-deps": "warn", // useEffectの依存配列チェック
@@ -74,6 +76,10 @@ export default tseslint.config(
       ],
       // any型使用を警告レベル（完全禁止は現実的でない）
       "@typescript-eslint/no-explicit-any": "warn",
+
+      // === TanStack Router対応 ===
+      // throw redirect()は正常なパターンなのでオフ
+      "@typescript-eslint/only-throw-error": "off",
 
       // === 一般的な品質ルール ===
       // console.log使用制限（warn/errorのみ許可）
