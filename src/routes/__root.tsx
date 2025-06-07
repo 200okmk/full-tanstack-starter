@@ -20,7 +20,7 @@ const getUser = createServerFn({ method: "GET" }).handler(async () => {
 
   const session = await auth.api.getSession({ headers });
 
-  return session?.user || null;
+  return session?.user ?? null;
 });
 
 export const Route = createRootRouteWithContext<{

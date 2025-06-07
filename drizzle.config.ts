@@ -18,7 +18,7 @@ export default {
 
   // データベース接続情報
   dbCredentials: {
-    url: process.env.DATABASE_URL as string,
+    url: process.env.DATABASE_URL!,
   },
 
   // マイグレーション関連の設定

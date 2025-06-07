@@ -20,7 +20,7 @@ export const isLocalEnvironment = (): boolean => {
  * Deploy Preview: deploy-preview-{PR番号}--{サイト名}.netlify.app
  * Branch Deploy: {ブランチ名}--{サイト名}.netlify.app (プロダクション以外)
  */
-export const isNetlifyPreviewEnvironment = (url: string = process.env.URL || ''): boolean => {
+export const isNetlifyPreviewEnvironment = (url: string = process.env.URL ?? ''): boolean => {
   if (!url) return false;
 
   // Deploy Preview パターンの検出
@@ -45,7 +45,7 @@ export const isNetlifyPreviewEnvironment = (url: string = process.env.URL || '')
 /**
  * プロダクション環境かどうかを判定
  */
-export const isProductionEnvironment = (url: string = process.env.URL || ''): boolean => {
+export const isProductionEnvironment = (url: string = process.env.URL ?? ''): boolean => {
   return !isLocalEnvironment() && !isNetlifyPreviewEnvironment(url);
 }
 
@@ -55,7 +55,7 @@ export const isProductionEnvironment = (url: string = process.env.URL || ''): bo
  * それ以外は現在のURLを使用
  */
 export const getOAuthRedirectURL = (provider: string, productionUrl: string): string => {
-  const currentUrl = process.env.URL || 'http://localhost:3000';
+  const currentUrl = process.env.URL ?? 'http://localhost:3000';
 
   if (isNetlifyPreviewEnvironment(currentUrl)) {
     // プレビュー環境ではプロダクションURLを使用（OAuth Proxyが処理）
@@ -69,7 +69,7 @@ export const getOAuthRedirectURL = (provider: string, productionUrl: string): st
 // プロダクション環境のURL（プロキシサーバーとして使用）
 // process.env.URLパターンからプロダクションURLを推定
 export const getProductionURL = (): string => {
-  const currentUrl = process.env.URL || 'http://localhost:3000';
+  const currentUrl = process.env.URL ?? 'http://localhost:3000';
 
   // 既にプロダクションURLの形式の場合はそのまま使用
   if (!currentUrl.includes('--') && currentUrl.includes('.netlify.app')) {
@@ -86,5 +86,5 @@ export const getProductionURL = (): string => {
   }
 
   // フォールバック（環境変数で明示的に指定されている場合）
-  return process.env.PRODUCTION_URL || currentUrl;
+  return process.env.PRODUCTION_URL ?? currentUrl;
 }

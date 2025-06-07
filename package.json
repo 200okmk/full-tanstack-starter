@@ -6,13 +6,23 @@
     "dev": "vinxi dev",
     "build": "vinxi build",
     "start": "vinxi start",
-    "lint": "eslint .",
+    "lint": "eslint . --fix",
     "format": "prettier --write .",
     "db": "drizzle-kit",
     "deps": "pnpm dlx npm-check-updates@latest --interactive --format group",
     "ui": "pnpm dlx shadcn@latest",
     "auth": "pnpm dlx @better-auth/cli@latest",
-    "auth:generate": "pnpm dlx @better-auth/cli@latest generate --y --output ./src/lib/server/schema/auth.schema.ts && prettier --write ./src/lib/server/schema/auth.schema.ts"
+    "auth:generate": "pnpm dlx @better-auth/cli@latest generate --y --output ./src/lib/server/schema/auth.schema.ts && prettier --write ./src/lib/server/schema/auth.schema.ts",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,css,md}": [
+      "prettier --write"
+    ]
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.0",
@@ -50,6 +60,8 @@
     "eslint": "^9.25.1",
     "eslint-config-prettier": "^10.1.2",
     "eslint-plugin-react-hooks": "6.0.0-rc.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.0",
     "prettier": "^3.5.3",
     "prettier-plugin-organize-imports": "^4.1.0",
     "prettier-plugin-tailwindcss": "^0.6.11",
