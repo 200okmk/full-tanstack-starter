@@ -37,7 +37,7 @@ function SignupForm() {
     setIsLoading(true);
     setErrorMessage("");
 
-    signUp.email(
+    void signUp.email(
       {
         name,
         email,
@@ -51,7 +51,7 @@ function SignupForm() {
         },
         onSuccess: async () => {
           await queryClient.invalidateQueries({ queryKey: ["user"] });
-          navigate({ to: redirectUrl });
+          void navigate({ to: redirectUrl });
         },
       },
     );
@@ -135,7 +135,7 @@ function SignupForm() {
               type="button"
               disabled={isLoading}
               onClick={() =>
-                signIn.social(
+                void signIn.social(
                   {
                     provider: "github",
                     callbackURL: redirectUrl,
@@ -167,7 +167,7 @@ function SignupForm() {
               type="button"
               disabled={isLoading}
               onClick={() =>
-                signIn.social(
+                void signIn.social(
                   {
                     provider: "google",
                     callbackURL: redirectUrl,

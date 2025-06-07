@@ -24,7 +24,8 @@ export function DefaultCatchBoundary({ error }: Readonly<ErrorComponentProps>) {
         <Button
           type="button"
           onClick={() => {
-            router.invalidate();
+            // キャッシュ無効化のメソッドなのでPromise戻り値を明示的に無視して良い
+            void router.invalidate();
           }}
         >
           Try Again

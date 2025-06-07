@@ -41,10 +41,12 @@ function Home() {
           </div>
 
           <Button
-            onClick={async () => {
-              await signOut();
-              await queryClient.invalidateQueries({ queryKey: ["user"] });
-              await router.invalidate();
+            onClick={() => {
+              void (async () => {
+                await signOut();
+                await queryClient.invalidateQueries({ queryKey: ["user"] });
+                await router.invalidate();
+              })();
             }}
             type="button"
             className="w-fit"
