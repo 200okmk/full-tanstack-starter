@@ -15,7 +15,7 @@ import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { auth } from "~/lib/auth";
 import appCss from "~/lib/styles/app.css?url";
 
-const getUser = createServerFn({ method: "GET" }).handler(async () => {
+const getSessionUser = createServerFn({ method: "GET" }).handler(async () => {
   const { headers } = getWebRequest()!;
 
   const session = await auth.api.getSession({ headers });
@@ -25,12 +25,12 @@ const getUser = createServerFn({ method: "GET" }).handler(async () => {
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
-  user: Awaited<ReturnType<typeof getUser>>;
+  user: Awaited<ReturnType<typeof getSessionUser>>;
 }>()({
   beforeLoad: async ({ context }) => {
     const user = await context.queryClient.fetchQuery({
       queryKey: ["user"],
-      queryFn: ({ signal }) => getUser({ signal }),
+      queryFn: ({ signal }) => getSessionUser({ signal }),
     }); // we're using react-query for caching, see router.tsx
     return { user };
   },

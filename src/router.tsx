@@ -21,7 +21,7 @@ export function createRouter() {
       routeTree,
       context: { queryClient, user: null },
       defaultPreload: "intent",
-      // react-query will handle data fetching & caching
+      // react-queryがデータの取得とキャッシュを処理する
       // https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#passing-all-loader-events-to-an-external-cache
       defaultPreloadStaleTime: 0,
       defaultErrorComponent: DefaultCatchBoundary,
