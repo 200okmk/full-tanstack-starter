@@ -1,0 +1,703 @@
+---
+description:
+globs: src/routes/**/*.tsx
+alwaysApply: false
+---
+
+# TanStack Router ルーティング・エラーハンドリング・状態管理戦略
+
+このルールは、TanStack Routerの型安全なルーティング、包括的なエラーハンドリング、そして検索パラメータを中心とした状態管理戦略を定義します。
+
+## 🗂️ ファイルベースルーティング原則
+
+### ルートファイル構造標準
+ファイル構造がURL構造と直接対応する明確なパターンを採用します。
+
+```tsx
+// src/routes/__root.tsx - ルートレイアウト
+import { createRootRouteWithContext, Outlet } from '@tanstack/react-router'
+import { TanStackRouterDevtools } from '@tanstack/router-devtools'
+
+interface RouterContext {
+  user?: User
+  queryClient: QueryClient
+}
+
+export const Route = createRootRouteWithContext<RouterContext>()({
+  component: RootComponent,
+  errorComponent: GlobalErrorComponent,
+  notFoundComponent: GlobalNotFoundComponent,
+})
+
+function RootComponent() {
+  return (
+    <div className="app">
+      <Header />
+      <main>
+        <Outlet />
+      </main>
+      <Footer />
+      {process.env.NODE_ENV === 'development' && <TanStackRouterDevtools />}
+    </div>
+  )
+}
+```
+
+### ルート定義パターン
+各ルートファイルは完全な型安全性を持つ自己完結型の定義を行います。
+
+```tsx
+// src/routes/posts/$postId.tsx
+import { createFileRoute, notFound } from '@tanstack/react-router'
+import { z } from 'zod'
+
+// 検索パラメータスキーマ
+const postSearchSchema = z.object({
+  tab: z.enum(['content', 'comments', 'analytics']).default('content'),
+  page: z.number().min(1).default(1),
+  sort: z.enum(['newest', 'oldest', 'popular']).default('newest'),
+})
+
+export const Route = createFileRoute('/posts/$postId')({
+  // パラメータ検証
+  parseParams: (params) => ({
+    postId: z.string().parse(params.postId),
+  }),
+
+  // 検索パラメータ検証
+  validateSearch: postSearchSchema,
+
+  // データローダー
+  loader: async ({ params, context, abortController }) => {
+    const post = await getPost(params.postId, {
+      signal: abortController.signal,
+    })
+
+    if (!post) {
+      throw notFound()
+    }
+
+    return { post }
+  },
+
+  // コンポーネント定義
+  component: PostDetailComponent,
+
+  // エラーコンポーネント
+  errorComponent: PostErrorComponent,
+
+  // ローディングコンポーネント
+  pendingComponent: () => <PostDetailSkeleton />,
+
+  // ルート固有のエラーハンドリング
+  onError: ({ error }) => {
+    console.error('Post route error:', error)
+    // エラー追跡サービスに送信
+    trackError('post_route_error', error)
+  },
+})
+
+function PostDetailComponent() {
+  const { post } = Route.useLoaderData()
+  const { tab, page, sort } = Route.useSearch()
+  const navigate = useNavigate({ from: Route.fullPath })
+
+  const handleTabChange = (newTab: string) => {
+    navigate({
+      search: (prev) => ({ ...prev, tab: newTab, page: 1 }),
+    })
+  }
+
+  return (
+    <article className="post-detail">
+      <h1>{post.title}</h1>
+      <PostTabs
+        activeTab={tab}
+        onTabChange={handleTabChange}
+      />
+      <PostContent
+        post={post}
+        tab={tab}
+        page={page}
+        sort={sort}
+      />
+    </article>
+  )
+}
+```
+
+### ネストルートとレイアウト
+階層的なルート構造で共通レイアウトを効率的に管理します。
+
+```tsx
+// src/routes/dashboard.tsx - レイアウトルート
+export const Route = createFileRoute('/dashboard')({
+  beforeLoad: async ({ context }) => {
+    // 認証チェック
+    if (!context.user) {
+      throw redirect({ to: '/login' })
+    }
+  },
+  component: DashboardLayout,
+})
+
+function DashboardLayout() {
+  return (
+    <div className="dashboard-layout">
+      <DashboardSidebar />
+      <div className="dashboard-content">
+        <Outlet />
+      </div>
+    </div>
+  )
+}
+
+// src/routes/dashboard/analytics.tsx - 子ルート
+export const Route = createFileRoute('/dashboard/analytics')({
+  loader: async ({ context }) => {
+    const analytics = await getAnalytics(context.user.id)
+    return { analytics }
+  },
+  component: AnalyticsPage,
+})
+```
+
+## 🔍 検索パラメータ状態管理
+
+### 検索パラメータをファーストクラス状態として扱う
+URLの検索パラメータを型安全で反応的な状態管理システムとして活用します。
+
+```tsx
+// 複雑な検索パラメータスキーマの例
+const dashboardSearchSchema = z.object({
+  // フィルタリング
+  status: z.enum(['active', 'inactive', 'pending']).optional(),
+  category: z.array(z.string()).default([]),
+
+  // ページネーション
+  page: z.number().min(1).default(1),
+  limit: z.number().min(10).max(100).default(20),
+
+  // ソート
+  sortBy: z.enum(['name', 'date', 'status']).default('date'),
+  sortOrder: z.enum(['asc', 'desc']).default('desc'),
+
+  // 日付範囲
+  dateRange: z.object({
+    from: z.string().datetime().optional(),
+    to: z.string().datetime().optional(),
+  }).optional(),
+
+  // 検索クエリ
+  q: z.string().optional(),
+})
+
+export const Route = createFileRoute('/dashboard')({
+  validateSearch: dashboardSearchSchema,
+  component: DashboardComponent,
+})
+
+function DashboardComponent() {
+  const search = Route.useSearch()
+  const navigate = useNavigate({ from: Route.fullPath })
+
+  // 個別の検索パラメータ更新
+  const updateFilter = (key: string, value: any) => {
+    navigate({
+      search: (prev) => ({ ...prev, [key]: value, page: 1 }), // ページをリセット
+    })
+  }
+
+  // 複数パラメータの一括更新
+  const applyFilters = (filters: Partial<typeof search>) => {
+    navigate({
+      search: (prev) => ({ ...prev, ...filters, page: 1 }),
+    })
+  }
+
+  // URLからの状態復元
+  const resetFilters = () => {
+    navigate({
+      search: {},
+    })
+  }
+
+  return (
+    <div className="dashboard">
+      <DashboardFilters
+        search={search}
+        onUpdateFilter={updateFilter}
+        onApplyFilters={applyFilters}
+        onReset={resetFilters}
+      />
+      <DashboardContent search={search} />
+    </div>
+  )
+}
+```
+
+### 階層的検索パラメータ継承
+親ルートの検索パラメータを子ルートが継承・拡張する仕組みを活用します。
+
+```tsx
+// 親ルート: 共通フィルタ
+const baseSearchSchema = z.object({
+  workspace: z.string().optional(),
+  theme: z.enum(['light', 'dark']).default('light'),
+})
+
+// 子ルート: 親の検索パラメータを継承・拡張
+const projectSearchSchema = baseSearchSchema.extend({
+  projectStatus: z.enum(['active', 'archived']).default('active'),
+  assignee: z.string().optional(),
+})
+```
+
+## 🚨 包括的エラーハンドリング戦略
+
+### 階層的エラーバウンダリ
+エラーの種類と発生場所に応じた適切なエラーハンドリングを実装します。
+
+```tsx
+// グローバルエラーコンポーネント（__root.tsx）
+function GlobalErrorComponent({ error, reset }: ErrorComponentProps) {
+  const router = useRouter()
+
+  useEffect(() => {
+    // エラー追跡
+    trackError('global_error', error)
+  }, [error])
+
+  return (
+    <div className="error-page">
+      <div className="error-container">
+        <h1>Something went wrong</h1>
+        <p>We're sorry, but something unexpected happened.</p>
+
+        <div className="error-actions">
+          <button
+            onClick={() => {
+              reset()
+              router.invalidate()
+            }}
+            className="btn btn-primary"
+          >
+            Try Again
+          </button>
+
+          <button
+            onClick={() => router.navigate({ to: '/' })}
+            className="btn btn-secondary"
+          >
+            Go Home
+          </button>
+        </div>
+
+        {process.env.NODE_ENV === 'development' && (
+          <details className="error-details">
+            <summary>Error Details</summary>
+            <pre>{error.stack}</pre>
+          </details>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ルート固有のエラーコンポーネント
+function PostErrorComponent({ error, reset }: ErrorComponentProps) {
+  const router = useRouter()
+  const navigate = useNavigate()
+
+  const handleRetry = () => {
+    reset()
+    router.invalidate()
+  }
+
+  const handleGoBack = () => {
+    navigate({ to: '/posts' })
+  }
+
+  // エラーの種類に応じた処理
+  if (error.message.includes('404') || error.message.includes('not found')) {
+    return (
+      <div className="error-not-found">
+        <h2>Post Not Found</h2>
+        <p>The post you're looking for doesn't exist or has been removed.</p>
+        <button onClick={handleGoBack} className="btn btn-primary">
+          Back to Posts
+        </button>
+      </div>
+    )
+  }
+
+  if (error.message.includes('403') || error.message.includes('unauthorized')) {
+    return (
+      <div className="error-unauthorized">
+        <h2>Access Denied</h2>
+        <p>You don't have permission to view this post.</p>
+        <button onClick={handleGoBack} className="btn btn-primary">
+          Back to Posts
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="error-generic">
+      <h2>Failed to Load Post</h2>
+      <p>There was an error loading this post. Please try again.</p>
+      <div className="error-actions">
+        <button onClick={handleRetry} className="btn btn-primary">
+          Retry
+        </button>
+        <button onClick={handleGoBack} className="btn btn-secondary">
+          Back to Posts
+        </button>
+      </div>
+    </div>
+  )
+}
+```
+
+### ローダーエラーハンドリング
+データローダーでの適切なエラーハンドリングパターンを実装します。
+
+```tsx
+export const Route = createFileRoute('/posts/$postId')({
+  loader: async ({ params, context, abortController }) => {
+    try {
+      // 並列データフェッチ
+      const [post, comments, relatedPosts] = await Promise.all([
+        getPost(params.postId, { signal: abortController.signal }),
+        getComments(params.postId, { signal: abortController.signal }),
+        getRelatedPosts(params.postId, { signal: abortController.signal }),
+      ])
+
+      if (!post) {
+        throw notFound({
+          data: { postId: params.postId },
+        })
+      }
+
+      return { post, comments, relatedPosts }
+    } catch (error) {
+      // AbortErrorは再スローしない
+      if (error.name === 'AbortError') {
+        throw error
+      }
+
+      // 認証エラー
+      if (error.status === 401) {
+        throw redirect({ to: '/login' })
+      }
+
+      // 権限エラー
+      if (error.status === 403) {
+        throw new Error('You do not have permission to view this post')
+      }
+
+      // ネットワークエラー
+      if (!navigator.onLine) {
+        throw new Error('No internet connection. Please check your network and try again.')
+      }
+
+      // その他のエラー
+      console.error('Post loader error:', error)
+      throw new Error('Failed to load post. Please try again later.')
+    }
+  },
+
+  // エラー発生時のコールバック
+  onError: ({ error, location }) => {
+    // エラー追跡サービスに送信
+    trackError('post_loader_error', {
+      error,
+      postId: location.pathname.split('/').pop(),
+      userAgent: navigator.userAgent,
+      timestamp: new Date().toISOString(),
+    })
+  },
+})
+```
+
+### Not Found エラーハンドリング
+404エラーの適切な処理とユーザーエクスペリエンスの向上を図ります。
+
+```tsx
+// グローバル Not Found コンポーネント
+function GlobalNotFoundComponent() {
+  const router = useRouter()
+  const location = useLocation()
+
+  return (
+    <div className="not-found-page">
+      <div className="not-found-container">
+        <h1>Page Not Found</h1>
+        <p>The page <code>{location.pathname}</code> doesn't exist.</p>
+
+        <div className="not-found-actions">
+          <button
+            onClick={() => router.navigate({ to: '/' })}
+            className="btn btn-primary"
+          >
+            Go Home
+          </button>
+
+          <button
+            onClick={() => router.history.back()}
+            className="btn btn-secondary"
+          >
+            Go Back
+          </button>
+        </div>
+
+        <div className="not-found-suggestions">
+          <h3>You might be looking for:</h3>
+          <ul>
+            <li><Link to="/posts">Posts</Link></li>
+            <li><Link to="/dashboard">Dashboard</Link></li>
+            <li><Link to="/settings">Settings</Link></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// 特定ルートでのnot foundハンドリング
+export const Route = createFileRoute('/posts/$postId')({
+  loader: async ({ params }) => {
+    const post = await getPost(params.postId)
+
+    if (!post) {
+      // 特定の親ルートにnot foundを委譲
+      throw notFound({
+        routeId: '/posts',
+        data: { postId: params.postId }
+      })
+    }
+
+    return { post }
+  },
+})
+```
+
+## 🔄 状態管理統合パターン
+
+### Router状態とクライアント状態の協調
+TanStack RouterとTanStack Queryの効果的な統合パターンを実装します。
+
+```tsx
+// ルーターとクエリの統合
+export const Route = createFileRoute('/posts')({
+  validateSearch: z.object({
+    page: z.number().default(1),
+    filter: z.string().optional(),
+  }),
+
+  // ローダーでクエリを事前フェッチ
+  loader: async ({ context: { queryClient }, search }) => {
+    await queryClient.ensureQueryData(
+      postsQueryOptions({
+        page: search.page,
+        filter: search.filter,
+      })
+    )
+  },
+
+  component: PostsComponent,
+})
+
+function PostsComponent() {
+  const search = Route.useSearch()
+  const navigate = useNavigate({ from: Route.fullPath })
+
+  // クエリでデータを取得（キャッシュから即座に利用可能）
+  const postsQuery = useQuery(
+    postsQueryOptions({
+      page: search.page,
+      filter: search.filter,
+    })
+  )
+
+  // 検索パラメータの更新
+  const handlePageChange = (page: number) => {
+    navigate({
+      search: (prev) => ({ ...prev, page }),
+    })
+  }
+
+  const handleFilterChange = (filter: string) => {
+    navigate({
+      search: (prev) => ({ ...prev, filter, page: 1 }),
+    })
+  }
+
+  return (
+    <div className="posts-page">
+      <PostsFilter
+        value={search.filter || ''}
+        onChange={handleFilterChange}
+      />
+
+      <PostsList posts={postsQuery.data} />
+
+      <Pagination
+        currentPage={search.page}
+        totalPages={postsQuery.data?.totalPages || 1}
+        onPageChange={handlePageChange}
+      />
+    </div>
+  )
+}
+```
+
+### 楽観的更新とルーター状態
+楽観的更新とルーター状態の同期を適切に管理します。
+
+```tsx
+function PostActions({ postId }: { postId: string }) {
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
+
+  const updatePostMutation = useMutation({
+    mutationFn: updatePost,
+
+    // 楽観的更新
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: ['post', postId] })
+
+      const previousPost = queryClient.getQueryData(['post', postId])
+
+      queryClient.setQueryData(['post', postId], (old: Post) => ({
+        ...old,
+        ...variables,
+      }))
+
+      return { previousPost }
+    },
+
+    // 成功時の処理
+    onSuccess: (updatedPost) => {
+      // 関連するクエリを無効化
+      queryClient.invalidateQueries({ queryKey: ['posts'] })
+
+      // 必要に応じてルーター状態を更新
+      if (updatedPost.status === 'published') {
+        navigate({
+          to: '/posts/$postId',
+          params: { postId: updatedPost.id },
+          search: { tab: 'published' },
+        })
+      }
+    },
+
+    // エラー時のロールバック
+    onError: (error, variables, context) => {
+      if (context?.previousPost) {
+        queryClient.setQueryData(['post', postId], context.previousPost)
+      }
+    },
+  })
+
+  return (
+    <button
+      onClick={() => updatePostMutation.mutate({ status: 'published' })}
+      disabled={updatePostMutation.isPending}
+    >
+      {updatePostMutation.isPending ? 'Publishing...' : 'Publish'}
+    </button>
+  )
+}
+```
+
+## 🎯 型安全性とパフォーマンス最適化
+
+### 型安全なナビゲーション
+完全に型安全なナビゲーションパターンを実装します。
+
+```tsx
+// 型安全なリンクコンポーネント
+function TypeSafeLink() {
+  return (
+    <div>
+      {/* ✅ 型安全：パラメータとサーチが検証される */}
+      <Link
+        to="/posts/$postId"
+        params={{ postId: '123' }}
+        search={{ tab: 'comments', page: 1 }}
+      >
+        View Post
+      </Link>
+
+      {/* ✅ 型安全：相対ナビゲーション */}
+      <Link
+        from="/posts/$postId"
+        to=".."
+        search={{ filter: 'published' }}
+      >
+        Back to Posts
+      </Link>
+
+      {/* ❌ TypeScriptエラー：存在しないルート */}
+      {/* <Link to="/nonexistent" /> */}
+    </div>
+  )
+}
+
+// プログラマティックナビゲーション
+function NavigationExample() {
+  const navigate = useNavigate()
+
+  const handleNavigation = () => {
+    // ✅ 型安全なナビゲーション
+    navigate({
+      to: '/posts/$postId',
+      params: { postId: '123' },
+      search: { tab: 'comments' },
+    })
+  }
+
+  return <button onClick={handleNavigation}>Navigate</button>
+}
+```
+
+### パフォーマンス最適化
+レンダリング最適化とバンドルサイズの最適化を実装します。
+
+```tsx
+// 構造的共有による再レンダリング最適化
+function OptimizedComponent() {
+  // 特定のサーチパラメータのみを監視
+  const page = Route.useSearch({
+    select: (search) => search.page,
+  })
+
+  const filter = Route.useSearch({
+    select: (search) => search.filter,
+    structuralSharing: true, // 構造的共有を有効化
+  })
+
+  // pageまたはfilterが変更された時のみ再レンダリング
+  return (
+    <div>
+      <p>Page: {page}</p>
+      <p>Filter: {filter}</p>
+    </div>
+  )
+}
+
+// コードスプリッティング
+const LazyPostEditor = lazy(() => import('./PostEditor'))
+
+export const Route = createFileRoute('/posts/$postId/edit')({
+  component: () => (
+    <Suspense fallback={<PostEditorSkeleton />}>
+      <LazyPostEditor />
+    </Suspense>
+  ),
+})
+```
+
+このルールに従うことで、TanStack Routerの能力を最大限に活用し、型安全で保守性の高い、パフォーマンスに優れたルーティングシステムを構築できます。
