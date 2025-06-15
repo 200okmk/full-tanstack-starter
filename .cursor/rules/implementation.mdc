@@ -1,0 +1,548 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# TanStack Start Implementation Patterns
+
+## 🎯 React 19 + Compiler Patterns
+
+### Component Structure Standards
+```tsx
+// ✅ Preferred: Function declarations with explicit typing
+function UserProfile({ userId }: { userId: string }) {
+  const user = Route.useLoaderData()
+  const navigate = useNavigate({ from: Route.fullPath })
+
+  return (
+    <div className="space-y-4">
+      <h1 className="text-2xl font-bold">{user.name}</h1>
+      {/* Component content */}
+    </div>
+  )
+}
+
+// ❌ Avoid: Arrow functions for components
+const UserProfile = ({ userId }: { userId: string }) => { /* ... */ }
+```
+
+### React Compiler Optimization
+- **Always use function declarations** for components (better for React Compiler)
+- **Avoid manual memoization** (React.memo, useMemo, useCallback) - let React Compiler handle it
+- **Use destructuring in function parameters** for better optimization
+- **Prefer early returns** for conditional rendering
+
+### Hook Usage Patterns
+```tsx
+// ✅ Type-safe route hooks with Route API
+function PostDetail() {
+  const params = Route.useParams()        // Type-safe params
+  const search = Route.useSearch()        // Type-safe search
+  const loaderData = Route.useLoaderData() // Type-safe loader data
+
+  // Router-wide hooks require 'from' for type safety
+  const navigate = useNavigate({ from: Route.fullPath })
+  const matchRoute = useMatchRoute()
+
+  return <div>{/* Component content */}</div>
+}
+```
+
+## 🗂️ File-Based Routing Standards
+
+### Route File Structure
+```tsx
+// src/routes/posts/$postId.tsx
+import { createFileRoute } from '@tanstack/react-router'
+import { z } from 'zod'
+
+// Search params validation
+const postSearchSchema = z.object({
+  tab: z.enum(['details', 'comments']).optional(),
+  page: z.number().min(1).optional()
+})
+
+export const Route = createFileRoute('/posts/$postId')({
+  // Loader for server-side data fetching
+  loader: async ({ params, context }) => {
+    const post = await getPost(params.postId)
+    if (!post) throw notFound()
+    return { post }
+  },
+
+  // Search params validation
+  validateSearch: postSearchSchema,
+
+  // Component definition
+  component: PostDetail,
+
+  // Error boundary
+  errorComponent: ({ error }) => (
+    <div className="error-boundary">
+      <h2>Something went wrong</h2>
+      <p>{error.message}</p>
+    </div>
+  ),
+
+  // Loading component
+  pendingComponent: () => <div className="loading-spinner">Loading...</div>
+})
+
+function PostDetail() {
+  const { post } = Route.useLoaderData()
+  const { tab = 'details' } = Route.useSearch()
+
+  return (
+    <article className="prose max-w-none">
+      <h1>{post.title}</h1>
+      {/* Component content */}
+    </article>
+  )
+}
+```
+
+### Route Protection Patterns
+```tsx
+// Protected route with authentication check
+export const Route = createFileRoute('/dashboard')({
+  beforeLoad: async ({ context }) => {
+    if (!context.user) {
+      throw redirect({ to: '/login' })
+    }
+  },
+  loader: async ({ context }) => {
+    // User is guaranteed to exist here
+    return getDashboardData(context.user.id)
+  },
+  component: Dashboard
+})
+```
+
+## 🔐 Authentication Implementation
+
+### Better Auth Setup Pattern
+```typescript
+// src/lib/auth.ts
+import { betterAuth } from 'better-auth'
+import { drizzleAdapter } from 'better-auth/adapters/drizzle'
+import { db } from './db'
+
+export const auth = betterAuth({
+  database: drizzleAdapter(db, {
+    provider: 'pg',
+    schema: {
+      user: userTable,
+      session: sessionTable,
+      account: accountTable,
+      verification: verificationTable
+    }
+  }),
+
+  // OAuth providers configuration
+  socialProviders: {
+    github: {
+      clientId: process.env.GITHUB_CLIENT_ID!,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET!
+    },
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!
+    }
+  },
+
+  // Session configuration
+  session: {
+    expiresIn: 60 * 60 * 24 * 7, // 7 days
+    updateAge: 60 * 60 * 24      // 1 day
+  },
+
+  // Security settings
+  advanced: {
+    crossSubDomainCookies: {
+      enabled: true,
+      domain: process.env.NODE_ENV === 'production' ? '.yourdomain.com' : undefined
+    }
+  }
+})
+
+export type Session = typeof auth.$Infer.Session
+export type User = typeof auth.$Infer.User
+```
+
+### Authentication Route Handler
+```typescript
+// src/routes/api/auth/$.ts
+import { createAPIFileRoute } from '@tanstack/react-start/api'
+import { auth } from '~/lib/auth'
+
+export const APIRoute = createAPIFileRoute('/api/auth/$')({
+  GET: ({ request }) => auth.handler(request),
+  POST: ({ request }) => auth.handler(request)
+})
+```
+
+### Client-Side Auth Usage
+```tsx
+// src/components/AuthButton.tsx
+import { authClient } from '~/lib/auth-client'
+
+function AuthButton() {
+  const { data: session, isPending } = authClient.useSession()
+
+  if (isPending) return <div>Loading...</div>
+
+  if (session) {
+    return (
+      <div className="flex items-center gap-2">
+        <img
+          src={session.user.image}
+          alt={session.user.name}
+          className="w-8 h-8 rounded-full"
+        />
+        <span>{session.user.name}</span>
+        <button
+          onClick={() => authClient.signOut()}
+          className="btn btn-outline"
+        >
+          Sign Out
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex gap-2">
+      <button
+        onClick={() => authClient.signIn.social({ provider: 'github' })}
+        className="btn btn-primary"
+      >
+        Sign in with GitHub
+      </button>
+      <button
+        onClick={() => authClient.signIn.social({ provider: 'google' })}
+        className="btn btn-primary"
+      >
+        Sign in with Google
+      </button>
+    </div>
+  )
+}
+```
+
+## 🗄️ Database Patterns with Drizzle ORM
+
+### Schema Definition Standards
+```typescript
+// src/lib/db/schemas/users.schema.ts
+import { pgTable, text, timestamp, boolean } from 'drizzle-orm/pg-core'
+
+export const userTable = pgTable('users', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  email: text('email').notNull().unique(),
+  emailVerified: boolean('email_verified').default(false).notNull(),
+  image: text('image'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull()
+})
+
+export type User = typeof userTable.$inferSelect
+export type NewUser = typeof userTable.$inferInsert
+```
+
+### Database Query Patterns
+```typescript
+// src/lib/db/queries/users.ts
+import { db } from '../index'
+import { userTable } from '../schemas/users.schema'
+import { eq, and, desc } from 'drizzle-orm'
+
+export async function getUserById(id: string) {
+  const [user] = await db
+    .select()
+    .from(userTable)
+    .where(eq(userTable.id, id))
+    .limit(1)
+
+  return user
+}
+
+export async function updateUser(id: string, data: Partial<NewUser>) {
+  const [updatedUser] = await db
+    .update(userTable)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(userTable.id, id))
+    .returning()
+
+  return updatedUser
+}
+
+// ✅ Use transactions for related operations
+export async function createUserWithProfile(userData: NewUser, profileData: any) {
+  return await db.transaction(async (tx) => {
+    const [user] = await tx.insert(userTable).values(userData).returning()
+    const [profile] = await tx.insert(profileTable).values({
+      ...profileData,
+      userId: user.id
+    }).returning()
+
+    return { user, profile }
+  })
+}
+```
+
+### Migration Workflow
+```bash
+# Development: Use push for rapid iteration
+pnpm drizzle-kit push
+
+# Before PR: Generate migration files
+pnpm drizzle-kit generate
+
+# Production: Apply migrations (handled by GitHub Actions)
+pnpm drizzle-kit migrate
+```
+
+## 🎨 UI Component Patterns
+
+### shadcn/ui Integration
+```tsx
+// src/components/ui/button.tsx (generated by shadcn/ui)
+import { cn } from '~/lib/utils'
+import { Slot } from '@radix-ui/react-slot'
+
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link'
+  size?: 'default' | 'sm' | 'lg' | 'icon'
+  asChild?: boolean
+}
+
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant = 'default', size = 'default', asChild = false, ...props }, ref) => {
+    const Comp = asChild ? Slot : 'button'
+    return (
+      <Comp
+        className={cn(buttonVariants({ variant, size, className }))}
+        ref={ref}
+        {...props}
+      />
+    )
+  }
+)
+```
+
+### Custom Component Patterns
+```tsx
+// src/components/DataTable.tsx
+import { Button } from '~/components/ui/button'
+import { Input } from '~/components/ui/input'
+
+interface DataTableProps<T> {
+  data: T[]
+  columns: ColumnDef<T>[]
+  searchKey?: keyof T
+  onRowClick?: (row: T) => void
+}
+
+function DataTable<T>({ data, columns, searchKey, onRowClick }: DataTableProps<T>) {
+  const [search, setSearch] = useState('')
+
+  const filteredData = useMemo(() => {
+    if (!searchKey || !search) return data
+    return data.filter(item =>
+      String(item[searchKey]).toLowerCase().includes(search.toLowerCase())
+    )
+  }, [data, search, searchKey])
+
+  return (
+    <div className="space-y-4">
+      {searchKey && (
+        <Input
+          placeholder={`Search by ${String(searchKey)}...`}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-sm"
+        />
+      )}
+
+      <div className="rounded-md border">
+        <table className="w-full">
+          {/* Table implementation */}
+        </table>
+      </div>
+    </div>
+  )
+}
+```
+
+## 🔧 Utility Functions & Helpers
+
+### Type-Safe Environment Variables
+```typescript
+// src/lib/env.ts
+import { z } from 'zod'
+
+const envSchema = z.object({
+  NODE_ENV: z.enum(['development', 'production', 'test']),
+  DATABASE_URL: z.string().url(),
+  BETTER_AUTH_SECRET: z.string().min(32),
+  GITHUB_CLIENT_ID: z.string(),
+  GITHUB_CLIENT_SECRET: z.string(),
+  GOOGLE_CLIENT_ID: z.string(),
+  GOOGLE_CLIENT_SECRET: z.string()
+})
+
+export const env = envSchema.parse(process.env)
+```
+
+### Error Handling Patterns
+```typescript
+// src/lib/errors.ts
+export class AppError extends Error {
+  constructor(
+    message: string,
+    public statusCode: number = 500,
+    public code?: string
+  ) {
+    super(message)
+    this.name = 'AppError'
+  }
+}
+
+export function handleApiError(error: unknown) {
+  if (error instanceof AppError) {
+    return new Response(
+      JSON.stringify({ error: error.message, code: error.code }),
+      { status: error.statusCode }
+    )
+  }
+
+  console.error('Unexpected error:', error)
+  return new Response(
+    JSON.stringify({ error: 'Internal server error' }),
+    { status: 500 }
+  )
+}
+```
+
+### Form Handling with React Hook Form
+```tsx
+// src/components/forms/UserForm.tsx
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+
+const userFormSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters'),
+  email: z.string().email('Invalid email address'),
+  bio: z.string().max(500, 'Bio must be less than 500 characters').optional()
+})
+
+type UserFormData = z.infer<typeof userFormSchema>
+
+function UserForm({ onSubmit, defaultValues }: {
+  onSubmit: (data: UserFormData) => Promise<void>
+  defaultValues?: Partial<UserFormData>
+}) {
+  const form = useForm<UserFormData>({
+    resolver: zodResolver(userFormSchema),
+    defaultValues
+  })
+
+  return (
+    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <div>
+        <label htmlFor="name">Name</label>
+        <Input
+          id="name"
+          {...form.register('name')}
+          className={form.formState.errors.name ? 'border-red-500' : ''}
+        />
+        {form.formState.errors.name && (
+          <p className="text-red-500 text-sm">{form.formState.errors.name.message}</p>
+        )}
+      </div>
+
+      <Button type="submit" disabled={form.formState.isSubmitting}>
+        {form.formState.isSubmitting ? 'Saving...' : 'Save'}
+      </Button>
+    </form>
+  )
+}
+```
+
+## 📱 Responsive Design Standards
+
+### Tailwind CSS Patterns
+```tsx
+// Mobile-first responsive design
+function ResponsiveLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="
+      min-h-screen bg-background
+      px-4 py-6
+      sm:px-6 sm:py-8
+      lg:px-8 lg:py-12
+      xl:px-12 xl:py-16
+    ">
+      <div className="
+        mx-auto max-w-7xl
+        grid grid-cols-1
+        lg:grid-cols-12
+        gap-6 lg:gap-8
+      ">
+        <aside className="lg:col-span-3">
+          {/* Sidebar content */}
+        </aside>
+        <main className="lg:col-span-9">
+          {children}
+        </main>
+      </div>
+    </div>
+  )
+}
+```
+
+### Dark Mode Support
+```tsx
+// src/components/ThemeProvider.tsx
+import { createContext, useContext, useEffect, useState } from 'react'
+
+type Theme = 'dark' | 'light' | 'system'
+
+const ThemeContext = createContext<{
+  theme: Theme
+  setTheme: (theme: Theme) => void
+}>({
+  theme: 'system',
+  setTheme: () => null
+})
+
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const [theme, setTheme] = useState<Theme>('system')
+
+  useEffect(() => {
+    const root = window.document.documentElement
+    root.classList.remove('light', 'dark')
+
+    if (theme === 'system') {
+      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches
+        ? 'dark'
+        : 'light'
+      root.classList.add(systemTheme)
+    } else {
+      root.classList.add(theme)
+    }
+  }, [theme])
+
+  return (
+    <ThemeContext.Provider value={{ theme, setTheme }}>
+      {children}
+    </ThemeContext.Provider>
+  )
+}
+
+export const useTheme = () => useContext(ThemeContext)
+```
+
+These patterns ensure consistent, type-safe, and performant implementation across all TanStack Start projects using this template.
