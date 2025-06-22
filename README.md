@@ -11,6 +11,37 @@
 - [Better Auth](https://www.better-auth.com/)
 - deployed on [Netlify](https://www.netlify.com/)
 
+## アーキテクチャ
+
+### プロジェクト構造
+
+```
+src/
+├── routes/                   # ファイルベースルーティング
+│   ├── __root.tsx            # ルートレイアウト・グローバル設定
+│   ├── index.tsx             # ホームページ
+│   ├── (auth)/               # 認証関連のルートグループ
+│   │   ├── route.tsx         # 認証レイアウト
+│   │   ├── login.tsx         # ログインページ
+│   │   └── signup.tsx        # サインアップページ
+│   ├── dashboard/            # ルーティング例(/dashboardパス)
+│   │   ├── route.tsx         # ダッシュボードレイアウト
+│   │   ├── index.tsx         # ダッシュボードホーム
+│   │   └── $userId.tsx       # 動的ユーザーページ
+│   └── api/                  # API ルート
+│       └── auth/
+│           └── $.ts         # 認証API（Better Auth）
+├── serverFn/                # サーバー関数
+├── lib/                     # 共通ライブラリ
+│   ├── db/                  # DBインスタンス設定、DBスキーマ、マイグレーションファイル
+│   ├── middleware/          # Tanstack StartのMiddleware
+│   ├── auth.ts              # Better Auth設定ファイル
+│   └── utils.ts             # 一般的なユーティリティヘルパー関数
+└── components/              # 再利用可能コンポーネント
+    ├── ui/                  # UI コンポーネント
+    └── **.tsx               # カスタムコンポーネント
+```
+
 ## Project Rules
 
 このテンプレートでは、[Cursor Project Rules](https://docs.cursor.com/context/rules#project-rules)を活用して、TanStack エコシステムの開発ベストプラクティスを体系化・自動生成することに挑戦しています。
