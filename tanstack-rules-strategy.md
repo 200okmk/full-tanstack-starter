@@ -127,39 +127,11 @@
 #### 対象領域
 
 - データフェッチング戦略
+- キャッシュ管理
 - Mutations管理
-- キャッシュ戦略
 - エラーハンドリング
 - Optimistic Updates
 - Server State管理
-
-#### 主要項目
-
-1. **クエリ設計パターン**
-
-   - `useQuery`の効果的な使用
-   - Key設計戦略
-   - Stale Time設定
-   - Cache Time管理
-
-2. **Mutations**
-
-   - `useMutation`パターン
-   - Optimistic Updates
-   - エラー処理
-   - 成功時の処理
-
-3. **キャッシュ管理**
-
-   - Invalidation戦略
-   - Background Refetch
-   - Manual Updates
-   - Garbage Collection
-
-4. **サーバー状態管理**
-   - Server State vs Client State
-   - 同期戦略
-   - コンフリクト解決
 
 ### 4. TanStack Integration Rule (`tanstack-integration.mdc`)
 

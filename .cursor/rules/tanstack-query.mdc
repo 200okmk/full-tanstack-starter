@@ -1,818 +1,504 @@
 ---
-description:
+description: Core TanStack Query patterns independent of framework integration
 globs:
 alwaysApply: false
 ---
-# TanStack Query PPR対応データフェッチング・状態管理戦略
+# TanStack Query Rule
 
-このルールは、TanStack Queryを使用したPartial Prerendering（PPR）相当のレンダリング戦略と、Suspenseを活用した段階的データローディング、包括的なエラーハンドリング、パフォーマンス最適化を定義します。
+このルールは、TanStack Query の核心機能における独立したパターンを定義します。Router や Start との統合パターンは `tanstack-integration.mdc` で扱い、ここでは Query 単体で価値のある実装パターンに集中します。
 
-## ⚡ PPR対応レンダリング戦略
+## 🔍 Query 基本パターン
 
-### 段階的データローディング設計
-重要度に応じてデータを階層化し、静的コンテンツを即座に表示しながら動的コンテンツを段階的に配信します。
+### useQuery vs useSuspenseQuery の使い分け
 
 ```tsx
-// ✅ 推奨：PPR相当の段階的レンダリング設計
-function Dashboard() {
-  return (
-    <div className="dashboard">
-      {/* 即座に表示される静的コンテンツ */}
-      <DashboardHeader />
-      <NavigationMenu />
-
-      {/* 最重要データ：並列フェッチで最優先表示 */}
-      <Suspense fallback={<CriticalDataSkeleton />}>
-        <CriticalDashboardData />
-      </Suspense>
-
-      {/* 重要データ：独立したSuspense境界で並列処理 */}
-      <div className="important-section">
-        <Suspense fallback={<UserStatsSkeleton />}>
-          <UserStats />
-        </Suspense>
-
-        <Suspense fallback={<RecentActivitySkeleton />}>
-          <RecentActivity />
-        </Suspense>
-      </div>
-
-      {/* 補助データ：遅延ローディング */}
-      <Suspense fallback={<SecondaryDataSkeleton />}>
-        <RecommendedContent />
-        <AnalyticsWidget />
-      </Suspense>
-    </div>
-  )
-}
-
-// 最重要データコンポーネント：複数クエリの並列実行
-function CriticalDashboardData() {
-  // useSuspenseQueriesで複数クエリを並列実行
-  const [userQuery, notificationsQuery, tasksQuery] = useSuspenseQueries({
-    queries: [
-      {
-        queryKey: ['user', 'profile'],
-        queryFn: fetchUserProfile,
-        staleTime: 5 * 60 * 1000, // 5分間キャッシュ
-      },
-      {
-        queryKey: ['notifications', 'urgent'],
-        queryFn: fetchUrgentNotifications,
-        staleTime: 1 * 60 * 1000, // 1分間キャッシュ
-      },
-      {
-        queryKey: ['tasks', 'today'],
-        queryFn: fetchTodayTasks,
-        staleTime: 2 * 60 * 1000, // 2分間キャッシュ
-      },
-    ],
+// ✅ 基本的なデータフェッチ: useQuery
+function UserProfile({ userId }: { userId: string }) {
+  const { data: user, isLoading, error } = useQuery({
+    queryKey: ['user', userId],
+    queryFn: () => fetchUser(userId)
   })
 
-  return (
-    <div className="critical-data">
-      <UserProfileCard user={userQuery.data} />
-      <UrgentNotifications notifications={notificationsQuery.data} />
-      <TodayTasks tasks={tasksQuery.data} />
-    </div>
-  )
+  if (isLoading) return <UserSkeleton />
+  if (error) return <ErrorMessage error={error} />
+
+  return <UserDetails user={user} />
 }
-```
 
-### useSuspenseQuery活用パターン
-型安全で確実なデータ取得にuseSuspenseQueryを活用します。
-
-```tsx
-// ✅ 推奨：useSuspenseQueryによる型安全なデータフェッチ
-function UserProfile({ userId }: { userId: string }) {
-  // dataは常に定義されることが保証される
+// ✅ Suspense境界内での確実なデータ: useSuspenseQuery
+function UserDetails({ userId }: { userId: string }) {
+  // data は常に定義済み、isLoading は存在しない
   const { data: user } = useSuspenseQuery({
     queryKey: ['user', userId],
-    queryFn: () => fetchUser(userId),
-    staleTime: 10 * 60 * 1000, // 10分間キャッシュ
+    queryFn: () => fetchUser(userId)
   })
 
-  const { data: preferences } = useSuspenseQuery({
-    queryKey: ['user', userId, 'preferences'],
-    queryFn: () => fetchUserPreferences(userId),
-    staleTime: 30 * 60 * 1000, // 30分間キャッシュ
-  })
-
-  // TypeScriptでdata.は常に安全にアクセス可能
-  return (
-    <div className="user-profile">
-      <h1>{user.name}</h1>
-      <p>{user.email}</p>
-      <UserPreferences preferences={preferences} />
-    </div>
-  )
-}
-
-// ❌ 避ける：useQueryでの複雑な状態管理
-function UserProfile({ userId }: { userId: string }) {
-  const { data: user, isPending: userPending, error: userError } = useQuery({
-    queryKey: ['user', userId],
-    queryFn: () => fetchUser(userId),
-  })
-
-  const { data: preferences, isPending: prefsPending } = useQuery({
-    queryKey: ['user', userId, 'preferences'],
-    queryFn: () => fetchUserPreferences(userId),
-    enabled: !!user, // 依存関係で複雑化
-  })
-
-  if (userPending) return <UserSkeleton />
-  if (userError) return <ErrorMessage error={userError} />
-  if (!user) return null
-
-  return (
-    <div className="user-profile">
-      <h1>{user.name}</h1>
-      <p>{user.email}</p>
-      {prefsPending ? (
-        <PreferencesSkeleton />
-      ) : (
-        <UserPreferences preferences={preferences} />
-      )}
-    </div>
-  )
+  return <div>{user.name}</div> // user は never undefined
 }
 ```
 
-### プリフェッチ戦略の実装
-データの事前取得でローディング時間を最小化します。
+**使い分け指針**:
+- **`useQuery`**: 標準的なデータフェッチ、条件付きローディング表示
+- **`useSuspenseQuery`**: Suspense境界内、データの存在が保証された場面
+
+### queryKey 設計原則
 
 ```tsx
-// ✅ 推奨：戦略的プリフェッチパターン
-function ArticleLayout({ articleId }: { articleId: string }) {
-  const queryClient = useQueryClient()
-
-  // 記事詳細を事前フェッチ
-  usePrefetchQuery({
-    queryKey: ['article', articleId],
-    queryFn: () => fetchArticle(articleId),
-    staleTime: 5 * 60 * 1000,
-  })
-
-  // 関連コンテンツも並行して事前フェッチ
-  usePrefetchQuery({
-    queryKey: ['article', articleId, 'comments'],
-    queryFn: () => fetchArticleComments(articleId),
-    staleTime: 2 * 60 * 1000,
-  })
-
-  usePrefetchQuery({
-    queryKey: ['article', articleId, 'related'],
-    queryFn: () => fetchRelatedArticles(articleId),
-    staleTime: 10 * 60 * 1000,
-  })
-
-  return (
-    <div className="article-layout">
-      <ArticleHeader />
-
-      {/* メインコンテンツ：事前フェッチ済みで即座に表示 */}
-      <Suspense fallback={<ArticleSkeleton />}>
-        <ArticleContent articleId={articleId} />
-      </Suspense>
-
-      {/* サイドコンテンツ：独立してストリーミング */}
-      <aside>
-        <Suspense fallback={<CommentsSkeleton />}>
-          <ArticleComments articleId={articleId} />
-        </Suspense>
-
-        <Suspense fallback={<RelatedArticlesSkeleton />}>
-          <RelatedArticles articleId={articleId} />
-        </Suspense>
-      </aside>
-    </div>
-  )
+// ✅ 推奨: 階層的で一貫したキー設計
+const userQueryKeys = {
+  all: ['users'] as const,
+  lists: () => [...userQueryKeys.all, 'list'] as const,
+  list: (filters: UserFilters) => [...userQueryKeys.lists(), filters] as const,
+  details: () => [...userQueryKeys.all, 'detail'] as const,
+  detail: (id: string) => [...userQueryKeys.details(), id] as const,
 }
-
-// インタラクション時のプリフェッチ
-function ArticleCard({ article }: { article: Article }) {
-  const queryClient = useQueryClient()
-
-  const prefetchArticle = () => {
-    queryClient.prefetchQuery({
-      queryKey: ['article', article.id],
-      queryFn: () => fetchArticle(article.id),
-      staleTime: 60 * 1000, // 1分間有効
-    })
-  }
-
-  return (
-    <article
-      className="article-card"
-      onMouseEnter={prefetchArticle} // ホバー時にプリフェッチ
-      onFocus={prefetchArticle}      // フォーカス時にプリフェッチ
-    >
-      <h3>{article.title}</h3>
-      <p>{article.summary}</p>
-      <Link to={`/articles/${article.id}`}>
-        Read More
-      </Link>
-    </article>
-  )
-}
-```
-
-## 🎯 クエリキー設計原則
-
-### 階層的クエリキー構造
-一貫性のある階層的なクエリキー設計で効率的なキャッシュ管理を実現します。
-
-```tsx
-// ✅ 推奨：階層的クエリキー設計
-const queryKeys = {
-  // エンティティレベル
-  users: ['users'] as const,
-  user: (id: string) => ['users', id] as const,
-  userProfile: (id: string) => ['users', id, 'profile'] as const,
-  userPreferences: (id: string) => ['users', id, 'preferences'] as const,
-  userPosts: (id: string, filters?: PostFilters) =>
-    ['users', id, 'posts', ...(filters ? [filters] : [])] as const,
-
-  // 機能レベル
-  posts: ['posts'] as const,
-  postList: (filters: PostFilters) => ['posts', 'list', filters] as const,
-  post: (id: string) => ['posts', id] as const,
-  postComments: (id: string, page?: number) =>
-    ['posts', id, 'comments', ...(page ? [page] : [])] as const,
-
-  // 設定レベル
-  settings: ['settings'] as const,
-  appSettings: () => ['settings', 'app'] as const,
-  userSettings: (userId: string) => ['settings', 'user', userId] as const,
-} as const
-
-// クエリキーの使用例
-function useUserProfile(userId: string) {
-  return useSuspenseQuery({
-    queryKey: queryKeys.userProfile(userId),
-    queryFn: () => fetchUserProfile(userId),
-    staleTime: 10 * 60 * 1000,
-  })
-}
-
-function useUserPosts(userId: string, filters: PostFilters) {
-  return useSuspenseQuery({
-    queryKey: queryKeys.userPosts(userId, filters),
-    queryFn: () => fetchUserPosts(userId, filters),
-    staleTime: 5 * 60 * 1000,
-  })
-}
-
-// 関連データの無効化
-function useUpdateUserProfile() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: updateUserProfile,
-    onSuccess: (updatedUser) => {
-      // 特定ユーザーのすべてのデータを無効化
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.user(updatedUser.id),
-      })
-
-      // ユーザーリストも無効化
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.users,
-      })
-    },
-  })
-}
-```
-
-### クエリファクトリパターン
-再利用可能なクエリオプション定義でコードの一貫性を保ちます。
-
-```tsx
-// ✅ 推奨：クエリファクトリパターン
-const userQueries = {
-  profile: (userId: string) => ({
-    queryKey: queryKeys.userProfile(userId),
-    queryFn: () => fetchUserProfile(userId),
-    staleTime: 10 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
-  }),
-
-  preferences: (userId: string) => ({
-    queryKey: queryKeys.userPreferences(userId),
-    queryFn: () => fetchUserPreferences(userId),
-    staleTime: 30 * 60 * 1000,
-    gcTime: 60 * 60 * 1000,
-  }),
-
-  posts: (userId: string, filters: PostFilters) => ({
-    queryKey: queryKeys.userPosts(userId, filters),
-    queryFn: () => fetchUserPosts(userId, filters),
-    staleTime: 5 * 60 * 1000,
-    gcTime: 15 * 60 * 1000,
-  }),
-} as const
 
 // 使用例
-function UserDashboard({ userId }: { userId: string }) {
-  const userProfile = useSuspenseQuery(userQueries.profile(userId))
-  const userPreferences = useSuspenseQuery(userQueries.preferences(userId))
+const userQuery = useQuery({
+  queryKey: userQueryKeys.detail(userId),
+  queryFn: () => fetchUser(userId)
+})
 
-  return (
-    <div className="user-dashboard">
-      <UserCard user={userProfile.data} />
-      <UserSettings preferences={userPreferences.data} />
-    </div>
-  )
-}
-
-// プリフェッチでも同じクエリオプションを使用
-function useUserDataPrefetch(userId: string) {
-  usePrefetchQuery(userQueries.profile(userId))
-  usePrefetchQuery(userQueries.preferences(userId))
-}
+const usersQuery = useQuery({
+  queryKey: userQueryKeys.list({ active: true }),
+  queryFn: () => fetchUsers({ active: true })
+})
 ```
 
-## 🚀 楽観的更新とミューテーション
+**キー設計原則**:
+- **配列形式**: `['entity', param1, param2]`
+- **階層構造**: エンティティ → 操作 → パラメータ
+- **型安全性**: `as const` アサーションで型推論を強化
+- **無効化効率**: 部分キーでの一括無効化を考慮
 
-### 楽観的更新の実装
-即座のUI反応性を実現する楽観的更新パターンを実装します。
-
-```tsx
-// ✅ 推奨：包括的な楽観的更新
-function useOptimisticTodoUpdate() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: updateTodo,
-
-    // 楽観的更新の実行
-    onMutate: async (updatedTodo) => {
-      // 進行中のクエリをキャンセル
-      await queryClient.cancelQueries({
-        queryKey: queryKeys.todo(updatedTodo.id)
-      })
-
-      await queryClient.cancelQueries({
-        queryKey: queryKeys.todoList()
-      })
-
-      // 現在のデータのスナップショット
-      const previousTodo = queryClient.getQueryData(
-        queryKeys.todo(updatedTodo.id)
-      )
-      const previousTodoList = queryClient.getQueryData(
-        queryKeys.todoList()
-      )
-
-      // 楽観的に個別Todoを更新
-      queryClient.setQueryData(
-        queryKeys.todo(updatedTodo.id),
-        (old: Todo) => ({ ...old, ...updatedTodo })
-      )
-
-      // 楽観的にTodoリストを更新
-      queryClient.setQueryData(
-        queryKeys.todoList(),
-        (old: Todo[]) =>
-          old.map(todo =>
-            todo.id === updatedTodo.id ? { ...todo, ...updatedTodo } : todo
-          )
-      )
-
-      // ロールバック用コンテキストを返す
-      return { previousTodo, previousTodoList, updatedTodo }
-    },
-
-    // 成功時の処理
-    onSuccess: (data, variables, context) => {
-      // サーバーからの実際のデータでキャッシュを更新
-      queryClient.setQueryData(queryKeys.todo(data.id), data)
-
-      queryClient.setQueryData(
-        queryKeys.todoList(),
-        (old: Todo[]) =>
-          old.map(todo => todo.id === data.id ? data : todo)
-      )
-
-      // 関連するクエリを無効化して最新データを取得
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.userTodos(data.userId),
-      })
-    },
-
-    // エラー時のロールバック
-    onError: (error, variables, context) => {
-      if (context?.previousTodo) {
-        queryClient.setQueryData(
-          queryKeys.todo(context.updatedTodo.id),
-          context.previousTodo
-        )
-      }
-
-      if (context?.previousTodoList) {
-        queryClient.setQueryData(
-          queryKeys.todoList(),
-          context.previousTodoList
-        )
-      }
-
-      // エラー通知
-      toast.error('Failed to update todo. Please try again.')
-    },
-
-    // 完了時の処理（成功・失敗問わず）
-    onSettled: (data, error, variables) => {
-      // 関連するクエリを無効化して整合性を保証
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.todo(variables.id),
-      })
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.todoList(),
-      })
-    },
-  })
-}
-
-// 楽観的更新の使用例
-function TodoItem({ todo }: { todo: Todo }) {
-  const updateTodoMutation = useOptimisticTodoUpdate()
-
-  const handleToggleComplete = () => {
-    updateTodoMutation.mutate({
-      id: todo.id,
-      completed: !todo.completed,
-      updatedAt: new Date().toISOString(),
-    })
-  }
-
-  return (
-    <div className={`todo-item ${todo.completed ? 'completed' : ''}`}>
-      <input
-        type="checkbox"
-        checked={todo.completed}
-        onChange={handleToggleComplete}
-        disabled={updateTodoMutation.isPending}
-      />
-      <span>{todo.title}</span>
-
-      {updateTodoMutation.isPending && (
-        <span className="updating-indicator">Updating...</span>
-      )}
-    </div>
-  )
-}
-```
-
-### バックグラウンド同期パターン
-オフライン対応とバックグラウンド同期を実装します。
+### select による部分購読パターン
 
 ```tsx
-// ✅ 推奨：オフライン対応のミューテーション
-function useOfflineCapableMutation() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: createPost,
-
-    // ネットワークモードの設定
-    networkMode: 'offlineFirst', // オフライン時も楽観的更新を実行
-
-    // 再試行設定
-    retry: (failureCount, error) => {
-      // ネットワークエラーの場合は最大5回再試行
-      if (error.name === 'NetworkError' && failureCount < 5) {
-        return true
-      }
-      // その他のエラーは3回まで
-      return failureCount < 3
-    },
-
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-
-    onMutate: async (newPost) => {
-      // 楽観的更新
-      const optimisticPost = {
-        ...newPost,
-        id: `temp-${Date.now()}`,
-        status: 'pending' as const,
-        createdAt: new Date().toISOString(),
-      }
-
-      queryClient.setQueryData(
-        queryKeys.postList(),
-        (old: Post[]) => [optimisticPost, ...old]
-      )
-
-      return { optimisticPost }
-    },
-
-    onSuccess: (data, variables, context) => {
-      // 楽観的更新を実際のデータに置き換え
-      queryClient.setQueryData(
-        queryKeys.postList(),
-        (old: Post[]) =>
-          old.map(post =>
-            post.id === context.optimisticPost.id ? data : post
-          )
-      )
-    },
-
-    onError: (error, variables, context) => {
-      // 楽観的更新を取り消し
-      if (context?.optimisticPost) {
-        queryClient.setQueryData(
-          queryKeys.postList(),
-          (old: Post[]) =>
-            old.filter(post => post.id !== context.optimisticPost.id)
-        )
-      }
-
-      // オフラインの場合は後で再試行することを通知
-      if (!navigator.onLine) {
-        toast.info('Post will be created when you come back online')
-      } else {
-        toast.error('Failed to create post')
-      }
-    },
-  })
-}
-```
-
-## 🎨 エラーハンドリング戦略
-
-### 階層的エラーバウンダリ
-コンテキストに応じた適切なエラーハンドリングを実装します。
-
-```tsx
-// ✅ グローバルエラーバウンダリ
-function GlobalErrorBoundary({ children }: { children: React.ReactNode }) {
-  return (
-    <QueryErrorResetBoundary>
-      {({ reset }) => (
-        <ErrorBoundary
-          onReset={reset}
-          fallbackRender={({ error, resetErrorBoundary }) => (
-            <div className="global-error">
-              <h1>予期しないエラーが発生しました</h1>
-              <p>申し訳ございませんが、アプリケーションでエラーが発生しました。</p>
-
-              <div className="error-actions">
-                <button
-                  onClick={resetErrorBoundary}
-                  className="btn btn-primary"
-                >
-                  再試行
-                </button>
-
-                <button
-                  onClick={() => window.location.href = '/'}
-                  className="btn btn-secondary"
-                >
-                  ホームに戻る
-                </button>
-              </div>
-
-              {process.env.NODE_ENV === 'development' && (
-                <details className="error-details">
-                  <summary>エラー詳細</summary>
-                  <pre>{error.stack}</pre>
-                </details>
-              )}
-            </div>
-          )}
-        />
-      )}
-    </QueryErrorResetBoundary>
-  )
-}
-
-// ✅ セクション固有のエラーハンドリング
-function DataSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="data-section">
-      <h2>{title}</h2>
-      <ErrorBoundary
-        fallbackRender={({ error, resetErrorBoundary }) => (
-          <div className="section-error">
-            <p>このセクションの読み込みに失敗しました</p>
-            <button onClick={resetErrorBoundary}>
-              再読み込み
-            </button>
-          </div>
-        )}
-      >
-        <Suspense fallback={<SectionSkeleton />}>
-          {children}
-        </Suspense>
-      </ErrorBoundary>
-    </section>
-  )
-}
-```
-
-### クエリレベルエラーハンドリング
-クエリの種類に応じた柔軟なエラー処理を実装します。
-
-```tsx
-// ✅ 推奨：クエリレベルのエラーハンドリング
-function useCriticalData(userId: string) {
-  return useSuspenseQuery({
-    queryKey: queryKeys.userProfile(userId),
-    queryFn: async () => {
-      try {
-        return await fetchUserProfile(userId)
-      } catch (error) {
-        // 認証エラーの場合は再ログインを促す
-        if (error.status === 401) {
-          throw new Error('認証が必要です。再度ログインしてください。')
-        }
-
-        // 権限エラー
-        if (error.status === 403) {
-          throw new Error('このデータにアクセスする権限がありません。')
-        }
-
-        // ネットワークエラー
-        if (!navigator.onLine) {
-          throw new Error('インターネット接続を確認してください。')
-        }
-
-        throw error
-      }
-    },
-    staleTime: 5 * 60 * 1000,
-
-    // 重要なデータは積極的に再試行
-    retry: (failureCount, error) => {
-      if (error.message.includes('認証') || error.message.includes('権限')) {
-        return false // 認証・権限エラーは再試行しない
-      }
-      return failureCount < 3
-    },
-
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
-  })
-}
-
-function useOptionalData(userId: string) {
-  return useQuery({
-    queryKey: queryKeys.userPreferences(userId),
-    queryFn: fetchUserPreferences,
-    staleTime: 30 * 60 * 1000,
-
-    // オプショナルなデータはエラーでもアプリを停止させない
-    throwOnError: false,
-
-    // 失敗時のデフォルトデータ
-    placeholderData: (previousData) => previousData || getDefaultPreferences(),
-
-    // 軽い再試行設定
-    retry: 1,
-    retryDelay: 5000,
-  })
-}
-```
-
-## 📊 パフォーマンス最適化
-
-### select最適化とレンダリング制御
-selectオプションで再レンダリングを最小化します。
-
-```tsx
-// ✅ 推奨：selectによる部分選択
+// ✅ 効率的な部分データ購読
 function useUserName(userId: string) {
-  return useSuspenseQuery({
-    queryKey: queryKeys.userProfile(userId),
-    queryFn: () => fetchUserProfile(userId),
-    select: (user) => user.name,  // 名前のみを選択
-    staleTime: 10 * 60 * 1000,
+  return useQuery({
+    queryKey: ['user', userId],
+    queryFn: () => fetchUser(userId),
+    // 名前のみを購読、他の変更では再レンダリングしない
+    select: (user) => user.name
   })
 }
 
 function useUserStats(userId: string) {
-  return useSuspenseQuery({
-    queryKey: queryKeys.userProfile(userId),
-    queryFn: () => fetchUserProfile(userId),
+  return useQuery({
+    queryKey: ['user', userId],
+    queryFn: () => fetchUser(userId),
+    // 統計情報のみを購読
     select: (user) => ({
-      postsCount: user.postsCount,
-      followersCount: user.followersCount,
-      followingCount: user.followingCount,
-    }),
-    staleTime: 10 * 60 * 1000,
+      postsCount: user.posts.length,
+      followersCount: user.followers.length
+    })
   })
 }
 
-// カスタムフックでの使用例
-function UserCard({ userId }: { userId: string }) {
-  const userName = useUserName(userId)    // user.nameが変更された時のみ再レンダリング
-  const userStats = useUserStats(userId)  // 統計情報が変更された時のみ再レンダリング
-
-  return (
-    <div className="user-card">
-      <h3>{userName.data}</h3>
-      <div className="stats">
-        <span>Posts: {userStats.data.postsCount}</span>
-        <span>Followers: {userStats.data.followersCount}</span>
-        <span>Following: {userStats.data.followingCount}</span>
-      </div>
-    </div>
-  )
-}
-```
-
-### 構造的共有とメモ化
-構造的共有を活用してオブジェクト参照の安定性を保ちます。
-
-```tsx
-// ✅ 推奨：構造的共有の活用
-function useTodoList(filters: TodoFilters) {
-  return useSuspenseQuery({
-    queryKey: queryKeys.todoList(filters),
-    queryFn: () => fetchTodos(filters),
-    staleTime: 5 * 60 * 1000,
-
-    // 構造的共有を有効化（デフォルト）
-    structuralSharing: true,
-
-    // selectでの安定化
-    select: useCallback((todos: Todo[]) => ({
-      completed: todos.filter(todo => todo.completed),
-      pending: todos.filter(todo => !todo.completed),
-      total: todos.length,
-    }), []),
-  })
-}
-
-// ✅ 推奨：メモ化されたselect関数
-const selectCompletedTodos = (todos: Todo[]) =>
-  todos.filter(todo => todo.completed)
-
-function useCompletedTodos(filters: TodoFilters) {
-  return useSuspenseQuery({
-    queryKey: queryKeys.todoList(filters),
-    queryFn: () => fetchTodos(filters),
-    select: selectCompletedTodos, // 関数は再作成されないため安定
-    staleTime: 5 * 60 * 1000,
+// ✅ メモ化が必要な複雑な変換
+function useProcessedUserData(userId: string) {
+  return useQuery({
+    queryKey: ['user', userId],
+    queryFn: () => fetchUser(userId),
+    select: useCallback(
+      (user) => expensiveDataTransformation(user),
+      []
+    )
   })
 }
 ```
 
-### 無限クエリとページネーション
-効率的な無限スクロール実装を行います。
+**select パターンの価値**:
+- **再レンダリング最適化**: 必要なデータのみ購読
+- **データ変換**: レスポンスデータの加工
+- **複数コンポーネント**: 同じクエリから異なる形でデータ利用
+
+## 🔄 Mutation 基本パターン
+
+### useMutation の基本実装
 
 ```tsx
-// ✅ 推奨：useSuspenseInfiniteQueryによる無限スクロール
-function useInfinitePostList(filters: PostFilters) {
-  return useSuspenseInfiniteQuery({
-    queryKey: queryKeys.postList(filters),
-    queryFn: ({ pageParam }) => fetchPosts({ ...filters, cursor: pageParam }),
-    initialPageParam: null,
-    getNextPageParam: (lastPage) => lastPage.nextCursor,
-    staleTime: 5 * 60 * 1000,
-
-    // パフォーマンス最適化
-    maxPages: 10, // メモリ使用量を制限
-  })
-}
-
-function InfinitePostList({ filters }: { filters: PostFilters }) {
-  const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-  } = useInfinitePostList(filters)
-
-  const { ref, inView } = useInView({
-    threshold: 0,
-    rootMargin: '100px',
-  })
-
-  // ビューポートに入ったら次のページを読み込み
-  useEffect(() => {
-    if (inView && hasNextPage && !isFetchingNextPage) {
-      fetchNextPage()
+// ✅ 基本的な Mutation パターン
+function useCreateUser() {
+  return useMutation({
+    mutationFn: (userData: CreateUserData) => createUser(userData),
+    onSuccess: (newUser) => {
+      // 成功時の処理
+      console.log('User created:', newUser.id)
+    },
+    onError: (error) => {
+      // エラー時の処理
+      console.error('Failed to create user:', error)
     }
-  }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage])
+  })
+}
+
+// コンポーネントでの使用
+function CreateUserForm() {
+  const createUserMutation = useCreateUser()
+
+  const handleSubmit = (formData: FormData) => {
+    const userData = {
+      name: formData.get('name') as string,
+      email: formData.get('email') as string
+    }
+
+    createUserMutation.mutate(userData, {
+      onSuccess: () => {
+        // この特定の呼び出しでの成功処理
+        navigate('/users')
+      }
+    })
+  }
 
   return (
-    <div className="post-list">
-      {data.pages.map((page, i) => (
-        <div key={i}>
-          {page.posts.map((post) => (
-            <PostCard key={post.id} post={post} />
-          ))}
-        </div>
-      ))}
-
-      {/* 無限スクロールトリガー */}
-      <div ref={ref} className="scroll-trigger">
-        {isFetchingNextPage && <PostListSkeleton />}
-      </div>
-    </div>
+    <form onSubmit={handleSubmit}>
+      {createUserMutation.isPending && <div>Creating...</div>}
+      {createUserMutation.isError && (
+        <div>Error: {createUserMutation.error.message}</div>
+      )}
+      <input name="name" required />
+      <input name="email" type="email" required />
+      <button type="submit">Create User</button>
+    </form>
   )
 }
 ```
 
-このルールに従うことで、TanStack Queryの能力を最大限に活用し、PPR相当のレンダリング戦略を実現し、優れたユーザーエクスペリエンスを提供するReactアプリケーションを構築できます。
+### mutate vs mutateAsync の使い分け
+
+```tsx
+// ✅ mutate: コールバックベースの処理
+function useCreateTodo() {
+  return useMutation({
+    mutationFn: createTodo,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['todos'] })
+    }
+  })
+}
+
+function TodoForm() {
+  const createTodo = useCreateTodo()
+
+  const handleSubmit = (data: TodoData) => {
+    createTodo.mutate(data, {
+      onSuccess: () => setIsModalOpen(false),
+      onError: (error) => setErrorMessage(error.message)
+    })
+  }
+
+  return <form onSubmit={handleSubmit}>...</form>
+}
+
+// ✅ mutateAsync: async/await パターン
+function useCreateTodoAsync() {
+  return useMutation({
+    mutationFn: createTodo
+  })
+}
+
+function TodoFormAsync() {
+  const createTodo = useCreateTodoAsync()
+
+  const handleSubmit = async (data: TodoData) => {
+    try {
+      const newTodo = await createTodo.mutateAsync(data)
+
+      // 他の非同期処理と組み合わせ
+      await uploadTodoImage(newTodo.id, imageFile)
+      await sendNotification(newTodo.id)
+
+      setIsModalOpen(false)
+    } catch (error) {
+      setErrorMessage(error.message)
+    }
+  }
+
+  return <form onSubmit={handleSubmit}>...</form>
+}
+```
+
+**使い分け指針**:
+- **`mutate`**: シンプルな成功/エラー処理、コールバック十分
+- **`mutateAsync`**: 複数の非同期処理の組み合わせ、Promise チェーン
+
+## ⚡ Optimistic Updates
+
+### 基本的な Optimistic Update パターン
+
+```tsx
+// ✅ シンプルな楽観的更新
+function useToggleTodo() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, completed }: { id: string; completed: boolean }) =>
+      updateTodo(id, { completed }),
+
+    onMutate: async ({ id, completed }) => {
+      // 進行中のリフェッチをキャンセル
+      await queryClient.cancelQueries({ queryKey: ['todos'] })
+
+      // 現在のデータをスナップショット
+      const previousTodos = queryClient.getQueryData(['todos'])
+
+      // 楽観的更新
+      queryClient.setQueryData(['todos'], (old: Todo[]) =>
+        old.map(todo =>
+          todo.id === id ? { ...todo, completed } : todo
+        )
+      )
+
+      // ロールバック用のコンテキストを返す
+      return { previousTodos }
+    },
+
+    onError: (error, variables, context) => {
+      // エラー時にロールバック
+      if (context?.previousTodos) {
+        queryClient.setQueryData(['todos'], context.previousTodos)
+      }
+    },
+
+    onSettled: () => {
+      // 成功・失敗に関わらず最新データを取得
+      queryClient.invalidateQueries({ queryKey: ['todos'] })
+    }
+  })
+}
+```
+
+### 複雑な Optimistic Update パターン
+
+```tsx
+// ✅ 新規アイテム追加の楽観的更新
+function useCreateTodo() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (newTodo: CreateTodoData) => createTodo(newTodo),
+
+    onMutate: async (newTodo) => {
+      await queryClient.cancelQueries({ queryKey: ['todos'] })
+
+      const previousTodos = queryClient.getQueryData(['todos'])
+
+      // 一時的なIDで楽観的アイテムを作成
+      const optimisticTodo = {
+        id: `temp-${Date.now()}`,
+        ...newTodo,
+        createdAt: new Date().toISOString(),
+        isOptimistic: true
+      }
+
+      queryClient.setQueryData(['todos'], (old: Todo[]) => [
+        ...old,
+        optimisticTodo
+      ])
+
+      return { previousTodos, optimisticTodo }
+    },
+
+    onSuccess: (realTodo, variables, context) => {
+      // 楽観的アイテムを実際のレスポンスで置き換え
+      queryClient.setQueryData(['todos'], (old: Todo[]) =>
+        old.map(todo =>
+          todo.id === context.optimisticTodo.id ? realTodo : todo
+        )
+      )
+    },
+
+    onError: (error, variables, context) => {
+      // 楽観的アイテムを削除
+      if (context?.previousTodos) {
+        queryClient.setQueryData(['todos'], context.previousTodos)
+      }
+    }
+  })
+}
+```
+
+## 🗄️ 基本キャッシュ操作
+
+### キャッシュ直接操作パターン
+
+```tsx
+// ✅ キャッシュの読み取りと更新
+function useUserActions(userId: string) {
+  const queryClient = useQueryClient()
+
+  const updateUserLocally = (updates: Partial<User>) => {
+    // 現在のデータを取得
+    const currentUser = queryClient.getQueryData(['user', userId])
+
+    if (currentUser) {
+      // キャッシュを直接更新
+      queryClient.setQueryData(['user', userId], {
+        ...currentUser,
+        ...updates
+      })
+    }
+  }
+
+  const invalidateUser = () => {
+    // 特定ユーザーのキャッシュを無効化
+    queryClient.invalidateQueries({ queryKey: ['user', userId] })
+  }
+
+  const removeUser = () => {
+    // キャッシュからユーザーを削除
+    queryClient.removeQueries({ queryKey: ['user', userId] })
+  }
+
+  return { updateUserLocally, invalidateUser, removeUser }
+}
+```
+
+### 効率的な invalidation パターン
+
+```tsx
+// ✅ 階層的な無効化戦略
+function useUserMutations() {
+  const queryClient = useQueryClient()
+
+  const updateUser = useMutation({
+    mutationFn: updateUser,
+    onSuccess: (updatedUser) => {
+      // 1. 特定ユーザーのキャッシュを更新
+      queryClient.setQueryData(['user', updatedUser.id], updatedUser)
+
+      // 2. ユーザー一覧も無効化
+      queryClient.invalidateQueries({
+        queryKey: ['users', 'list'],
+        exact: false // 部分マッチで関連するリストを無効化
+      })
+    }
+  })
+
+  const deleteUser = useMutation({
+    mutationFn: deleteUser,
+    onSuccess: (_, deletedUserId) => {
+      // 1. 特定ユーザーのキャッシュを削除
+      queryClient.removeQueries({ queryKey: ['user', deletedUserId] })
+
+      // 2. すべてのユーザー関連クエリを無効化
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+    }
+  })
+
+  return { updateUser, deleteUser }
+}
+```
+
+### キャッシュ状態の確認
+
+```tsx
+// ✅ キャッシュ状態の読み取り
+function useQueryStatus(queryKey: QueryKey) {
+  const queryClient = useQueryClient()
+
+  const getQueryState = () => {
+    return queryClient.getQueryState(queryKey)
+  }
+
+  const isStale = () => {
+    const state = getQueryState()
+    return state?.isInvalidated || false
+  }
+
+  const getDataAge = () => {
+    const state = getQueryState()
+    if (!state?.dataUpdatedAt) return null
+
+    return Date.now() - state.dataUpdatedAt
+  }
+
+  const isCached = () => {
+    return queryClient.getQueryData(queryKey) !== undefined
+  }
+
+  return { getQueryState, isStale, getDataAge, isCached }
+}
+```
+
+## 🎯 エラーハンドリング基本パターン
+
+### Query レベルエラー処理
+
+```tsx
+// ✅ クエリ固有のエラーハンドリング
+function useUserWithErrorHandling(userId: string) {
+  return useQuery({
+    queryKey: ['user', userId],
+    queryFn: async () => {
+      const response = await fetchUser(userId)
+      if (!response.ok) {
+        throw new Error(`Failed to fetch user: ${response.status}`)
+      }
+      return response.json()
+    },
+    retry: (failureCount, error) => {
+      // 404 エラーはリトライしない
+      if (error.message.includes('404')) return false
+
+      // 最大3回までリトライ
+      return failureCount < 3
+    },
+    retryDelay: (attemptIndex) => {
+      // 指数バックオフ
+      return Math.min(1000 * 2 ** attemptIndex, 30000)
+    }
+  })
+}
+```
+
+### Mutation エラーリカバリ
+
+```tsx
+// ✅ Mutation エラーの段階的処理
+function useCreateUserWithRecovery() {
+  return useMutation({
+    mutationFn: createUser,
+    retry: (failureCount, error) => {
+      // ネットワークエラーのみリトライ
+      if (error.name === 'NetworkError') return failureCount < 2
+      return false
+    },
+    onError: (error, variables, context) => {
+      // エラー種別に応じた処理
+      if (error.message.includes('email already exists')) {
+        // 特定エラーの処理
+        console.warn('User with this email already exists')
+      } else {
+        // 一般的なエラー処理
+        console.error('Failed to create user:', error)
+      }
+    }
+  })
+}
+```
+
+## 🏗️ 実装時の注意点
+
+### 必須原則
+
+1. **不変性の維持**: `setQueryData` では常に新しいオブジェクトを返す
+2. **型安全性**: `queryKey` の型定義と一貫性
+3. **メモリ効率**: 不要なキャッシュの適切な削除
+4. **エラー境界**: 予期しないエラーに対する適切な処理
+
+### パフォーマンス考慮事項
+
+1. **select の最適化**: 必要な場合のみメモ化
+2. **キャッシュサイズ**: 適切な `gcTime` 設定
+3. **リフェッチ戦略**: 不要な再取得の回避
+4. **並列実行**: 独立したクエリの同期実行
+
+### 避けるべきパターン
+
+1. **直接変更**: キャッシュデータの直接変更
+2. **過度な楽観的更新**: 複雑すぎる楽観的更新ロジック
+3. **キー重複**: 一貫性のないキー命名
+4. **メモリリーク**: 削除されたエンティティのキャッシュ残存
