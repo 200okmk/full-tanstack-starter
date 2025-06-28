@@ -122,18 +122,7 @@
    - Lazy Loading
    - Preloading戦略
 
-### 3. TanStack Query Rule (`tanstack-query.mdc`)
-
-#### 対象領域
-
-- データフェッチング戦略
-- キャッシュ管理
-- Mutations管理
-- エラーハンドリング
-- Optimistic Updates
-- Server State管理
-
-### 4. TanStack Integration Rule (`tanstack-integration.mdc`)
+### 3. TanStack Integration Rule (`tanstack-integration.mdc`)
 
 #### 対象領域
 

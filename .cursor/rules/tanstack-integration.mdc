@@ -1,0 +1,667 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+# TanStack Integration Rule
+
+このルールは、TanStack Start・Router・Queryの3つのライブラリを統合した現代的なフルスタックReactアプリケーションの実装パターンを定義します。Render-as-you-fetchパターンの徹底、型安全性の確保、パフォーマンス最適化を重視した設計戦略を採用します。
+
+## 🏗️ 基本統合設定
+
+### QueryClient統合の基本パターン
+
+```tsx
+// src/router.tsx
+import { createRouter as createTanStackRouter } from '@tanstack/react-router'
+import { QueryClient } from '@tanstack/react-query'
+import { routeTree } from './routeTree.gen'
+
+// 型安全なコンテキスト定義
+export interface RouterContext {
+  queryClient: QueryClient
+  user: User | null
+}
+
+export function createRouter() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 60 * 1000, // 1分
+        gcTime: 5 * 60 * 1000, // 5分
+        experimental_prefetchInRender: true, // React 19対応
+      },
+    },
+  })
+
+  return createTanStackRouter({
+    routeTree,
+    context: {
+      queryClient,
+      user: null, // 初期値、後でbeforeLoadで設定
+    } satisfies RouterContext,
+    defaultPreload: 'intent',
+    defaultPreloadStaleTime: 0,
+  })
+}
+```
+
+### Client-side統合設定
+
+```tsx
+// src/client.tsx
+/// <reference types="vinxi/types/client" />
+import { StartClient } from "@tanstack/react-start";
+import { StrictMode } from "react";
+import { hydrateRoot } from "react-dom/client";
+import { createRouter } from "./router";
+
+const router = createRouter();
+
+hydrateRoot(
+  document,
+  <StrictMode>
+    <StartClient router={router} />
+  </StrictMode>,
+);
+```
+
+### Root Route統合パターン
+
+```tsx
+// src/routes/__root.tsx
+import type { QueryClient } from "@tanstack/react-query";
+import {
+  createRootRouteWithContext,
+  HeadContent,
+  Outlet,
+  ScriptOnce,
+  Scripts,
+} from "@tanstack/react-router";
+import { createServerFn } from "@tanstack/react-start";
+import { getWebRequest } from "@tanstack/react-start/server";
+
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
+
+import { auth } from "~/lib/auth";
+import appCss from "~/lib/styles/app.css?url";
+
+const getSessionUser = createServerFn({ method: "GET" }).handler(async () => {
+  const { headers } = getWebRequest()!;
+
+  const session = await auth.api.getSession({ headers });
+
+  return session?.user ?? null;
+});
+
+export const Route = createRootRouteWithContext<{
+  queryClient: QueryClient;
+  user: Awaited<ReturnType<typeof getSessionUser>>;
+}>()({
+  beforeLoad: async ({ context }) => {
+    const user = await context.queryClient.fetchQuery({
+      queryKey: ["user"],
+      queryFn: ({ signal }) => getSessionUser({ signal }),
+    }); // キャッシュにTanstack Queryを使用, router.tsxを参照
+    return { user };
+  },
+  head: () => ({
+    meta: [
+      {
+        charSet: "utf-8",
+      },
+      {
+        name: "viewport",
+        content: "width=device-width, initial-scale=1",
+      },
+      {
+        title: "React TanStarter",
+      },
+      {
+        name: "description",
+        content: "A minimal starter template for 🏝️ TanStack Start.",
+      },
+    ],
+    links: [{ rel: "stylesheet", href: appCss }],
+  }),
+  component: RootComponent,
+});
+
+function RootComponent() {
+  return (
+    <RootDocument>
+      <Outlet />
+    </RootDocument>
+  );
+}
+
+function RootDocument({ children }: { readonly children: React.ReactNode }) {
+  return (
+    // suppress since we're updating the "dark" class in a custom script below
+    <html suppressHydrationWarning>
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        <ScriptOnce>
+          {`document.documentElement.classList.toggle(
+            'dark',
+            localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)
+            )`}
+        </ScriptOnce>
+
+        {children}
+
+        <ReactQueryDevtools buttonPosition="bottom-left" />
+        <TanStackRouterDevtools position="bottom-right" />
+
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+```
+
+## 🔄 Render-as-you-fetch パターンの徹底
+
+### 基本的なデータ取得パターン
+
+```tsx
+// 推奨：ensureQueryData + useSuspenseQuery
+export const Route = createFileRoute('/posts/$postId')({
+  loader: async ({ context, params }) => {
+    // ★ 重要なデータは確実に取得してからレンダリング
+    await context.queryClient.ensureQueryData({
+      queryKey: ['post', params.postId],
+      queryFn: () => getPost(params.postId), // createServerFn
+    })
+
+    // ★ 非重要なデータはバックグラウンドでプリフェッチ
+    context.queryClient.prefetchQuery({
+      queryKey: ['post-comments', params.postId],
+      queryFn: () => getPostComments(params.postId),
+    })
+  },
+  component: PostComponent,
+})
+
+function PostComponent() {
+  const params = Route.useParams()
+
+  // loaderで取得済み - 即座に利用可能
+  const { data: post } = useSuspenseQuery({
+    queryKey: ['post', params.postId],
+    queryFn: () => getPost(params.postId),
+  })
+
+  // プリフェッチ済み、またはクライアントで取得
+  const { data: comments, isLoading } = useQuery({
+    queryKey: ['post-comments', params.postId],
+    queryFn: () => getPostComments(params.postId),
+  })
+
+  return (
+    <article>
+      <h1>{post.title}</h1>
+      <div>{post.content}</div>
+
+      {isLoading ? (
+        <CommentsSkeleton />
+      ) : (
+        <CommentsList comments={comments} />
+      )}
+    </article>
+  )
+}
+```
+
+### 並列データフェッチの最適化
+
+```tsx
+// 複数データソースの効率的な並列取得
+export const Route = createFileRoute('/dashboard')({
+  loader: async ({ context }) => {
+    // ★ Promise.allで並列実行 - ウォーターフォール回避
+    await Promise.all([
+      context.queryClient.ensureQueryData({
+        queryKey: ['user-profile'],
+        queryFn: getUserProfile,
+      }),
+      context.queryClient.ensureQueryData({
+        queryKey: ['user-stats'],
+        queryFn: getUserStats,
+      }),
+      context.queryClient.ensureQueryData({
+        queryKey: ['recent-activity'],
+        queryFn: getRecentActivity,
+      }),
+    ])
+
+    // 非重要なデータは非同期でプリフェッチ
+    context.queryClient.prefetchQuery({
+      queryKey: ['recommendations'],
+      queryFn: getRecommendations,
+    })
+  },
+  component: DashboardComponent,
+})
+```
+
+### Server Functions統合パターン
+
+```tsx
+// Server Functionの定義
+export const getPostWithMetrics = createServerFn({
+  method: 'GET',
+})
+  .validator(z.string())
+  .handler(async ({ data: postId, context }) => {
+    // 並列でデータ取得
+    const [post, metrics, relatedPosts] = await Promise.all([
+      // Drizzle ORM SQL-like方式
+      db.select().from(posts).where(eq(posts.id, postId)),
+
+      // メトリクスの集計
+      db.select({
+        views: count(postViews.id),
+        likes: count(postLikes.id),
+      })
+        .from(postViews)
+        .leftJoin(postLikes, eq(postViews.postId, postLikes.postId))
+        .where(eq(postViews.postId, postId)),
+
+      // 関連投稿
+      db.select()
+        .from(posts)
+        .where(and(
+          ne(posts.id, postId),
+          eq(posts.published, true)
+        ))
+        .limit(3),
+    ])
+
+    return {
+      post: post[0],
+      metrics: metrics[0],
+      relatedPosts,
+    }
+  })
+
+// ルートでの使用
+export const Route = createFileRoute('/posts/$postId')({
+  loader: async ({ context, params }) => {
+    await context.queryClient.ensureQueryData({
+      queryKey: ['post-with-metrics', params.postId],
+      queryFn: () => getPostWithMetrics(params.postId),
+    })
+  },
+  component: () => {
+    const params = Route.useParams()
+    const { data } = useSuspenseQuery({
+      queryKey: ['post-with-metrics', params.postId],
+      queryFn: () => getPostWithMetrics(params.postId),
+    })
+
+    return (
+      <PostDetail
+        post={data.post}
+        metrics={data.metrics}
+        relatedPosts={data.relatedPosts}
+      />
+    )
+  },
+})
+```
+
+## 🛡️ 認証統合戦略
+
+### 認証保護ルートの実装
+
+```tsx
+// 認証ミドルウェアと統合
+export const Route = createFileRoute('/dashboard')({
+  beforeLoad: ({ context, location }) => {
+    // ルートレベルで認証済みユーザー情報を確認
+    if (!context.user) {
+      throw redirect({
+        to: '/login',
+        search: { redirect: location.href },
+      })
+    }
+
+    // 追加の認証情報を事前計算
+    return {
+      userPermissions: getUserPermissions(context.user),
+      canAccessAdmin: context.user.role === 'admin',
+    }
+  },
+
+  loader: async ({ context }) => {
+    // 認証済み前提でデータを並列取得
+    await Promise.all([
+      context.queryClient.ensureQueryData({
+        queryKey: ['user-dashboard'],
+        queryFn: () => getUserDashboard(context.user.id),
+      }),
+      context.queryClient.ensureQueryData({
+        queryKey: ['user-notifications'],
+        queryFn: () => getUserNotifications(context.user.id),
+      }),
+    ])
+  },
+
+  component: DashboardComponent,
+})
+```
+
+### データ変更時のクエリ管理
+
+```tsx
+// ユーザープロフィール更新のServer Function
+export const updateUserProfile = createServerFn({
+  method: 'POST',
+})
+  .validator(z.object({
+    name: z.string(),
+    bio: z.string().optional(),
+    avatar: z.string().optional(),
+  }))
+  .handler(async ({ data, context }) => {
+    if (!context.user) {
+      throw new Error('Authentication required')
+    }
+
+    const updatedUser = await db
+      .update(users)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(users.id, context.user.id))
+      .returning()
+
+    return updatedUser[0]
+  })
+
+// クライアントサイドでの使用
+function ProfileUpdateForm() {
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
+
+  const updateProfileMutation = useMutation({
+    mutationFn: updateUserProfile,
+    onSuccess: (updatedUser) => {
+      // ★ 関連するユーザーデータキャッシュを無効化
+      queryClient.invalidateQueries({ queryKey: ['user', updatedUser.id] })
+      queryClient.invalidateQueries({ queryKey: ['user-profile'] })
+
+      // ★ 楽観的更新でユーザー情報をすぐに反映
+      queryClient.setQueryData(['session'], (oldSession: any) =>
+        oldSession ? { ...oldSession, user: updatedUser } : oldSession
+      )
+
+      // ★ プロフィールページにリダイレクト
+      navigate({ to: '/profile' })
+    },
+    onError: (error) => {
+      console.error('Profile update failed:', error)
+    },
+  })
+
+  return (
+    <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault()
+      const formData = new FormData(e.target)
+      updateProfileMutation.mutate({
+        name: formData.get('name') as string,
+        bio: formData.get('bio') as string,
+      })
+    }}>
+      <input name="name" placeholder="Name" required />
+      <textarea name="bio" placeholder="Bio" />
+      <button
+        type="submit"
+        disabled={updateProfileMutation.isPending}
+      >
+        {updateProfileMutation.isPending ? 'Updating...' : 'Update Profile'}
+      </button>
+    </form>
+  )
+}
+```
+
+### 条件付きデータフェッチ
+
+```tsx
+// ユーザー権限に基づく条件付きデータ取得
+export const Route = createFileRoute('/admin')({
+  beforeLoad: ({ context }) => {
+    if (!context.user?.isAdmin) {
+      throw redirect({ to: '/dashboard' })
+    }
+  },
+
+  loader: async ({ context }) => {
+    // 管理者のみがアクセス可能なデータ
+    await Promise.all([
+      context.queryClient.ensureQueryData({
+        queryKey: ['admin-stats'],
+        queryFn: getAdminStats,
+      }),
+      context.queryClient.ensureQueryData({
+        queryKey: ['user-management'],
+        queryFn: getUserManagement,
+      }),
+    ])
+  },
+
+  component: AdminComponent,
+})
+```
+
+## ⚡ パフォーマンス最適化
+
+### 重要度別Suspense境界設計
+
+```tsx
+function DashboardPage() {
+  return (
+    <div className="dashboard">
+      {/* 即座に表示される静的コンテンツ */}
+      <DashboardHeader />
+      <Navigation />
+
+      {/* 重要なデータ - 並列フェッチで即座に表示 */}
+      <Suspense fallback={<CriticalDataSkeleton />}>
+        <CriticalDashboardData />
+      </Suspense>
+
+      {/* 補助的なデータ - 独立してフェッチ */}
+      <Suspense fallback={<SecondaryDataSkeleton />}>
+        <SecondaryDashboardData />
+      </Suspense>
+
+      {/* 非重要なデータ - 最後にフェッチ */}
+      <Suspense fallback={<OptionalDataSkeleton />}>
+        <OptionalDashboardData />
+      </Suspense>
+    </div>
+  )
+}
+
+// 重要なデータコンポーネント
+function CriticalDashboardData() {
+  const { data: profile } = useSuspenseQuery({
+    queryKey: ['user-profile'],
+    queryFn: getUserProfile,
+  })
+
+  const { data: stats } = useSuspenseQuery({
+    queryKey: ['user-stats'],
+    queryFn: getUserStats,
+  })
+
+  return (
+    <div className="grid grid-cols-2">
+      <UserProfileCard profile={profile} />
+      <UserStatsCard stats={stats} />
+    </div>
+  )
+}
+```
+
+### 効率的なキャッシュ戦略
+
+```tsx
+// キャッシュ無効化の効率的なパターン
+export const createPost = createServerFn({
+  method: 'POST',
+})
+  .validator(createPostSchema)
+  .handler(async ({ data, context }) => {
+    const newPost = await db.insert(posts).values({
+      ...data,
+      authorId: context.user.id,
+      createdAt: new Date(),
+    }).returning()
+
+    return newPost[0]
+  })
+
+// クライアントサイドでの使用
+function CreatePostForm() {
+  const queryClient = useQueryClient()
+
+  const createPostMutation = useMutation({
+    mutationFn: createPost,
+    onSuccess: (newPost) => {
+      // ★ 関連するクエリを効率的に無効化
+      queryClient.invalidateQueries({ queryKey: ['posts'] })
+      queryClient.invalidateQueries({ queryKey: ['user-posts'] })
+
+      // ★ 新しい投稿を既存キャッシュに楽観的に追加
+      queryClient.setQueryData(['posts'], (oldPosts: Post[]) =>
+        [newPost, ...(oldPosts || [])]
+      )
+    },
+  })
+
+  return <PostForm onSubmit={createPostMutation.mutate} />
+}
+```
+
+## 🎯 エラーハンドリング統合
+
+### 統合エラーバウンダリ戦略
+
+```tsx
+// Route レベルエラーハンドリング
+export const Route = createFileRoute('/posts/$postId')({
+  loader: async ({ context, params }) => {
+    try {
+      await context.queryClient.ensureQueryData({
+        queryKey: ['post', params.postId],
+        queryFn: () => getPost(params.postId),
+      })
+    } catch (error) {
+      // ★ 404エラーは適切にハンドリング
+      if (error.status === 404) {
+        throw notFound()
+      }
+      throw error
+    }
+  },
+
+  errorComponent: ({ error, reset }) => {
+    if (error.status === 404) {
+      return <PostNotFound />
+    }
+
+    return (
+      <div className="error-container">
+        <h2>Something went wrong</h2>
+        <p>{error.message}</p>
+        <button onClick={reset}>Try again</button>
+      </div>
+    )
+  },
+
+  component: PostComponent,
+})
+```
+
+### Server Function エラーハンドリング
+
+```tsx
+// エラーレスポンスの標準化
+export const getPost = createServerFn({
+  method: 'GET',
+})
+  .validator(z.string())
+  .handler(async ({ data: postId }) => {
+    try {
+      const [post] = await db
+        .select()
+        .from(posts)
+        .where(eq(posts.id, postId))
+
+      if (!post) {
+        setResponseStatus(404)
+        throw new Error('Post not found')
+      }
+
+      return post
+    } catch (error) {
+      // ログ記録
+      console.error('Failed to fetch post:', error)
+
+      if (error.message === 'Post not found') {
+        throw error
+      }
+
+      setResponseStatus(500)
+      throw new Error('Failed to fetch post')
+    }
+  })
+```
+
+## 🔧 開発・デバッグ戦略
+
+### 開発用ツールの統合
+
+```tsx
+// src/routes/__root.tsx での開発ツール設定
+function RootComponent() {
+  return (
+    <RootDocument>
+      <Outlet />
+    </RootDocument>
+  );
+}
+
+function RootDocument({ children }: { readonly children: React.ReactNode }) {
+  return (
+    // suppress since we're updating the "dark" class in a custom script below
+    <html suppressHydrationWarning>
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        <ScriptOnce>
+          {`document.documentElement.classList.toggle(
+            'dark',
+            localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)
+            )`}
+        </ScriptOnce>
+
+        {children}
+
+        <ReactQueryDevtools buttonPosition="bottom-left" />
+        <TanStackRouterDevtools position="bottom-right" />
+
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+```
+
+このルールに従うことで、TanStack Start・Router・Queryの3つのライブラリを効率的に統合し、高性能で保守性の高いフルスタックReactアプリケーションを構築できます。
