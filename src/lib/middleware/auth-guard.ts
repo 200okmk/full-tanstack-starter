@@ -6,7 +6,7 @@ import { auth } from "~/lib/auth";
 // This is a sample middleware that you can use in your server functions.
 
 /**
- * Middleware to force authentication on a server function, and add the user to the context.
+ * サーバー機能で認証を強制し、ユーザーをコンテキストに追加するミドルウェア
  */
 export const authMiddleware = createMiddleware().server(async ({ next }) => {
   const { headers } = getWebRequest()!;
@@ -14,7 +14,6 @@ export const authMiddleware = createMiddleware().server(async ({ next }) => {
   const session = await auth.api.getSession({
     headers,
     query: {
-      // ensure session is fresh
       // https://www.better-auth.com/docs/concepts/session-management#session-caching
       disableCookieCache: true,
     },

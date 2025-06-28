@@ -31,7 +31,7 @@ export const Route = createRootRouteWithContext<{
     const user = await context.queryClient.fetchQuery({
       queryKey: ["user"],
       queryFn: ({ signal }) => getSessionUser({ signal }),
-    }); // we're using react-query for caching, see router.tsx
+    }); // キャッシュにTanstack Queryを使用, router.tsxを参照
     return { user };
   },
   head: () => ({
