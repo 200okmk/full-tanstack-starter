@@ -239,50 +239,97 @@ function Home() {
 ### createFileRoute の正しい使用法
 
 ```tsx
-// ✅ 正しい順序: beforeLoad → loader → component
+// ✅ パターン1: 認証チェックのみ（シンプルなケース）
 export const Route = createFileRoute('/posts/$postId')({
-  // 1. beforeLoad: コンテキスト設定・認証チェック・事前計算
-  beforeLoad: ({ params, context }) => {
-    return {
-      postId: params.postId,
-      isOwner: context.user?.posts?.includes(params.postId), // 所有者チェック
-      calculatedResult: calculateSomething(context.user, params.postId) // 計算結果
+  beforeLoad: ({ context }) => {
+    if (!context.user) {
+      throw redirect({ to: '/login' })
     }
+    // 認証チェックのみの場合は何も返さない
   },
 
-  // 2. loader: データフェッチ（beforeLoadの結果を利用可能）
-  loader: async ({ context, params }) => {
-    // TypeScriptが正しく型推論
+  loader: async ({ params }) => {
+    // paramsは直接使用可能
     await context.queryClient.ensureQueryData({
       queryKey: ['post', params.postId],
       queryFn: () => getPost(params.postId)
     })
   },
 
-  // 3. component: UIレンダリング
   component: PostComponent
 })
 
-function PostComponent() {
+// ✅ パターン2: 権限チェックと事前計算が必要なケース
+export const Route = createFileRoute('/posts/$postId/edit')({
+  beforeLoad: ({ params, context }) => {
+    if (!context.user) {
+      throw redirect({ to: '/login' })
+    }
+
+    // 実際に意味のある事前計算
+    const userRole = context.user.role
+    const canEditPost = userRole === 'admin' || userRole === 'editor'
+
+    if (!canEditPost) {
+      throw redirect({ to: '/posts/$postId', params: { postId: params.postId } })
+    }
+
+    return {
+      canEditPost,
+      userRole,
+      editPermissions: getEditPermissions(userRole)
+    }
+  },
+
+  loader: async ({ params, context }) => {
+    // beforeLoadの結果とparamsの両方を使用
+    await Promise.all([
+      context.queryClient.ensureQueryData({
+        queryKey: ['post', params.postId],
+        queryFn: () => getPost(params.postId)
+      }),
+      // 編集権限がある場合のみ追加データを取得
+      context.canEditPost && context.queryClient.ensureQueryData({
+        queryKey: ['post-edit-data', params.postId],
+        queryFn: () => getPostEditData(params.postId)
+      })
+    ])
+  },
+
+  component: PostEditComponent
+})
+
+function PostEditComponent() {
   const params = Route.useParams() // { postId: string }
-  const { isOwner, calculatedResult } = Route.useRouteContext() // beforeLoadの戻り値
+  const { canEditPost, editPermissions } = Route.useRouteContext()
 
   return (
     <div>
-      <h1>Post: {params.postId}</h1>
-      {canEdit && <button>Edit</button>}
-      {isOwner && <button>Delete</button>}
+      <h1>Edit Post: {params.postId}</h1>
+      {editPermissions.canChangeTitle && <input placeholder="Title" />}
+      {editPermissions.canPublish && <button>Publish</button>}
     </div>
   )
 }
+
+// ✅ パターン3: データフェッチングのみ（beforeLoad不要）
+export const Route = createFileRoute('/posts/$postId')({
+  loader: async ({ params }) => {
+    return getPost(params.postId)
+  },
+  component: PostComponent
+})
 ```
 
-**beforeLoad()を使う理由**:
-- **Route.useParams()で直接アクセス可能**だが、beforeLoad()には以下の利点：
-  1. **認証・権限チェック**: paramsに基づくアクセス制御
-  2. **データの事前計算**: paramsを使った派生データの計算
-  3. **型安全なコンテキスト**: Route.useRouteContext()での型安全なアクセス
-  4. **エラーハンドリング**: 無効なparamsでのリダイレクト処理
+**beforeLoad()を使うべき場面**:
+- **認証・権限チェック**: ユーザー状態に基づくアクセス制御
+- **事前計算**: paramsやcontextを使った派生データの計算
+- **条件付きリダイレクト**: 無効な状態での適切な画面遷移
+- **型安全なコンテキスト**: Route.useRouteContext()での型安全なアクセス
+
+**beforeLoad()が不要な場面**:
+- 単純なデータフェッチングのみ
+- paramsの値をそのまま使用する場合
 
 ### Route API の型安全活用
 
