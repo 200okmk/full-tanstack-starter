@@ -50,12 +50,14 @@ src/
 
 ```text
 .cursor/rules/
-├── tanstack-integration.mdc      # TanStack エコシステム統合（核）
-├── react.mdc                     # React 19 + Compiler 原則（核）
-├── project-architecture.mdc      # プロジェクト構造・設計原則（核）
+├── react.mdc                     # React 19 + Compiler 原則
+├── tanstack-integration.mdc      # TanStack エコシステム統合
+├── tanstack-start.mdc            # TanStack Start機能関連
+├── tanstack-integration.mdc      # TanStack Router機能関連
+├── project-architecture.mdc      # プロジェクト構造・設計原則
 ├── authentication.mdc             # Better Auth 認証認可戦略
 ├── database.mdc                   # Drizzle ORM + PostgreSQL戦略
-├── ui-components.mdc              # Tailwind + shadcn/ui デザイン
+├── ui-components.mdc              # Tailwind + shadcn/ui + アクセシビリティ
 ├── typescript.mdc                 # TypeScript/JavaScript 規約
 ├── development-workflow.mdc       # ESLint + Git + ブランチ戦略
 ├── testing.mdc                    # Vitest テスト戦略
