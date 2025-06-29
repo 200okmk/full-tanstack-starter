@@ -2,7 +2,7 @@ import type { Config } from "drizzle-kit";
 
 export default {
   // マイグレーションファイルの出力ディレクトリ
-  out: "./src/lib/db/migrations",
+  out: "./migrations",
 
   // スキーマ定義ファイルのパス（テーブル定義を含むファイル）
   schema: "./src/lib/db/schemas/index.ts",
