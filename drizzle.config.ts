@@ -5,7 +5,7 @@ export default {
   out: "./migrations",
 
   // スキーマ定義ファイルのパス（テーブル定義を含むファイル）
-  schema: "./src/lib/db/schemas/index.ts",
+  schema: "./src/db/schemas/index.ts",
 
   // drizzle-kit push コマンドを実行するときに、出力された SQL ステートメントを実行するかどうかを確認するプロンプトが表示される
   strict: true,
