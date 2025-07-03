@@ -7,9 +7,9 @@ import { db } from "~/db";
 import {
   accountsTable,
   sessionsTable,
+  usersTable,
   verificationTokensTable,
-} from "~/db/schemas/auth.schema";
-import { usersTable } from "~/db/schemas/public.schema";
+} from "~/db/schema";
 import { getOAuthRedirectURL, getProductionURL } from "~/lib/utils";
 
 const productionURL = getProductionURL();
