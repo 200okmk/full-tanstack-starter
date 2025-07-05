@@ -31,9 +31,11 @@ src/
 │   └── api/                  # API ルート
 │       └── auth/
 │           └── $.ts         # 認証API（Better Auth）
-├── serverFn/                # サーバー関数
+├── server/                  # サーバー関数
+├── db/                      # Drizzle
+│   ├── schema.ts            # DBスキーマ
+│   ├── index.ts             # DBインスタンス設定
 ├── lib/                     # 共通ライブラリ
-│   ├── db/                  # DBインスタンス設定、DBスキーマ、マイグレーションファイル
 │   ├── middleware/          # Tanstack StartのMiddleware
 │   ├── auth.ts              # Better Auth設定ファイル
 │   └── utils.ts             # 一般的なユーティリティヘルパー関数
