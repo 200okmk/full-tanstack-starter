@@ -11,7 +11,7 @@ alwaysApply: false
 ### **🏗️ Drizzleスキーマの構造と命名規則**
 
 ```ts
-// src/db/schema.ts - `schema.ts`ファイル内では上から順にテーブル定義（認証関連、アプリ本体Entity）、リレーション定義、Zodスキーマ生成、TS型生成の順番で、コメントアウトでわかりやすくセクション化しながら記述していく。また各セクションの冒頭に定義した命名規則を徹底する。
+// src/db/schema.ts - `schema.ts`ファイル内では上から順にテーブル定義（認証関連、アプリ本体Entity）、リレーション定義、Zodスキーマ生成、TS型生成の順番にコメントアウトでわかりやすくセクション化しながら記述していく。また各セクションの冒頭に定義した命名規則を徹底する。
 
 // =============================================================================
 // Schema Factory設定（プロジェクト全体で統一的なルールを適用。毎回型強制coerceの自動適用など）
@@ -26,7 +26,7 @@ const { createInsertSchema: createInsert, createSelectSchema: createSelect } = c
 // =============================================================================
 // テーブル定義
 // =============================================================================
-// 命名規則: 各テーブルのTSオブジェクト名は{entity}TableやcreatedAtなどcamelCaseにし、DB上の実テーブル名（pgTableの第1引数など）はusers, verification_tokensのようにsnake_caseにする。
+// 命名規則: 各テーブルのTSオブジェクト名は{entity}Table、各カラムのプロパティ名はやcreatedAtなどcamelCaseにする。一方、DB上の実テーブル名（pgTableの第1引数など）はusers, verification_tokensのようにsnake_caseにする。
 // 認証関連
 export const usersTable = pgTable("users", {
   id: text("id").primaryKey(),
@@ -158,51 +158,149 @@ export type ValidatedPostSelect = z.infer<typeof postSelectSchema>;
 
 ```
 
-### **単一ファイル集約管理**
+### **Single Source of Truthの徹底**
 
-##
+`schema.ts`にて定義したdrizzle-zod統合によるZodスキーマとTS型をコードベース全体で一貫してimport使用し、独自定義をなるべく避けることで保守性を向上する。
+
+#### **🎯 適用必須ユースケース**
+
+**📊 データベース層**
+- テーブル定義時のZodスキーマ自動生成（createInsertSchema, createSelectSchema, createUpdateSchema）
+- テーブル定義時のTS型自動生成（生成したZodスキーマから型推論、Drizzleスキーマから直接型生成の2パターン）
+- シード処理・初期データ作成時の型安全性
+- マイグレーション後のデータ検証
+
+**🔧 TanStack Start Server Functions**
+- Server Function入力検証（POST/PUT request body）
+- Server Function出力検証（レスポンス型安全性）
+- createServerFn validator統合
+- 認証保護されたServer Functions
+- ファイルアップロード検証
+
+**⚛️ TanStack Router統合**
+- Route loader検証（URL params, search params）
+- Route beforeLoad検証
+- 動的ルート（$userId等）パラメータ検証
+- navigate時のstate検証
+
+**📊 TanStack Query統合**
+- queryFn戻り値型安全性
+- mutationFn引数・戻り値検証
+- optimistic update時のデータ検証
+- キャッシュデータ整合性チェック
+
+**📝 フォーム処理（TanStack Formなどフォームライブラリでも同様）**
+- フォーム入力検証
+- フィールドレベルバリデーション
+- 送信前データ変換・正規化
+- エラーメッセージ表示
+
+**🔐 Better Auth統合**
+- ユーザー登録・ログインデータ検証
+- セッションデータ検証
+- JWT payload検証
+- 権限・ロール検証
+
+**🎨 UI コンポーネント（shadcn/ui）**
+- コンポーネントProps型安全性
+- イベントハンドラー引数検証
+- 条件付きレンダリング型ガード
+
+**💾 状態管理（Zustand追加時）**
+- store state型定義
+- action payload検証
+- state更新時の型安全性
+
+**🧪 テスト環境（Vitest/Playwright追加時）**
+- モックデータ生成
+- テスト用フィクスチャ作成
+- API レスポンス検証
+- E2Eテスト用データ準備
+
+**☁️ 外部サービス統合（AWS SDK追加時）**
+- 外部API連携時の型変換
+- 設定値・環境変数検証
+- AWS service request/response検証
+
+**🔗 ユーティリティ・共通処理**
+- データ変換関数（transformer）
+- 型ガード関数（type guard）
+- バリデーション関数（validator）
+- 設定ファイル検証
+
+#### **✅ 統合パターン例**
+
+```tsx
+// ❌ 避けるべき独自定義
+const customUserSchema = z.object({
+  name: z.string(),
+  email: z.string().email(),
+  // 独自に定義したスキーマ
+});
+
+// ✅ 推奨: schema.tsからインポート
+import { userInsertSchema, userSelectSchema, User, ValidatedUserInsert } from "~/db/schema";
+
+// Server Function統合
+export const createUser = createServerFn({
+  method: "POST",
+})
+  .validator(userInsertSchema) // ★ schema.tsで生成されたスキーマを使用
+  .handler(async ({ data }) => {
+    // data は ValidatedUserInsert 型として自動推論
+    const [user] = await db.insert(usersTable).values(data).returning();
+    return user; // User 型として自動推論
+  });
 
 
-```ts
-// =============================================================================
-// テーブル定義
-// =============================================================================
-// 認証関連テーブル
-export const usersTable = pgTable("users", { /* ... */ });
+// ユーティリティ関数統合
+export function transformUserData(rawData: unknown): ValidatedUserInsert {
+  return userInsertSchema.parse(rawData); // ★ schema.tsで定義された検証ロジック
+}
 
+export function isValidUser(data: unknown): data is User {
+  return userSelectSchema.safeParse(data).success; // ★ 型ガード関数も統一
+}
 
-// アプリ本体のEntity
-export const postsTable = pgTable("posts", { /* ... */ });
-export const commentsTable = pgTable("comments", { /* ... */ });
+// テスト統合
+export function createMockUser(overrides?: Partial<ValidatedUserInsert>): User {
+  const defaultUser = {
+    id: 1,
+    name: "Test User",
+    email: "test@example.com",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  };
 
+  return userSelectSchema.parse(defaultUser); // ★ テストデータも同じスキーマで検証
+}
 
-// =============================================================================
-// Zodスキーマ定義
-// =============================================================================
-export const postsTable = pgTable("posts", { /* ... */ });
-export const commentsTable = pgTable("comments", { /* ... */ });
+// TanStack Query統合
+function useUser(userId: string) {
+  return useSuspenseQuery({
+    queryKey: ["user", userId],
+    queryFn: () => getUserById(userId), // ★ 戻り値は User 型として自動推論
+  });
+}
 
-// コンテンツ関連スキーマ
-export const postInsertSchema = createInsertSchema(postsTable, { /* ... */ });
-export const commentInsertSchema = createInsertSchema(commentsTable, { /* ... */ });
+// TanStack Router統合
+export const Route = createFileRoute("/users/$userId")({
+  loader: async ({ context, params }) => {
+    // ★ パラメータ検証も統一スキーマで
+    const userId = z.string().parse(params.userId);
+
+    await context.queryClient.ensureQueryData({
+      queryKey: ["user", userId],
+      queryFn: () => getUserById(userId),
+    });
+  },
+  component: UserDetailComponent,
+});
 ```
 
-### **命名規則の統一**
+**重要原則**: 新しいデータ構造や検証ロジックが必要な場合は、まず`schema.ts`への追加を検討し、既存スキーマの拡張や組み合わせで解決できないかを判断してから独自定義を行う。
 
-```ts
-// ✅ 推奨: 一貫した命名パターン
-//
-export const usersTable = pgTable("users", { /* ... */ });
-export const userInsertSchema = createInsertSchema(usersTable);       // スキーマ:
-export const userSelectSchema = createSelectSchema(usersTable);
-export type User = typeof usersTable.$inferSelect;                    // 型: {Entity}（DB内部用）
-export type ValidatedUserInsert = z.infer<typeof userInsertSchema>;   // 型:
-
-// ❌ 非推奨: 不一致な命名
-export const users = pgTable("users", { /* ... */ });                // テーブル名の不一致
-export const createUserSchema = createInsertSchema(users);            // 動詞形の使用
-export type UserType = typeof users.$inferSelect;                     // 不必要なサフィックス
-```
 
 ## 🔍 クエリビルド標準
 
