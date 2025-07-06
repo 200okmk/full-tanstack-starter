@@ -1,3 +1,8 @@
+---
+alwaysApply: true
+
+---
+
 # Drizzle Zod Rule
 
 このルールは、Drizzle ORM・drizzle-zod統合による現代的なデータベース操作パターンを定義します。Single Source of Truthの徹底実現、型安全性の確保、TanStack Start Server Functions統合を重視した設計戦略を採用します。
@@ -171,14 +176,8 @@ export type PostUpdate = z.infer<typeof postUpdateSchema>;
 - 動的ルート（$userId等）パラメータ検証
 - navigate時のstate検証
 
-**📊 TanStack Query統合**
-- queryFn戻り値型安全性
-- mutationFn引数・戻り値検証
-- optimistic update時のデータ検証
-- キャッシュデータ整合性チェック
-
 **📝 フォーム処理（TanStack Form）**
-- フォーム入力検証
+- フォーム入力検証（`validators: { onChange: userInsertSchema }`）
 - フィールドレベルバリデーション
 - 送信前データ変換・正規化
 - エラーメッセージ表示
@@ -211,7 +210,7 @@ export type PostUpdate = z.infer<typeof postUpdateSchema>;
 - バリデーション関数（validator）
 - 設定ファイル検証
 
-#### **✅ 統合パターン例**
+#### **✅ 基本統合パターン**
 
 ```tsx
 // ❌ 避けるべき独自定義
@@ -223,68 +222,15 @@ const customUserSchema = z.object({
 // ✅ 推奨: schema.tsからインポート
 import { userInsertSchema, userSelectSchema, User, UserInsert } from "~/db/schema";
 
-// フォーム統合
-function UserForm() {
-  const createUserMutation = useCreateUser();
-
-  const form = useForm({
-    defaultValues: {
-      name: '',
-      email: '',
-    },
-    validators: {
-      onChange: userInsertSchema,
-    },
-    onSubmit: async ({ value }) => {
-      await createUserMutation.mutateAsync(value);
-    },
-  });
-
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        form.handleSubmit();
-      }}
-    >
-      <form.Field
-        name="name"
-        validators={{
-          onChange: ({ value }) =>
-            !value ? 'Name is required' : undefined,
-        }}
-      >
-        {(field) => (
-          <div>
-            <input
-              value={field.state.value || ""}
-              onChange={(e) => field.handleChange(e.target.value)}
-              onBlur={field.handleBlur}
-            />
-            {field.state.meta.errors.map((error) => (
-              <span key={error} className="error">{error}</span>
-            ))}
-          </div>
-        )}
-      </form.Field>
-
-      <form.Subscribe
-        selector={(state) => [state.canSubmit, state.isSubmitting]}
-        children={([canSubmit, isSubmitting]) => (
-          <button type="submit" disabled={!canSubmit}>
-            {isSubmitting ? '作成中...' : '作成'}
-          </button>
-        )}
-      />
-    </form>
-  );
-}
-
 // ユーティリティ関数統合
 export function validateUserData(data: unknown): UserInsert | null {
   const result = userInsertSchema.safeParse(data);
   return result.success ? result.data : null;
+}
+
+// 型ガード関数
+export function isValidUser(data: unknown): data is User {
+  return userSelectSchema.safeParse(data).success;
 }
 ```
 
@@ -301,7 +247,7 @@ src/
 │   └── auth.ts           # 認証関連 Server Functions
 ```
 
-**📋 Entityごとのファイル分割原則**
+### **📋 Entityごとの標準実装パターン**
 
 ```tsx
 // src/server/users.ts - ユーザー関連 Server Functions
@@ -310,6 +256,7 @@ import { eq, like, desc, count } from "drizzle-orm";
 import { db } from "~/db";
 import {
   usersTable,
+  postsTable,
   userInsertSchema,
   userUpdateSchema,
   type User,
@@ -317,191 +264,12 @@ import {
   type UserUpdate,
 } from "~/db/schema";
 
-// ✅ CREATE - ユーザー作成
+// ✅ CREATE - バリデーション + 重複チェック + トランザクション
 export const createUser = createServerFn({
   method: "POST",
 })
   .validator(userInsertSchema)
   .handler(async ({ data }) => {
-    // 重複チェック + 作成処理
-    return await db.transaction(async (tx) => {
-      const existing = await tx
-        .select({ id: usersTable.id })
-        .from(usersTable)
-        .where(eq(usersTable.email, data.email))
-        .limit(1);
-
-      if (existing.length > 0) {
-        throw new Error("メールアドレスが既に存在します");
-      }
-
-      const [user] = await tx.insert(usersTable).values(data).returning();
-      return user;
-    });
-  });
-
-// ✅ READ - ユーザー一覧取得
-export const getUsers = createServerFn({
-  method: "GET",
-})
-  .validator(z.object({
-    page: z.number().min(1).default(1),
-    limit: z.number().min(1).max(100).default(10),
-    search: z.string().optional(),
-  }))
-  .handler(async ({ data: { page, limit, search } }) => {
-    const offset = (page - 1) * limit;
-
-    return await db
-      .select({
-        id: usersTable.id,
-        name: usersTable.name,
-        email: usersTable.email,
-        createdAt: usersTable.createdAt,
-      })
-      .from(usersTable)
-      .where(search ? like(usersTable.name, `%${search}%`) : undefined)
-      .orderBy(desc(usersTable.createdAt))
-      .limit(limit)
-      .offset(offset);
-  });
-
-// ✅ UPDATE - ユーザー更新
-export const updateUser = createServerFn({
-  method: "PUT",
-})
-  .validator(z.object({
-    id: z.string(),
-    data: userUpdateSchema,
-  }))
-  .handler(async ({ data: { id, data } }) => {
-    const [user] = await db
-      .update(usersTable)
-      .set({ ...data, updatedAt: new Date() })
-      .where(eq(usersTable.id, id))
-      .returning();
-
-    if (!user) {
-      throw new Error("ユーザーが見つかりません");
-    }
-
-    return user;
-  });
-
-// ✅ DELETE - ユーザー削除
-export const deleteUser = createServerFn({
-  method: "DELETE",
-})
-  .validator(z.object({
-    id: z.string(),
-  }))
-  .handler(async ({ data: { id } }) => {
-    const [deletedUser] = await db
-      .delete(usersTable)
-      .where(eq(usersTable.id, id))
-      .returning();
-
-    if (!deletedUser) {
-      throw new Error("ユーザーが見つかりません");
-    }
-
-    return { success: true, deletedUser };
-  });
-```
-
-```tsx
-// src/server/posts.ts - 投稿関連 Server Functions
-import { createServerFn } from "@tanstack/react-start";
-import { eq, desc, and } from "drizzle-orm";
-import { db } from "~/db";
-import {
-  postsTable,
-  usersTable,
-  postInsertSchema,
-  postUpdateSchema,
-  type Post,
-  type PostInsert,
-} from "~/db/schema";
-
-// ✅ CREATE - 投稿作成（認証保護）
-export const createPost = createServerFn({
-  method: "POST",
-})
-  .validator(postInsertSchema.omit({ userId: true }))
-  .handler(async ({ data, context }) => {
-    // 認証チェック
-    if (!context.user) {
-      throw new Error("認証が必要です");
-    }
-
-    const [post] = await db
-      .insert(postsTable)
-      .values({ ...data, userId: context.user.id })
-      .returning();
-
-    return post;
-  });
-
-// ✅ READ - 投稿一覧取得（JOIN）
-export const getPosts = createServerFn({
-  method: "GET",
-})
-  .validator(z.object({
-    page: z.number().min(1).default(1),
-    limit: z.number().min(1).max(20).default(10),
-    authorId: z.string().optional(),
-    published: z.boolean().optional(),
-  }))
-  .handler(async ({ data: { page, limit, authorId, published } }) => {
-    const offset = (page - 1) * limit;
-
-    return await db
-      .select({
-        id: postsTable.id,
-        title: postsTable.title,
-        content: postsTable.content,
-        published: postsTable.published,
-        createdAt: postsTable.createdAt,
-        author: {
-          id: usersTable.id,
-          name: usersTable.name,
-        },
-      })
-      .from(postsTable)
-      .leftJoin(usersTable, eq(postsTable.userId, usersTable.id))
-      .where(
-        and(
-          authorId ? eq(postsTable.userId, authorId) : undefined,
-          published !== undefined ? eq(postsTable.published, published) : undefined
-        )
-      )
-      .orderBy(desc(postsTable.createdAt))
-      .limit(limit)
-      .offset(offset);
-  });
-```
-
-### **基本統合アーキテクチャ**
-
-```tsx
-// src/server/users.ts - 統合Server Functions実装例
-import { createServerFn } from "@tanstack/react-start";
-import { eq, and, desc, count } from "drizzle-orm";
-import { db } from "~/db";
-import {
-  usersTable, postsTable,
-  userInsertSchema, userSelectSchema, userUpdateSchema,
-  postInsertSchema, postSelectSchema,
-  type User, type UserInsert, type PostInsert
-} from "~/db/schema";
-
-// ✅ 作成 - カスタムバリデーション + 重複チェック + トランザクション
-export const createUser = createServerFn({
-  method: "POST",
-})
-  .validator(userInsertSchema)
-  .handler(async ({ data }) => {
-    // 入力データは UserInsert 型として自動推論
     return await db.transaction(async (tx) => {
       // 重複チェック
       const existing = await tx
@@ -516,11 +284,11 @@ export const createUser = createServerFn({
 
       // 新規作成
       const [user] = await tx.insert(usersTable).values(data).returning();
-      return user; // User 型として自動推論
+      return user;
     });
   });
 
-// ✅ 取得 - JOIN + 集計 + ページング
+// ✅ READ - JOIN + 集計 + ページング
 export const getUsers = createServerFn({
   method: "GET",
 })
@@ -532,7 +300,7 @@ export const getUsers = createServerFn({
   .handler(async ({ data: { page, limit, search } }) => {
     const offset = (page - 1) * limit;
 
-    const users = await db
+    return await db
       .select({
         id: usersTable.id,
         name: usersTable.name,
@@ -547,18 +315,16 @@ export const getUsers = createServerFn({
       .orderBy(desc(usersTable.createdAt))
       .limit(limit)
       .offset(offset);
-
-    return users; // 型推論される複合オブジェクト
   });
 
-// ✅ 更新 - 部分更新 + 楽観的ロック
+// ✅ UPDATE - 部分更新 + 楽観的ロック
 export const updateUser = createServerFn({
   method: "PUT",
 })
   .validator(z.object({
     id: z.string(),
     data: userUpdateSchema,
-    version: z.number().optional(), // 楽観的ロック用
+    version: z.number().optional(),
   }))
   .handler(async ({ data: { id, data, version } }) => {
     return await db.transaction(async (tx) => {
@@ -589,27 +355,54 @@ export const updateUser = createServerFn({
     });
   });
 
-// ✅ 認証保護 + 投稿作成
+// ✅ DELETE - カスケード削除対応
+export const deleteUser = createServerFn({
+  method: "DELETE",
+})
+  .validator(z.object({
+    id: z.string(),
+  }))
+  .handler(async ({ data: { id } }) => {
+    const [deletedUser] = await db
+      .delete(usersTable)
+      .where(eq(usersTable.id, id))
+      .returning();
+
+    if (!deletedUser) {
+      throw new Error("ユーザーが見つかりません");
+    }
+
+    return { success: true, deletedUser };
+  });
+```
+
+### **認証統合パターン**
+
+```tsx
+// 認証保護されたServer Function
 export const createPost = createServerFn({
   method: "POST",
 })
   .validator(postInsertSchema.omit({ userId: true }))
-  .handler(async ({ data }) => {
-    const { user } = await getSessionUser(); // Better Auth統合
-
-    if (!user) {
+  .handler(async ({ data, context }) => {
+    // 認証チェック（@tanstack-start.mdcのミドルウェア統合を活用）
+    if (!context.user) {
       throw new Error("認証が必要です");
     }
 
     const [post] = await db
       .insert(postsTable)
-      .values({ ...data, userId: user.id })
+      .values({ ...data, userId: context.user.id })
       .returning();
 
     return post;
   });
+```
 
-// ✅ 複雑なクエリ - リレーション + 条件フィルタ
+### **複雑なクエリパターン**
+
+```tsx
+// リレーション + 条件フィルタ
 export const getUserWithPosts = createServerFn({
   method: "GET",
 })
@@ -618,13 +411,13 @@ export const getUserWithPosts = createServerFn({
     includeUnpublished: z.boolean().default(false),
   }))
   .handler(async ({ data: { userId, includeUnpublished } }) => {
-    const user = await db
+    const [user] = await db
       .select()
       .from(usersTable)
       .where(eq(usersTable.id, userId))
       .limit(1);
 
-    if (user.length === 0) {
+    if (!user) {
       throw new Error("ユーザーが見つかりません");
     }
 
@@ -639,118 +432,152 @@ export const getUserWithPosts = createServerFn({
       )
       .orderBy(desc(postsTable.createdAt));
 
-    return {
-      user: user[0],
-      posts,
-    };
+    return { user, posts };
   });
 ```
 
+## 🚨 エラーハンドリング統合戦略
 
-
-
-
-## 🚨 エラーハンドリング統合
-
-### **フロントエンド統合エラーハンドリング**
+### **エラー分類と標準化**
 
 ```tsx
-// src/components/forms/UserForm.tsx - TanStack Form + エラーハンドリング統合
-import { useForm } from '@tanstack/react-form';
-import { userInsertSchema } from '~/db/schema';
-import { useCreateUser } from '~/hooks/users';
-import type { ApiError } from '~/lib/validation/error-handler';
+// src/lib/errors.ts - 統一的なエラーハンドリング
+export class ValidationError extends Error {
+  constructor(message: string, public field?: string) {
+    super(message);
+    this.name = 'ValidationError';
+  }
+}
 
-export function UserForm() {
-  const createUserMutation = useCreateUser();
+export class NotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NotFoundError';
+  }
+}
 
-  const form = useForm({
-    defaultValues: {
-      name: '',
-      email: '',
-    },
-    validators: {
-      onChange: userInsertSchema,
-    },
-    onSubmit: async ({ value }) => {
-      try {
-        await createUserMutation.mutateAsync(value);
-        form.reset();
-      } catch (error) {
-        const apiError = error as ApiError;
-        // エラーハンドリングはmutationのonErrorで処理
-        console.error('Form submission failed:', apiError);
+export class ConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ConflictError';
+  }
+}
+```
+
+### **Server Functions エラーハンドリング**
+
+```tsx
+// 統一的なエラーハンドリングパターン
+export const createUser = createServerFn({
+  method: "POST",
+})
+  .validator(userInsertSchema)
+  .handler(async ({ data }) => {
+    try {
+      return await db.transaction(async (tx) => {
+        const existing = await tx
+          .select({ id: usersTable.id })
+          .from(usersTable)
+          .where(eq(usersTable.email, data.email))
+          .limit(1);
+
+        if (existing.length > 0) {
+          throw new ConflictError("メールアドレスが既に存在します");
+        }
+
+        const [user] = await tx.insert(usersTable).values(data).returning();
+        return user;
+      });
+    } catch (error) {
+      // エラーログ
+      console.error('User creation failed:', error);
+
+      // 型に応じたエラーレスポンス
+      if (error instanceof ConflictError) {
+        throw error;
       }
-    },
-  });
 
+      throw new Error('ユーザー作成に失敗しました');
+    }
+  });
+```
+
+### **クライアントサイドエラーハンドリング**
+
+```tsx
+// TanStack Query mutation での統一エラーハンドリング
+export function useCreateUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: createUser,
+    onSuccess: (user) => {
+      // 成功時のキャッシュ更新
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.setQueryData(['user', user.id], user);
+    },
+    onError: (error) => {
+      // エラー種別に応じた処理
+      if (error.name === 'ConflictError') {
+        // 重複エラーの場合の処理
+        console.error('Conflict error:', error.message);
+      } else if (error.name === 'ValidationError') {
+        // バリデーションエラーの場合の処理
+        console.error('Validation error:', error.message);
+      } else {
+        // その他のエラー
+        console.error('Unexpected error:', error);
+      }
+    }
+  });
+}
+```
+
+### **統合エラーバウンダリ**
+
+```tsx
+// エラーバウンダリでの統一エラーハンドリング
+export function ApiErrorBoundary({ children }: { children: React.ReactNode }) {
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        form.handleSubmit();
+    <ErrorBoundary
+      fallback={({ error, reset }) => {
+        if (error.name === 'NotFoundError') {
+          return <NotFoundComponent />;
+        }
+
+        if (error.name === 'ValidationError') {
+          return <ValidationErrorComponent error={error} reset={reset} />;
+        }
+
+        return <GenericErrorComponent error={error} reset={reset} />;
       }}
     >
-      <form.Field
-        name="name"
-        validators={{
-          onChange: ({ value }) =>
-            !value ? 'Name is required' : undefined,
-        }}
-      >
-        {(field) => (
-          <div>
-            <input
-              type="text"
-              value={field.state.value}
-              onChange={(e) => field.handleChange(e.target.value)}
-              onBlur={field.handleBlur}
-            />
-            {field.state.meta.errors.map((error) => (
-              <span key={error} className="error">{error}</span>
-            ))}
-          </div>
-        )}
-      </form.Field>
-
-      <form.Field
-        name="email"
-        validators={{
-          onChange: ({ value }) =>
-            !value ? 'Email is required' : undefined,
-        }}
-      >
-        {(field) => (
-          <div>
-            <input
-              type="email"
-              value={field.state.value}
-              onChange={(e) => field.handleChange(e.target.value)}
-              onBlur={field.handleBlur}
-            />
-            {field.state.meta.errors.map((error) => (
-              <span key={error} className="error">{error}</span>
-            ))}
-          </div>
-        )}
-      </form.Field>
-
-      <form.Subscribe
-        selector={(state) => [state.canSubmit, state.isSubmitting]}
-        children={([canSubmit, isSubmitting]) => (
-          <button type="submit" disabled={!canSubmit}>
-            {isSubmitting ? '作成中...' : '作成'}
-          </button>
-        )}
-      />
-
-      {createUserMutation.error && (
-        <div className="error">
-          {(createUserMutation.error as ApiError).message}
-        </div>
-      )}
-    </form>
+      {children}
+    </ErrorBoundary>
   );
 }
 ```
+
+## 🔄 実装時の注意点
+
+### **必須事項**
+
+1. **Schema Factory設定**: プロジェクト全体で統一的な型変換ルールを適用
+2. **命名規則の徹底**: テーブル名、スキーマ名、型名の一貫性を保つ
+3. **Single Source of Truth**: 独自のZodスキーマ定義を避け、drizzle-zodで生成されたスキーマを使用
+4. **適切なエラーハンドリング**: Server Functions、クライアントサイドの両方で統一的なエラー処理
+
+### **ベストプラクティス**
+
+1. **型安全性の確保**: `$inferSelect`、`$inferInsert`、`z.infer<typeof schema>`を適切に使用
+2. **パフォーマンス最適化**: 必要最小限のデータのみを取得し、適切にインデックスを設定
+3. **トランザクション活用**: データ整合性が重要な処理では必ずトランザクションを使用
+4. **楽観的ロック**: 競合状態を考慮した更新処理の実装
+
+### **@tanstack-start.mdcとの連携**
+
+- **Server Functions**: 詳細なMiddleware実装、認証統合、ストリーミング対応は@tanstack-start.mdcを参照
+- **エラーハンドリング**: 統一的なエラーレスポンス、ログ記録、モニタリングは@tanstack-start.mdcを参照
+- **パフォーマンス**: キャッシュ戦略、並列処理、最適化手法は@tanstack-start.mdcを参照
+
+このルールに従うことで、drizzle-zodによるSingle Source of Truthを確立し、型安全で保守性の高いデータベース操作を実現できます。
