@@ -1,0 +1,704 @@
+---
+description:
+globs: src/**/*.tsx
+alwaysApply: false
+---
+
+# UI Components Integration Rule
+
+このルールは、TanStack StartプロジェクトにおけるUIコンポーネント統合戦略を定義します。Shadcn/ui + Tailwind v4を中心とした一貫性のあるデザインシステム、基本的なアクセシビリティ対応、TanStack Form統合、必須のSkeleton実装パターンを規定します。
+
+## 🔗 関連Rule参照と境界線
+
+### 関連Rule参照
+- **@react.mdc**: React 19根本原理・純粋関数・Suspense基盤・コンポーネント合成原則
+- **@tanstack-router.mdc**: Search Params基本状態管理・型安全ナビゲーション
+- **@drizzle-zod.mdc**: 型安全なスキーマ統合
+- **@tanstack-start.mdc**: Server Functions・Middleware・認証統合
+
+### 境界線定義
+| 概念 | @react.mdc | @ui.mdc |
+|------|-----------|---------|
+| コンポーネント合成 | HOC・Render Props（抽象原理） | shadcn/ui data-slot・具体実装 |
+| 条件付きレンダリング | 早期リターンパターン（原則） | UI状態・Skeleton実装（具体例） |
+| 状態管理 | React State原則（不変性） | Search Params + TanStack Form |
+| Suspense | 根本的な境界設計 | Skeleton・Loading具体実装 |
+
+---
+
+## 🎨 1. Shadcn/ui既存ベースのデザインシステム拡張
+
+### **app.css基盤の活用**
+
+```css
+/* src/lib/styles/app.css - 既存実装をベースに拡張 */
+@import "tailwindcss" source("../../");
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* 既存の @theme inline 構造を維持 */
+@theme inline {
+  /* 既存のカラーシステム拡張 */
+  --color-success: oklch(0.6 0.15 145);
+  --color-warning: oklch(0.8 0.15 85);
+  --color-info: oklch(0.65 0.15 230);
+
+  /* 既存のradius拡張 */
+  --radius-2xs: calc(var(--radius) - 6px);
+
+  /* アニメーション設定 */
+  --animate-duration-fast: 150ms;
+  --animate-duration-normal: 300ms;
+  --animate-duration-slow: 500ms;
+}
+
+/* 既存のrootセクション拡張 */
+:root {
+  /* 既存の色変数に追加 */
+  --success: var(--color-success);
+  --warning: var(--color-warning);
+  --info: var(--color-info);
+}
+
+.dark {
+  /* ダークモード用拡張 */
+  --success: oklch(0.55 0.12 145);
+  --warning: oklch(0.75 0.12 85);
+  --info: oklch(0.6 0.12 230);
+}
+
+/* コンポーネント専用スタイル */
+@layer components {
+  .skeleton {
+    @apply animate-pulse bg-muted rounded-md;
+  }
+
+  .loading-spinner {
+    @apply animate-spin rounded-full border-2 border-muted border-t-primary;
+  }
+}
+```
+
+### **Shadcn/ui コンポーネント拡張パターン**
+
+```tsx
+// data-slot活用のコンポーネント拡張例
+import { cn } from "~/lib/utils"
+import { cva, type VariantProps } from "class-variance-authority"
+
+const cardVariants = cva(
+  "rounded-lg border bg-card text-card-foreground shadow-sm",
+  {
+    variants: {
+      variant: {
+        default: "border",
+        elevated: "border-0 shadow-lg",
+        outline: "border-2",
+      },
+      size: {
+        default: "p-6",
+        sm: "p-4",
+        lg: "p-8",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+      size: "default",
+    },
+  }
+)
+
+interface CardProps extends
+  React.HTMLAttributes<HTMLDivElement>,
+  VariantProps<typeof cardVariants> {}
+
+export function Card({ className, variant, size, ...props }: CardProps) {
+  return (
+    <div
+      data-slot="card"
+      className={cn(cardVariants({ variant, size, className }))}
+      {...props}
+    />
+  )
+}
+```
+
+---
+
+## 📱 2. レスポンシブデザイン体系（Tailwind公式ブレークポイント）
+
+### **公式ブレークポイント戦略**
+
+```css
+/* Tailwind v4公式ブレークポイント（カスタム追加なし） */
+sm: 40rem (640px)   /* タブレット縦向き・大きなスマートフォン */
+md: 48rem (768px)   /* タブレット横向き */
+lg: 64rem (1024px)  /* 小さなデスクトップ・ラップトップ */
+xl: 80rem (1280px)  /* デスクトップ */
+2xl: 96rem (1536px) /* 大きなデスクトップ */
+```
+
+### **モバイルファーストレスポンシブパターン**
+
+```tsx
+// ✅ 推奨：モバイルファースト設計
+function ResponsiveGrid() {
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {/* モバイル：1列、タブレット：2列、デスクトップ：3-4列 */}
+    </div>
+  )
+}
+
+// ✅ コンテナクエリ対応
+function ResponsiveCard() {
+  return (
+    <div className="@container">
+      <div className="p-4 @md:p-6 @lg:flex @lg:gap-6">
+        <img className="w-full @lg:w-48" />
+        <div className="mt-4 @lg:mt-0">
+          {/* コンテンツ */}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ✅ TanStack Router Search Params統合
+function ResponsiveProductGrid() {
+  const search = Route.useSearch() // @tanstack-router.mdcパターン
+  const navigate = useNavigate({ from: Route.fullPath })
+
+  return (
+    <div className="space-y-4">
+      {/* フィルター（モバイルで折りたたみ、デスクトップで展開） */}
+      <div className="lg:hidden">
+        <Button onClick={() => navigate({ search: { ...search, showFilters: !search.showFilters } })}>
+          Toggle Filters
+        </Button>
+      </div>
+
+      <div className="lg:flex lg:gap-6">
+        {/* サイドバーフィルター */}
+        <aside className={cn(
+          "lg:w-64 lg:block",
+          search.showFilters ? "block" : "hidden lg:block"
+        )}>
+          <ProductFilters />
+        </aside>
+
+        {/* 商品グリッド */}
+        <main className="flex-1">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {/* 商品カード */}
+          </div>
+        </main>
+      </div>
+    </div>
+  )
+}
+```
+
+---
+
+## ♿ 3. 基本的なアクセシビリティ対応
+
+### **セマンティックHTML基盤**
+
+```tsx
+// ✅ 基本的なセマンティック構造
+function AccessibleCard({ title, description, action }: CardProps) {
+  return (
+    <article className="rounded-lg border p-6" role="article">
+      <header>
+        <h3 className="text-lg font-semibold">{title}</h3>
+      </header>
+
+      <main className="mt-2">
+        <p className="text-muted-foreground">{description}</p>
+      </main>
+
+      {action && (
+        <footer className="mt-4">
+          {action}
+        </footer>
+      )}
+    </article>
+  )
+}
+
+// ✅ フォーカス管理とキーボードナビゲーション
+function AccessibleDropdown() {
+  const [isOpen, setIsOpen] = useState(false)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+
+  return (
+    <div className="relative">
+      <Button
+        ref={buttonRef}
+        onClick={() => setIsOpen(!isOpen)}
+        aria-expanded={isOpen}
+        aria-haspopup="true"
+        className="focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      >
+        Menu
+      </Button>
+
+      {isOpen && (
+        <div
+          role="menu"
+          className="absolute top-full mt-1 min-w-[120px] rounded-md border bg-popover p-1 shadow-lg"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setIsOpen(false)
+              buttonRef.current?.focus()
+            }
+          }}
+        >
+          <Button
+            role="menuitem"
+            variant="ghost"
+            className="w-full justify-start"
+          >
+            Profile
+          </Button>
+        </div>
+      )}
+    </div>
+  )
+}
+```
+
+### **ARIA属性とスクリーンリーダー対応**
+
+```tsx
+// ✅ 基本的なARIA統合
+function AccessibleModal({ isOpen, onClose, title, children }: ModalProps) {
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent
+        role="dialog"
+        aria-labelledby="modal-title"
+        aria-describedby="modal-description"
+        className="sm:max-w-md"
+      >
+        <DialogHeader>
+          <DialogTitle id="modal-title">{title}</DialogTitle>
+        </DialogHeader>
+
+        <div id="modal-description" className="py-4">
+          {children}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={onClose}>
+            Confirm
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ✅ ローディング状態のアクセシビリティ
+function AccessibleButton({ isLoading, children, ...props }: ButtonProps) {
+  return (
+    <Button
+      disabled={isLoading}
+      aria-disabled={isLoading}
+      {...props}
+    >
+      {isLoading && (
+        <div
+          className="loading-spinner mr-2 h-4 w-4"
+          aria-hidden="true"
+        />
+      )}
+      {isLoading && <span className="sr-only">Loading...</span>}
+      {children}
+    </Button>
+  )
+}
+```
+
+---
+
+## 📝 4. TanStack Form統一実装パターン
+
+### **基本フォーム実装**
+
+```tsx
+import { useForm } from "@tanstack/react-form"
+import { zodValidator } from "@tanstack/zod-form-adapter"
+import { userInsertSchema } from "~/db/schema" // @drizzle-zod.mdcパターン
+
+function UserForm() {
+  const form = useForm({
+    defaultValues: {
+      name: '',
+      email: '',
+      bio: '',
+    },
+    onSubmit: async ({ value }) => {
+      // @tanstack-start.mdcパターン
+      await createUser(value)
+    },
+    validatorAdapter: zodValidator(),
+  })
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        form.handleSubmit()
+      }}
+      className="space-y-6"
+    >
+      <form.Field
+        name="name"
+        validators={{
+          onChange: userInsertSchema.shape.name,
+        }}
+        children={(field) => (
+          <div className="space-y-2">
+            <Label htmlFor={field.name}>Name</Label>
+            <Input
+              id={field.name}
+              value={field.state.value}
+              onBlur={field.handleBlur}
+              onChange={(e) => field.handleChange(e.target.value)}
+              aria-invalid={field.state.meta.errors.length > 0}
+            />
+            {field.state.meta.errors.length > 0 && (
+              <p className="text-sm text-destructive" role="alert">
+                {field.state.meta.errors[0]}
+              </p>
+            )}
+          </div>
+        )}
+      />
+
+      <form.Field
+        name="email"
+        validators={{
+          onChange: userInsertSchema.shape.email,
+        }}
+        children={(field) => (
+          <div className="space-y-2">
+            <Label htmlFor={field.name}>Email</Label>
+            <Input
+              id={field.name}
+              type="email"
+              value={field.state.value}
+              onBlur={field.handleBlur}
+              onChange={(e) => field.handleChange(e.target.value)}
+              aria-invalid={field.state.meta.errors.length > 0}
+            />
+            {field.state.meta.errors.length > 0 && (
+              <p className="text-sm text-destructive" role="alert">
+                {field.state.meta.errors[0]}
+              </p>
+            )}
+          </div>
+        )}
+      />
+
+      <form.Subscribe
+        selector={(state) => [state.canSubmit, state.isSubmitting]}
+        children={([canSubmit, isSubmitting]) => (
+          <Button
+            type="submit"
+            disabled={!canSubmit}
+            isLoading={isSubmitting}
+            className="w-full sm:w-auto"
+          >
+            {isSubmitting ? 'Creating...' : 'Create User'}
+          </Button>
+        )}
+      />
+    </form>
+  )
+}
+```
+
+### **Search Params統合フォーム**
+
+```tsx
+// @tanstack-router.mdcパターンとの統合
+function SearchForm() {
+  const search = Route.useSearch()
+  const navigate = useNavigate({ from: Route.fullPath })
+
+  const form = useForm({
+    defaultValues: {
+      query: search.query || '',
+      category: search.category || '',
+      sort: search.sort || 'newest',
+    },
+    onSubmit: async ({ value }) => {
+      navigate({
+        search: (prev) => ({ ...prev, ...value, page: 1 })
+      })
+    },
+  })
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        form.handleSubmit()
+      }}
+      className="flex flex-col gap-4 sm:flex-row sm:items-end"
+    >
+      <form.Field
+        name="query"
+        children={(field) => (
+          <div className="flex-1">
+            <Label htmlFor={field.name}>Search</Label>
+            <Input
+              id={field.name}
+              placeholder="Search products..."
+              value={field.state.value}
+              onChange={(e) => field.handleChange(e.target.value)}
+            />
+          </div>
+        )}
+      />
+
+      <Button type="submit" className="sm:w-auto">
+        Search
+      </Button>
+    </form>
+  )
+}
+```
+
+---
+
+## 🔄 5. Skeleton必須実装パターン
+
+### **基本原則**
+
+非同期データを取得する主要UIコンポーネントには、shadcn/ui Skeletonコンポーネントを使用したローディングUIを必ずセットで作成する。
+
+```tsx
+import { Skeleton } from "~/components/ui/skeleton"
+
+// ✅ データカード + Skeleton例
+function UserCard({ user }: { user: User }) {
+  return (
+    <div className="rounded-lg border p-4">
+      <div className="flex items-center gap-3">
+        <img
+          src={user.image}
+          alt={user.name}
+          className="h-10 w-10 rounded-full"
+        />
+        <div>
+          <h3 className="font-medium">{user.name}</h3>
+          <p className="text-sm text-muted-foreground">{user.email}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function UserCardSkeleton() {
+  return (
+    <div className="rounded-lg border p-4">
+      <div className="flex items-center gap-3">
+        <Skeleton className="h-10 w-10 rounded-full" />
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-3 w-32" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ✅ Suspense統合パターン（@react.mdcパターン）
+function UserList() {
+  return (
+    <Suspense fallback={<UserListSkeleton />}>
+      <UserListContent />
+    </Suspense>
+  )
+}
+
+function UserListSkeleton() {
+  return (
+    <div className="space-y-4">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <UserCardSkeleton key={i} />
+      ))}
+    </div>
+  )
+}
+
+function UserListContent() {
+  const { data: users } = useSuspenseQuery({
+    queryKey: ['users'],
+    queryFn: getUsers // @tanstack-start.mdcパターン
+  })
+
+  return (
+    <div className="space-y-4">
+      {users.map((user) => (
+        <UserCard key={user.id} user={user} />
+      ))}
+    </div>
+  )
+}
+```
+
+---
+
+## 🎯 6. TanStack Start統合パターン
+
+### **Server Functions統合UI**
+
+```tsx
+// @tanstack-start.mdcとの具体的統合例
+import { createUser, updateUser } from "~/server/users"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
+
+function UserManagement() {
+  const queryClient = useQueryClient()
+
+  const createUserMutation = useMutation({
+    mutationFn: createUser,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+    },
+  })
+
+  const updateUserMutation = useMutation({
+    mutationFn: updateUser,
+    onSuccess: (updatedUser) => {
+      queryClient.setQueryData(['user', updatedUser.id], updatedUser)
+    },
+  })
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">User Management</h1>
+        <CreateUserDialog
+          onSubmit={createUserMutation.mutate}
+          isLoading={createUserMutation.isPending}
+        />
+      </div>
+
+      <Suspense fallback={<UserTableSkeleton />}>
+        <UserTable
+          onUpdate={updateUserMutation.mutate}
+          isUpdating={updateUserMutation.isPending}
+        />
+      </Suspense>
+    </div>
+  )
+}
+```
+
+### **Better Auth統合UI**
+
+```tsx
+// Better Auth + UI統合例
+import { authClient } from "~/lib/auth-client"
+import { useRouter } from "@tanstack/react-router"
+
+function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
+  const [user, setUser] = useState<User | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    authClient.getSession().then((session) => {
+      setUser(session?.user ?? null)
+      setIsLoading(false)
+    })
+  }, [])
+
+  if (isLoading) {
+    return <AuthLayoutSkeleton />
+  }
+
+  if (!user) {
+    router.navigate({ to: '/login' })
+    return null
+  }
+
+  return (
+    <div className="min-h-screen">
+      <header className="border-b">
+        <nav className="container mx-auto flex items-center justify-between px-4 py-3">
+          <Link to="/dashboard" className="text-xl font-bold">
+            Dashboard
+          </Link>
+
+          <UserMenu user={user} />
+        </nav>
+      </header>
+
+      <main className="container mx-auto px-4 py-6">
+        {children}
+      </main>
+    </div>
+  )
+}
+
+function AuthLayoutSkeleton() {
+  return (
+    <div className="min-h-screen">
+      <header className="border-b">
+        <nav className="container mx-auto flex items-center justify-between px-4 py-3">
+          <Skeleton className="h-7 w-24" />
+          <Skeleton className="h-8 w-8 rounded-full" />
+        </nav>
+      </header>
+
+      <main className="container mx-auto px-4 py-6">
+        <Skeleton className="h-[400px] w-full" />
+      </main>
+    </div>
+  )
+}
+```
+
+---
+
+## 🛠️ 7. 実装時の注意点
+
+### **必須事項**
+
+1. **既存app.css構造維持**: `@theme inline`パターンの踏襲
+2. **Tailwind公式ブレークポイント**: カスタムブレークポイント追加禁止
+3. **Suspense + Skeleton**: 非同期UIには必ずSkeletonをセット実装
+4. **TanStack Form統一**: フォーム処理は全てTanStack Formで実装
+5. **型安全性確保**: @drizzle-zod.mdcスキーマとの統合
+
+### **ベストプラクティス**
+
+1. **data-slot活用**: shadcn/uiコンポーネントでのdata-slot一貫使用
+2. **モバイルファースト**: レスポンシブデザインの基本アプローチ
+3. **アクセシビリティ基本**: セマンティックHTML・ARIA・フォーカス管理
+4. **React Compiler対応**: @react.mdcの最適化パターンに準拠
+
+### **プロジェクト統合**
+
+1. **@tanstack-start.mdc連携**: Server Functions・認証・エラーハンドリング
+2. **@tanstack-router.mdc連携**: Search Params状態管理・型安全ナビゲーション
+3. **@drizzle-zod.mdc連携**: Zodスキーマ・型安全性確保
+
+このルールに従うことで、TanStack Startプロジェクトにおける一貫性のあるUI実装を実現し、保守性とユーザー体験を向上させることができます。
+
+
+---
+
+このルールに従うことで、shadcn/ui + Tailwind v4ベースの一貫性のあるUIコンポーネント実装、必須のアクセシビリティ対応、TanStack Form統合、そして適切なSkeleton実装を実現できます。
+

@@ -1,0 +1,583 @@
+---
+alwaysApply: true
+
+---
+
+# Drizzle Zod Rule
+
+このルールは、Drizzle ORM・drizzle-zod統合による現代的なデータベース操作パターンを定義します。Single Source of Truthの徹底実現、型安全性の確保、TanStack Start Server Functions統合を重視した設計戦略を採用します。
+
+## 🛡️ drizzle-zod統合戦略（schema.ts を Single Source of Truth としてZodスキーマ定義とTS型生成も管理する。コードベース全体でそれらをimportして使用することで独自定義を避ける）
+
+### **🏗️ Drizzleスキーマの構造と命名規則**
+
+```ts
+// src/db/schema.ts - `schema.ts`ファイル内では上から順にテーブル定義（認証関連、アプリ本体Entity）、リレーション定義、Zodスキーマ生成、TS型生成の順番にコメントアウトでわかりやすくセクション化しながら記述していく。また各セクションの冒頭に定義した命名規則を徹底する。
+
+// =============================================================================
+// Schema Factory設定（プロジェクト全体で統一的なルールを適用。型強制coerceの自動適用など）
+// =============================================================================
+import { createSchemaFactory } from 'drizzle-zod';
+import { z } from 'zod';
+
+const { createInsertSchema, createSelectSchema, createUpdateSchema } = createSchemaFactory({
+  coerce: {
+    date: true, // 日付型の自動変換を有効化
+  },
+  zodInstance: z // 拡張インスタンスを使用
+});
+
+// =============================================================================
+// テーブル定義
+// =============================================================================
+// 命名規則: 各テーブルのTSオブジェクト名は{entity}Table、各カラムのプロパティ名はやcreatedAtなどcamelCaseにする。一方、DB上の実テーブル名（pgTableの第1引数など）はusers, verification_tokensのようにsnake_caseにする。
+// 認証関連
+export const usersTable = pgTable("users", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  emailVerified: boolean("email_verified").notNull(),
+  image: text("image"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdateFn(() => new Date()),
+});
+
+export const sessionsTable = pgTable("sessions", { /* ... */ });
+
+export const accountsTable = pgTable("accounts", { /* ... */ });
+
+export const verificationTokensTable = pgTable("verification_tokens", { /* ... */ });
+
+// アプリ本体関連
+// 投稿テーブル
+export const postsTable = pgTable("posts", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => usersTable.id, { onDelete: "cascade" }),
+  published: boolean("published").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdateFn(() => new Date()),
+});
+
+// コメントテーブル
+export const commentsTable = pgTable("comments", {
+  id: serial("id").primaryKey(),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdateFn(() => new Date()),
+  postId: integer("post_id").references(() => postsTable.id, { onDelete: "cascade" }),
+});
+
+// タグテーブル
+export const tagsTable = pgTable("tags", { /* ... */ });
+
+
+// =============================================================================
+// リレーション定義
+// =============================================================================
+// 命名規則：{entities}Relations
+// 認証関連
+export const usersRelations = relations(usersTable, ({ many }) => ({
+  sessions: many(sessionsTable),
+  accounts: many(accountsTable),
+  posts: many(postsTable),
+}));
+
+export const sessionsRelations = relations(sessionsTable, ({ one }) => ({
+  user: one(usersTable, {
+    fields: [sessionsTable.userId],
+    references: [usersTable.id],
+  }),
+}));
+
+// アプリ本体
+export const postsRelations = relations(postsTable, ({ one, many }) => ({
+  user: one(usersTable, {
+    fields: [postsTable.userId],
+    references: [usersTable.id],
+  }),
+  comments: many(commentsTable),
+}));
+
+// =============================================================================
+// Zodスキーマ定義（drizzle-zod統合によるSingle Source of Truth）
+// =============================================================================
+// 命名規則：{entity}{Operation}Schema
+
+// users - カスタムバリデーション付きスキーマ
+export const userInsertSchema = createInsertSchema(usersTable, {
+  name: (schema) => schema.min(1, "名前は必須です").max(100, "名前は100文字以内"),
+  email: (schema) => schema.email("有効なメールアドレスを入力してください"),
+});
+export const userSelectSchema = createSelectSchema(usersTable);
+export const userUpdateSchema = createUpdateSchema(usersTable);
+
+// posts - カスタムバリデーション付きスキーマ
+export const postInsertSchema = createInsertSchema(postsTable, {
+  title: (schema) => schema.min(1, "タイトルは必須").max(200, "タイトルは200文字以内"),
+  content: (schema) => schema.min(1, "コンテンツは必須").max(5000, "コンテンツは5000文字以内"),
+});
+export const postSelectSchema = createSelectSchema(postsTable);
+export const postUpdateSchema = createUpdateSchema(postsTable);
+
+// =============================================================================
+// TS型定義（drizzle-zod統合によるSingle Source of Truth）
+// =============================================================================
+// 命名規則：{Entity}, {Entity}{Operation}
+
+// users
+export type User = typeof usersTable.$inferSelect;
+export type NewUser = typeof usersTable.$inferInsert;
+export type UserInsert = z.infer<typeof userInsertSchema>;
+export type UserSelect = z.infer<typeof userSelectSchema>;
+export type UserUpdate = z.infer<typeof userUpdateSchema>;
+
+// posts
+export type Post = typeof postsTable.$inferSelect;
+export type NewPost = typeof postsTable.$inferInsert;
+export type PostInsert = z.infer<typeof postInsertSchema>;
+export type PostSelect = z.infer<typeof postSelectSchema>;
+export type PostUpdate = z.infer<typeof postUpdateSchema>;
+```
+
+### **Single Source of Truthの徹底**
+
+`schema.ts`にて定義したdrizzle-zod統合によるZodスキーマとTS型をコードベース全体で一貫してimport使用し、独自定義をなるべく避けることで保守性を向上する。
+
+#### **🎯 適用必須ユースケース**
+
+**📊 データベース層**
+- テーブル定義時のZodスキーマ自動生成（createInsertSchema, createSelectSchema, createUpdateSchema）
+- シード処理・初期データ作成時の型安全性
+- マイグレーション後のデータ検証
+
+**🔧 TanStack Start Server Functions**
+- Server Function入力検証（POST/PUT request body）
+- Server Function出力検証（レスポンス型安全性）
+- createServerFn validator統合
+- 認証保護されたServer Functions
+- ファイルアップロード検証
+
+**⚛️ TanStack Router統合**
+- Route loader検証（URL params, search params）
+- Route beforeLoad検証
+- 動的ルート（$userId等）パラメータ検証
+- navigate時のstate検証
+
+**📝 フォーム処理（TanStack Form）**
+- フォーム入力検証（`validators: { onChange: userInsertSchema }`）
+- フィールドレベルバリデーション
+- 送信前データ変換・正規化
+- エラーメッセージ表示
+
+**🔐 Better Auth統合**
+- ユーザー登録・ログインデータ検証
+- セッションデータ検証
+- JWT payload検証
+- 権限・ロール検証
+
+**🎨 UI コンポーネント（shadcn/ui）**
+- コンポーネントProps型安全性
+- イベントハンドラー引数検証
+- 条件付きレンダリング型ガード
+
+**🧪 テスト環境（Vitest/Playwright）**
+- モックデータ生成
+- テスト用フィクスチャ作成
+- API レスポンス検証
+- E2Eテスト用データ準備
+
+**☁️ 外部サービス統合（AWS SDK）**
+- 外部API連携時の型変換
+- 設定値・環境変数検証
+- AWS service request/response検証
+
+**🔗 ユーティリティ・共通処理**
+- データ変換関数（transformer）
+- 型ガード関数（type guard）
+- バリデーション関数（validator）
+- 設定ファイル検証
+
+#### **✅ 基本統合パターン**
+
+```tsx
+// ❌ 避けるべき独自定義
+const customUserSchema = z.object({
+  name: z.string(),
+  email: z.string().email(),
+});
+
+// ✅ 推奨: schema.tsからインポート
+import { userInsertSchema, userSelectSchema, User, UserInsert } from "~/db/schema";
+
+// ユーティリティ関数統合
+export function validateUserData(data: unknown): UserInsert | null {
+  const result = userInsertSchema.safeParse(data);
+  return result.success ? result.data : null;
+}
+
+// 型ガード関数
+export function isValidUser(data: unknown): data is User {
+  return userSelectSchema.safeParse(data).success;
+}
+```
+
+## 🔧 TanStack Start統合実装パターン
+
+### **src/server/ディレクトリ管理戦略**
+
+```
+src/
+├── server/
+│   ├── users.ts          # ユーザー関連 Server Functions
+│   ├── posts.ts          # 投稿関連 Server Functions
+│   ├── comments.ts       # コメント関連 Server Functions
+│   └── auth.ts           # 認証関連 Server Functions
+```
+
+### **📋 Entityごとの標準実装パターン**
+
+```tsx
+// src/server/users.ts - ユーザー関連 Server Functions
+import { createServerFn } from "@tanstack/react-start";
+import { eq, like, desc, count } from "drizzle-orm";
+import { db } from "~/db";
+import {
+  usersTable,
+  postsTable,
+  userInsertSchema,
+  userUpdateSchema,
+  type User,
+  type UserInsert,
+  type UserUpdate,
+} from "~/db/schema";
+
+// ✅ CREATE - バリデーション + 重複チェック + トランザクション
+export const createUser = createServerFn({
+  method: "POST",
+})
+  .validator(userInsertSchema)
+  .handler(async ({ data }) => {
+    return await db.transaction(async (tx) => {
+      // 重複チェック
+      const existing = await tx
+        .select({ id: usersTable.id })
+        .from(usersTable)
+        .where(eq(usersTable.email, data.email))
+        .limit(1);
+
+      if (existing.length > 0) {
+        throw new Error("メールアドレスが既に存在します");
+      }
+
+      // 新規作成
+      const [user] = await tx.insert(usersTable).values(data).returning();
+      return user;
+    });
+  });
+
+// ✅ READ - JOIN + 集計 + ページング
+export const getUsers = createServerFn({
+  method: "GET",
+})
+  .validator(z.object({
+    page: z.number().min(1).default(1),
+    limit: z.number().min(1).max(100).default(10),
+    search: z.string().optional(),
+  }))
+  .handler(async ({ data: { page, limit, search } }) => {
+    const offset = (page - 1) * limit;
+
+    return await db
+      .select({
+        id: usersTable.id,
+        name: usersTable.name,
+        email: usersTable.email,
+        postCount: count(postsTable.id),
+        createdAt: usersTable.createdAt,
+      })
+      .from(usersTable)
+      .leftJoin(postsTable, eq(usersTable.id, postsTable.userId))
+      .where(search ? like(usersTable.name, `%${search}%`) : undefined)
+      .groupBy(usersTable.id)
+      .orderBy(desc(usersTable.createdAt))
+      .limit(limit)
+      .offset(offset);
+  });
+
+// ✅ UPDATE - 部分更新 + 楽観的ロック
+export const updateUser = createServerFn({
+  method: "PUT",
+})
+  .validator(z.object({
+    id: z.string(),
+    data: userUpdateSchema,
+    version: z.number().optional(),
+  }))
+  .handler(async ({ data: { id, data, version } }) => {
+    return await db.transaction(async (tx) => {
+      // 楽観的ロック（version指定時）
+      if (version !== undefined) {
+        const current = await tx
+          .select({ updatedAt: usersTable.updatedAt })
+          .from(usersTable)
+          .where(eq(usersTable.id, id))
+          .limit(1);
+
+        if (current.length === 0) {
+          throw new Error("ユーザーが見つかりません");
+        }
+
+        if (current[0].updatedAt.getTime() !== version) {
+          throw new Error("データが他のユーザーによって更新されています");
+        }
+      }
+
+      const [user] = await tx
+        .update(usersTable)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(usersTable.id, id))
+        .returning();
+
+      return user;
+    });
+  });
+
+// ✅ DELETE - カスケード削除対応
+export const deleteUser = createServerFn({
+  method: "DELETE",
+})
+  .validator(z.object({
+    id: z.string(),
+  }))
+  .handler(async ({ data: { id } }) => {
+    const [deletedUser] = await db
+      .delete(usersTable)
+      .where(eq(usersTable.id, id))
+      .returning();
+
+    if (!deletedUser) {
+      throw new Error("ユーザーが見つかりません");
+    }
+
+    return { success: true, deletedUser };
+  });
+```
+
+### **認証統合パターン**
+
+```tsx
+// 認証保護されたServer Function
+export const createPost = createServerFn({
+  method: "POST",
+})
+  .validator(postInsertSchema.omit({ userId: true }))
+  .handler(async ({ data, context }) => {
+    // 認証チェック（@tanstack-start.mdcのミドルウェア統合を活用）
+    if (!context.user) {
+      throw new Error("認証が必要です");
+    }
+
+    const [post] = await db
+      .insert(postsTable)
+      .values({ ...data, userId: context.user.id })
+      .returning();
+
+    return post;
+  });
+```
+
+### **複雑なクエリパターン**
+
+```tsx
+// リレーション + 条件フィルタ
+export const getUserWithPosts = createServerFn({
+  method: "GET",
+})
+  .validator(z.object({
+    userId: z.string(),
+    includeUnpublished: z.boolean().default(false),
+  }))
+  .handler(async ({ data: { userId, includeUnpublished } }) => {
+    const [user] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.id, userId))
+      .limit(1);
+
+    if (!user) {
+      throw new Error("ユーザーが見つかりません");
+    }
+
+    const posts = await db
+      .select()
+      .from(postsTable)
+      .where(
+        and(
+          eq(postsTable.userId, userId),
+          includeUnpublished ? undefined : eq(postsTable.published, true)
+        )
+      )
+      .orderBy(desc(postsTable.createdAt));
+
+    return { user, posts };
+  });
+```
+
+## 🚨 エラーハンドリング統合戦略
+
+### **エラー分類と標準化**
+
+```tsx
+// src/lib/errors.ts - 統一的なエラーハンドリング
+export class ValidationError extends Error {
+  constructor(message: string, public field?: string) {
+    super(message);
+    this.name = 'ValidationError';
+  }
+}
+
+export class NotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NotFoundError';
+  }
+}
+
+export class ConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ConflictError';
+  }
+}
+```
+
+### **Server Functions エラーハンドリング**
+
+```tsx
+// 統一的なエラーハンドリングパターン
+export const createUser = createServerFn({
+  method: "POST",
+})
+  .validator(userInsertSchema)
+  .handler(async ({ data }) => {
+    try {
+      return await db.transaction(async (tx) => {
+        const existing = await tx
+          .select({ id: usersTable.id })
+          .from(usersTable)
+          .where(eq(usersTable.email, data.email))
+          .limit(1);
+
+        if (existing.length > 0) {
+          throw new ConflictError("メールアドレスが既に存在します");
+        }
+
+        const [user] = await tx.insert(usersTable).values(data).returning();
+        return user;
+      });
+    } catch (error) {
+      // エラーログ
+      console.error('User creation failed:', error);
+
+      // 型に応じたエラーレスポンス
+      if (error instanceof ConflictError) {
+        throw error;
+      }
+
+      throw new Error('ユーザー作成に失敗しました');
+    }
+  });
+```
+
+### **クライアントサイドエラーハンドリング**
+
+```tsx
+// TanStack Query mutation での統一エラーハンドリング
+export function useCreateUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: createUser,
+    onSuccess: (user) => {
+      // 成功時のキャッシュ更新
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.setQueryData(['user', user.id], user);
+    },
+    onError: (error) => {
+      // エラー種別に応じた処理
+      if (error.name === 'ConflictError') {
+        // 重複エラーの場合の処理
+        console.error('Conflict error:', error.message);
+      } else if (error.name === 'ValidationError') {
+        // バリデーションエラーの場合の処理
+        console.error('Validation error:', error.message);
+      } else {
+        // その他のエラー
+        console.error('Unexpected error:', error);
+      }
+    }
+  });
+}
+```
+
+### **統合エラーバウンダリ**
+
+```tsx
+// エラーバウンダリでの統一エラーハンドリング
+export function ApiErrorBoundary({ children }: { children: React.ReactNode }) {
+  return (
+    <ErrorBoundary
+      fallback={({ error, reset }) => {
+        if (error.name === 'NotFoundError') {
+          return <NotFoundComponent />;
+        }
+
+        if (error.name === 'ValidationError') {
+          return <ValidationErrorComponent error={error} reset={reset} />;
+        }
+
+        return <GenericErrorComponent error={error} reset={reset} />;
+      }}
+    >
+      {children}
+    </ErrorBoundary>
+  );
+}
+```
+
+## 🔄 実装時の注意点
+
+### **必須事項**
+
+1. **Schema Factory設定**: プロジェクト全体で統一的な型変換ルールを適用
+2. **命名規則の徹底**: テーブル名、スキーマ名、型名の一貫性を保つ
+3. **Single Source of Truth**: 独自のZodスキーマ定義を避け、drizzle-zodで生成されたスキーマを使用
+4. **適切なエラーハンドリング**: Server Functions、クライアントサイドの両方で統一的なエラー処理
+
+### **ベストプラクティス**
+
+1. **型安全性の確保**: `$inferSelect`、`$inferInsert`、`z.infer<typeof schema>`を適切に使用
+2. **パフォーマンス最適化**: 必要最小限のデータのみを取得し、適切にインデックスを設定
+3. **トランザクション活用**: データ整合性が重要な処理では必ずトランザクションを使用
+4. **楽観的ロック**: 競合状態を考慮した更新処理の実装
+
+### **@tanstack-start.mdcとの連携**
+
+- **Server Functions**: 詳細なMiddleware実装、認証統合、ストリーミング対応は@tanstack-start.mdcを参照
+- **エラーハンドリング**: 統一的なエラーレスポンス、ログ記録、モニタリングは@tanstack-start.mdcを参照
+- **パフォーマンス**: キャッシュ戦略、並列処理、最適化手法は@tanstack-start.mdcを参照
+
+このルールに従うことで、drizzle-zodによるSingle Source of Truthを確立し、型安全で保守性の高いデータベース操作を実現できます。

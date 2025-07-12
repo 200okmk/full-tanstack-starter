@@ -1,0 +1,608 @@
+---
+description: TanStack Start Server Functions, Middleware, SSR, and API Routes implementation patterns
+globs:
+alwaysApply: false
+---
+# TanStack Start Rule
+
+このルールは、TanStack Startにおけるサーバー関数、ミドルウェア、SSR/ストリーミング、APIルートの実装パターンを定義します。型安全性、パフォーマンス、保守性を重視した実装戦略を採用します。
+
+## 🔧 Server Functions設計パターン
+
+### 基本的なServer Function定義
+
+```tsx
+// src/server/example.ts
+import { createServerFn } from '@tanstack/react-start'
+import { z } from 'zod'
+import { eq } from 'drizzle-orm'
+import { db } from '~/lib/db'
+import { users, profiles } from '~/lib/db/schemas'
+
+// バリデーションスキーマの定義
+const getUserSchema = z.object({
+  id: z.string().min(1),
+  includeProfile: z.boolean().default(false)
+})
+
+// 基本的なServer Function
+export const getUser = createServerFn({
+  method: 'GET',
+})
+  .validator(getUserSchema)
+  .handler(async ({ data }) => {
+    const { id, includeProfile } = data
+
+    try {
+      // Drizzle ORM SQL-like方式でのクエリ
+      let query = db.select().from(users).where(eq(users.id, id))
+
+      if (includeProfile) {
+        query = db
+          .select()
+          .from(users)
+          .leftJoin(profiles, eq(users.id, profiles.userId))
+          .where(eq(users.id, id))
+      }
+
+      const result = await query
+
+      if (!result.length) {
+        throw new Error('User not found')
+      }
+
+      return includeProfile ? result[0] : result[0]
+    } catch (error) {
+      console.error('Failed to fetch user:', error)
+      throw new Error('Failed to fetch user')
+    }
+  })
+```
+
+### 設定オプションの活用
+
+```tsx
+// レスポンス形式の制御
+export const getRawResponse = createServerFn({
+  method: 'GET',
+  response: 'raw', // Response オブジェクトを直接返す
+}).handler(async () => {
+  return new Response('Hello, World!', {
+    headers: { 'Content-Type': 'text/plain' }
+  })
+})
+
+// 静的Server Function（ビルド時実行）
+export const getStaticData = createServerFn({
+  type: 'static'
+}).handler(async () => {
+  return {
+    buildTime: new Date().toISOString(),
+    version: process.env.npm_package_version
+  }
+})
+```
+
+### フォームデータ処理パターン
+
+```tsx
+// FormData処理のServer Function
+export const createPost = createServerFn({
+  method: 'POST'
+})
+  .validator((data) => {
+    if (!(data instanceof FormData)) {
+      throw new Error('Invalid form data')
+    }
+
+    const title = data.get('title')
+    const content = data.get('content')
+
+    if (!title || !content) {
+      throw new Error('Title and content are required')
+    }
+
+    return {
+      title: title.toString(),
+      content: content.toString()
+    }
+  })
+  .handler(async ({ data, context }) => {
+    // 認証チェック
+    if (!context.user) {
+      throw new Error('Authentication required')
+    }
+
+    // Drizzle ORM SQL-like方式でのinsert
+    const [newPost] = await db
+      .insert(posts)
+      .values({
+        ...data,
+        authorId: context.user.id,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      })
+      .returning()
+
+    return newPost
+  })
+```
+
+### ストリーミングServer Function
+
+```tsx
+// ストリーミング対応
+export const streamData = createServerFn({
+  method: 'GET',
+  response: 'raw'
+}).handler(async ({ signal }) => {
+  const stream = new ReadableStream({
+    async start(controller) {
+      let count = 0
+
+      const interval = setInterval(() => {
+        if (signal.aborted) {
+          clearInterval(interval)
+          controller.close()
+          return
+        }
+
+        controller.enqueue(
+          new TextEncoder().encode(`data: ${JSON.stringify({ count: ++count })}\n\n`)
+        )
+
+        if (count >= 10) {
+          clearInterval(interval)
+          controller.close()
+        }
+      }, 1000)
+
+      signal.addEventListener('abort', () => {
+        clearInterval(interval)
+        controller.close()
+      })
+    }
+  })
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive'
+    }
+  })
+})
+```
+
+## 🛡️ Middleware実装標準
+
+### 認証ミドルウェア
+
+```tsx
+// src/lib/middleware/auth.ts
+import { createMiddleware } from '@tanstack/react-start'
+import { getWebRequest, setResponseStatus } from '@tanstack/react-start/server'
+import { auth } from '~/lib/auth'
+
+export const authMiddleware = createMiddleware().server(async ({ next }) => {
+  const { headers } = getWebRequest()!
+
+  const session = await auth.api.getSession({
+    headers,
+    query: {
+      disableCookieCache: true // セッションを最新に保つ
+    }
+  })
+
+  if (!session) {
+    setResponseStatus(401)
+    throw new Error('Authentication required')
+  }
+
+  return next({ context: { user: session.user } })
+})
+
+// オプショナル認証ミドルウェア
+export const optionalAuthMiddleware = createMiddleware().server(async ({ next }) => {
+  const { headers } = getWebRequest()!
+
+  const session = await auth.api.getSession({ headers })
+
+  return next({
+    context: {
+      user: session?.user ?? null
+    }
+  })
+})
+```
+
+### バリデーションミドルウェア
+
+```tsx
+// src/lib/middleware/validation.ts
+import { createMiddleware } from '@tanstack/react-start'
+import { z } from 'zod'
+
+export const createValidationMiddleware = <T>(schema: z.ZodSchema<T>) => {
+  return createMiddleware().server(async ({ next, data }) => {
+    try {
+      const validatedData = schema.parse(data)
+      return next({ data: validatedData })
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        throw new Error(`Validation failed: ${error.errors.map(e => e.message).join(', ')}`)
+      }
+      throw error
+    }
+  })
+}
+```
+
+### ログミドルウェア
+
+```tsx
+// src/lib/middleware/logging.ts
+import { createMiddleware } from '@tanstack/react-start'
+
+export const loggingMiddleware = createMiddleware().server(async ({ next }) => {
+  const startTime = Date.now()
+  const requestId = Math.random().toString(36).substr(2, 9)
+
+  console.log(`[${requestId}] Server function started at ${new Date().toISOString()}`)
+
+  try {
+    const result = await next()
+    console.log(`[${requestId}] Completed in ${Date.now() - startTime}ms`)
+    return result
+  } catch (error) {
+    console.error(`[${requestId}] Failed in ${Date.now() - startTime}ms:`, error)
+    throw error
+  }
+})
+```
+
+### エラー処理ミドルウェア
+
+```tsx
+// src/lib/middleware/error-handling.ts
+import { createMiddleware } from '@tanstack/react-start'
+import { setResponseStatus } from '@tanstack/react-start/server'
+
+export const errorHandlingMiddleware = createMiddleware().server(async ({ next }) => {
+  try {
+    return await next()
+  } catch (error) {
+    // エラーの種類に応じてステータスコードを設定
+    if (error.message.includes('Authentication')) {
+      setResponseStatus(401)
+    } else if (error.message.includes('Validation')) {
+      setResponseStatus(400)
+    } else if (error.message.includes('Not found')) {
+      setResponseStatus(404)
+    } else {
+      setResponseStatus(500)
+    }
+
+    // 本番環境では詳細なエラーを隠す
+    const message = process.env.NODE_ENV === 'production'
+      ? 'Internal server error'
+      : error.message
+
+    throw new Error(message)
+  }
+})
+```
+
+### ミドルウェアの組み合わせパターン
+
+```tsx
+// 複数ミドルウェアの使用例
+export const protectedServerFn = createServerFn()
+  .middleware([
+    loggingMiddleware,
+    errorHandlingMiddleware,
+    authMiddleware
+  ])
+  .handler(async ({ context }) => {
+    // context.user は型安全にアクセス可能
+    return `Hello, ${context.user.name}!`
+  })
+```
+
+## 🌊 SSR/Streaming戦略
+
+### 基本SSR設定
+
+```tsx
+// src/ssr.tsx
+import { getRouterManifest } from '@tanstack/react-start/router-manifest'
+import { createStartHandler, defaultStreamHandler } from '@tanstack/react-start/server'
+import { createRouter } from './router'
+
+export default createStartHandler({
+  createRouter,
+  getRouterManifest
+})(defaultStreamHandler)
+```
+
+### メタデータとSEO対応
+
+```tsx
+// src/routes/__root.tsx
+export const Route = createRootRouteWithContext<{
+  queryClient: QueryClient
+  user: User | null
+}>()({
+  head: ({ matches }) => {
+    const match = matches[matches.length - 1]
+    const title = match?.meta?.title ?? 'Default Title'
+    const description = match?.meta?.description ?? 'Default Description'
+
+    return {
+      meta: [
+        { charSet: 'utf-8' },
+        { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+        { title },
+        { name: 'description', content: description },
+        { property: 'og:title', content: title },
+        { property: 'og:description', content: description }
+      ],
+      links: [
+        { rel: 'stylesheet', href: appCss },
+        { rel: 'canonical', href: `https://example.com${match?.pathname}` }
+      ]
+    }
+  }
+})
+```
+
+### ストリーミング最適化
+
+```tsx
+// ルートレベルでのストリーミング対応
+export const Route = createFileRoute('/posts')({
+  loader: async ({ context }) => {
+    // データを並列で取得
+    await Promise.all([
+      context.queryClient.prefetchQuery({
+        queryKey: ['posts'],
+        queryFn: getPosts
+      }),
+      context.queryClient.prefetchQuery({
+        queryKey: ['categories'],
+        queryFn: getCategories
+      })
+    ])
+  },
+  component: () => (
+    <Suspense fallback={<PostsLoader />}>
+      <PostsPage />
+    </Suspense>
+  )
+})
+```
+
+## 🛣️ API Routes設計
+
+### ファイルベースAPI構造
+
+```tsx
+// src/routes/api/users/$.ts
+import { createAPIFileRoute } from '@tanstack/react-start/api'
+import { z } from 'zod'
+import { eq } from 'drizzle-orm'
+import { db } from '~/lib/db'
+import { users } from '~/lib/db/schemas'
+
+const getUserParamsSchema = z.object({
+  id: z.string()
+})
+
+const createUserSchema = z.object({
+  name: z.string().min(1),
+  email: z.string().email()
+})
+
+export const APIRoute = createAPIFileRoute('/api/users/$')({
+  GET: async ({ request, params }) => {
+    try {
+      const { id } = getUserParamsSchema.parse(params)
+
+      // Drizzle ORM SQL-like方式でのselect
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, id))
+
+      if (!user) {
+        return new Response('User not found', { status: 404 })
+      }
+
+      return Response.json(user)
+    } catch (error) {
+      return new Response('Invalid request', { status: 400 })
+    }
+  },
+
+  POST: async ({ request }) => {
+    try {
+      const body = await request.json()
+      const userData = createUserSchema.parse(body)
+
+      // Drizzle ORM SQL-like方式でのinsert
+      const [newUser] = await db
+        .insert(users)
+        .values(userData)
+        .returning()
+
+      return Response.json(newUser, { status: 201 })
+    } catch (error) {
+      return new Response('Invalid request', { status: 400 })
+    }
+  }
+})
+```
+
+### 認証統合API
+
+```tsx
+// src/routes/api/auth/$.ts
+import { createAPIFileRoute } from '@tanstack/react-start/api'
+import { auth } from '~/lib/auth'
+
+export const APIRoute = createAPIFileRoute('/api/auth/$')({
+  GET: async ({ request }) => auth.handler(request),
+  POST: async ({ request }) => auth.handler(request)
+})
+```
+
+### エラー応答の標準化
+
+```tsx
+// src/lib/api-utils.ts
+export const createErrorResponse = (
+  message: string,
+  status: number = 500,
+  details?: any
+) => {
+  return Response.json({
+    error: {
+      message,
+      status,
+      timestamp: new Date().toISOString(),
+      ...(process.env.NODE_ENV === 'development' && { details })
+    }
+  }, { status })
+}
+
+// 使用例
+export const APIRoute = createAPIFileRoute('/api/posts/$')({
+  GET: async ({ params }) => {
+    try {
+      // Drizzle ORM SQL-like方式でのselect
+      const [post] = await db
+        .select()
+        .from(posts)
+        .where(eq(posts.id, params.id))
+
+      if (!post) {
+        return createErrorResponse('Post not found', 404)
+      }
+
+      return Response.json(post)
+    } catch (error) {
+      return createErrorResponse('Post not found', 404, error)
+    }
+  }
+})
+```
+
+## 🔄 データフェッチパターン
+
+### Server FunctionとReact Queryの統合
+
+```tsx
+// src/routes/posts/index.tsx
+export const Route = createFileRoute('/posts/')({
+  loader: async ({ context }) => {
+    // サーバーサイドでデータを先行取得
+    await context.queryClient.prefetchQuery({
+      queryKey: ['posts'],
+      queryFn: () => getPosts({ page: 1, limit: 10 })
+    })
+  },
+  component: PostsPage
+})
+
+function PostsPage() {
+  // クライアントサイドでキャッシュされたデータを使用
+  const { data: posts } = useSuspenseQuery({
+    queryKey: ['posts'],
+    queryFn: () => getPosts({ page: 1, limit: 10 })
+  })
+
+  return (
+    <div>
+      {posts.map(post => (
+        <PostCard key={post.id} post={post} />
+      ))}
+    </div>
+  )
+}
+```
+
+### 複数データソースの効率的な取得
+
+```tsx
+// 複数のテーブルからデータを効率的に取得
+export const getDashboardData = createServerFn({
+  method: 'GET'
+})
+  .handler(async ({ context }) => {
+    if (!context.user) {
+      throw new Error('Authentication required')
+    }
+
+    // Drizzle ORM SQL-like方式での複数クエリ
+    const [userPosts, userComments, userStats] = await Promise.all([
+      // 投稿一覧
+      db.select()
+        .from(posts)
+        .where(eq(posts.authorId, context.user.id))
+        .orderBy(desc(posts.createdAt))
+        .limit(10),
+
+      // コメント一覧（投稿情報も含む）
+      db.select({
+        id: comments.id,
+        content: comments.content,
+        createdAt: comments.createdAt,
+        postTitle: posts.title
+      })
+        .from(comments)
+        .leftJoin(posts, eq(comments.postId, posts.id))
+        .where(eq(comments.authorId, context.user.id))
+        .limit(5),
+
+      // 統計情報
+      db.select({
+        totalPosts: count(posts.id),
+        totalComments: count(comments.id)
+      })
+        .from(posts)
+        .leftJoin(comments, eq(posts.id, comments.postId))
+        .where(eq(posts.authorId, context.user.id))
+    ])
+
+    return {
+      posts: userPosts,
+      comments: userComments,
+      stats: userStats[0]
+    }
+  })
+```
+
+## 🏗️ 実装時の注意点
+
+### パフォーマンス最適化
+- Server Functionsは必要最小限のデータのみ返す
+- Drizzle ORMのSQL-like方式で効率的なクエリを構築
+- ストリーミングを活用して初期表示を高速化
+- キャッシュ戦略を適切に設定
+
+### セキュリティ考慮事項
+- 認証が必要なServer Functionsには必ず認証ミドルウェアを適用
+- 基本的にバリデーションを実装
+- 本番環境では詳細なエラー情報を隠す
+- SQLインジェクション対策（Drizzle ORMが自動的に対応）
+
+### 型安全性の確保
+- Zodを使用した入力バリデーション
+- ミドルウェアでのコンテキスト型の適切な定義
+- Server Functionの戻り値型を明示的に定義
+- Drizzle ORMの型推論を活用（`$inferSelect`, `$inferInsert`）
+
+### デバッグとモニタリング
+- ログミドルウェアで実行時間と結果を記録
+- 開発環境では詳細なエラー情報を表示
+- Server Functionsの実行状況を適切に監視

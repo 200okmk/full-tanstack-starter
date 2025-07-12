@@ -4,6 +4,7 @@ import pluginRouter from "@tanstack/eslint-plugin-router";
 import eslintConfigPrettier from "eslint-config-prettier";
 import * as reactHooks from "eslint-plugin-react-hooks";
 import tseslint from "typescript-eslint";
+import youMightNotNeedAnEffect from "eslint-plugin-react-you-might-not-need-an-effect";
 
 export default tseslint.config(
   // グローバル除外設定 - ビルド成果物と自動生成ファイルを除外
@@ -34,7 +35,9 @@ export default tseslint.config(
       ...pluginQuery.configs["flat/recommended"],
       // TanStack Router設定 - 型安全なルーティング
       ...pluginRouter.configs["flat/recommended"],
-      // Prettier統合 - フォーマットルールとの競合を回避
+      // React useEffect最適化 - 不要なuseEffectを検出。(https://github.com/mizdra/eslint-plugin-react-you-might-not-need-an-effect)
+      youMightNotNeedAnEffect.configs.recommended,
+      // Prettier統合 - フォーマットルールとの競合を回避。
       eslintConfigPrettier,
     ],
     languageOptions: {

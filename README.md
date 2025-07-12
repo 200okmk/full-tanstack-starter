@@ -1,68 +1,102 @@
-# [React Tanstack Starter]()
+# [フルスタック Tanstack Starter🏝️]()
 
-A minimal starter template for 🏝️ TanStack Start.
+フルスタックTypeScript/ReactフレームワークのTanstack Startを素早く立ち上げ、デプロイするためのテンプレート
+
+## 使用技術
 
 - [React 19](https://react.dev) + [React Compiler](https://react.dev/learn/react-compiler)
 - TanStack [Start](https://tanstack.com/start/latest) + [Router](https://tanstack.com/router/latest) + [Query](https://tanstack.com/query/latest)
 - [Tailwind CSS v4](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/)
-- [Drizzle ORM](https://orm.drizzle.team/) + PostgreSQL
+- [Drizzle ORM](https://orm.drizzle.team/) + PostgreSQL on [Neon DB](https://neon.com/)
 - [Better Auth](https://www.better-auth.com/)
+- deployed on [Netlify](https://www.netlify.com/)
 
-## Getting Started
+## アーキテクチャ
 
-1. [Use this template](https://github.com/new?template_name=react-tanstarter&template_owner=dotnize) or clone this repository with gitpick:
+### プロジェクト構造
 
-   ```bash
-   npx gitpick dotnize/react-tanstarter myapp
-   cd myapp
-   ```
+```
+src/
+├── routes/                   # ファイルベースルーティング
+│   ├── __root.tsx            # ルートレイアウト・グローバル設定
+│   ├── index.tsx             # ホームページ
+│   ├── (auth)/               # 認証関連のルートグループ
+│   │   ├── route.tsx         # 認証レイアウト
+│   │   ├── login.tsx         # ログインページ
+│   │   └── signup.tsx        # サインアップページ
+│   ├── dashboard/            # ルーティング例(/dashboardパス)
+│   │   ├── route.tsx         # ダッシュボードレイアウト
+│   │   ├── index.tsx         # ダッシュボードホーム
+│   │   └── $userId.tsx       # 動的ユーザーページ
+│   └── api/                  # API ルート
+│       └── auth/
+│           └── $.ts          # 認証API（Better Auth）
+├── server/                   # Drizzleスキーマで定義したEntityごとのサーバー関数を格納
+│   ├── users.ts              # ユーザー関連
+│   ├── comments.ts           # コメント関連
+│   └── posts.tsx             # ポスト関連
+├── db/                      # Drizzle
+│   ├── schema.ts            # DBスキーマ
+│   ├── index.ts             # DBインスタンス設定
+├── lib/                     # 共通ライブラリ
+│   ├── middleware/          # Tanstack StartのMiddleware
+│   ├── auth.ts              # Better Auth設定ファイル
+│   └── utils.ts             # 一般的なユーティリティヘルパー関数
+└── components/              # 再利用可能コンポーネント
+    ├── ui/                  # カスタムコンポーネント作成時の元になるPrimitiveなUIコンポーネント群
+    └── **.tsx               # カスタムコンポーネント
+```
 
-2. Install dependencies:
+## Project Rules
 
-   ```bash
-   pnpm install
-   ```
+このテンプレートでは、[Cursor Project Rules](https://docs.cursor.com/context/rules#project-rules)を活用して、TanStack エコシステムの開発ベストプラクティスを体系化・自動生成することに挑戦しています。
 
-3. Create a `.env` file based on [`.env.example`](./.env.example).
+### 📁 Rule構成
 
-4. Push the schema to your database with drizzle-kit:
+```text
+.cursor/rules/
+├── react.mdc                     # React 19 + Compiler 原則
+├── tanstack-integration.mdc      # TanStack エコシステム統合
+├── tanstack-start.mdc            # TanStack Start機能関連
+├── tanstack-router.mdc           # TanStack Router機能関連
+├── project-architecture.mdc      # プロジェクト構造・設計原則
+├── authentication.mdc             # Better Auth 認証認可戦略
+├── drizzle-zod.mdc                # Drizzle ORM + drizzle-zod統合
+├── ui.mdc                         # Tailwind v4 + shadcn/ui + アクセシビリティ
+├── typescript.mdc                 # TypeScript/JavaScript 規約
+├── development-workflow.mdc       # プリコミットフック + ブランチ戦略
+├── testing.mdc                    # Vitest テスト戦略
+└── deployment.mdc                 # Netlify, Neon インフラ運用 + CDパイプライン（Github Actions）
+```
 
-   ```bash
-   pnpm db push
-   ```
+### 🎯 各Ruleの適用戦略
 
-   https://orm.drizzle.team/docs/migrations
+| ルール                     | 適用タイプ          | 適用条件                                                                             | 主な責務                                                        |
+| -------------------------- | ------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
+| `tanstack-integration.mdc` | **Auto Attached**   | `src/routes/**/*.tsx`<br/>`src/router.tsx`<br/>`src/ssr.tsx`                         | Start+Router+Query統合パターン<br/>サーバー機能・ストリーミング |
+| `react.mdc`                | **Auto Attached**   | `src/**/*.tsx`<br/>`src/**/*.ts`                                                     | React 19 + Compiler原則<br/>Suspense/use API活用                |
+| `project-architecture.mdc` | **Auto Attached**   | `src/**/*`<br/>`*.config.*`<br/>`package.json`                                       | ディレクトリ構造・命名規則<br/>設計原則・拡張戦略               |
+| `authentication.mdc`       | **Auto Attached**   | `src/lib/auth*.ts`<br/>`src/routes/(auth)/**/*.tsx`<br/>`src/lib/middleware/**/*.ts` | Better Auth認証フロー<br/>認可・セキュリティ戦略                |
+| `database.mdc`             | **Auto Attached**   | `src/lib/db/**/*.ts`<br/>`drizzle.config.ts`<br/>`src/lib/schemas/**/*.ts`           | Drizzle ORM最適化<br/>マイグレーション戦略                      |
+| `ui-components.mdc`        | **Auto Attached**   | `src/components/**/*.tsx`<br/>`src/lib/styles/**/*.css`                              | Tailwind + shadcn/ui<br/>デザインシステム一貫性                 |
+| `typescript.mdc`           | **Agent Requested** | 必要時適用                                                                           | 型安全性・コード品質向上<br/>最適化パターン                     |
+| `development-workflow.mdc` | **Agent Requested** | 必要時適用                                                                           | ESLint設定・Git戦略<br/>CI/CD・ブランチ運用                     |
+| `testing.mdc`              | **Agent Requested** | 必要時適用                                                                           | Vitest テスト設計<br/>品質保証戦略                              |
+| `deployment.mdc`           | **Agent Requested** | 必要時適用                                                                           | Netlify + Neon運用<br/>インフラ最適化                           |
 
-5. Run the development server:
+### 🚀 ブランチビルド運用戦略
 
-   ```bash
-   pnpm dev
-   ```
+#### 開発環境（feature/fix → develop）
 
-   The development server should now be running at [http://localhost:3000](http://localhost:3000).
+- **DB**: Docker Compose PostgreSQL + `drizzle-kit push`
+- **開発フロー**: 個人ブランチでの高速イテレーション
 
-## Issue watchlist
+#### プレビュー環境（develop）
 
-- [React Compiler docs](https://react.dev/learn/react-compiler), [Working Group](https://github.com/reactwg/react-compiler/discussions) - React Compiler is in RC.
-- https://github.com/TanStack/router/discussions/2863 - TanStack Start is in beta and may still undergo major changes.
+- **ビルド**: Netlify自動デプロイ（プレビュー用環境変数）
+- **DB**: GitHub Actions → Neon development子ブランチへマイグレーション適用
 
-## Goodies
+#### 本番環境（main）
 
-#### Scripts
-
-These scripts in [package.json](./package.json#L5) use **pnpm** by default, but you can modify them to use your preferred package manager.
-
-- **`auth:generate`** - Regenerate the [auth db schema](./src/lib/server/schema/auth.schema.ts) if you've made changes to your Better Auth [config](./src/lib/server/auth.ts).
-- **`db`** - Run drizzle-kit commands. (e.g. `pnpm db generate` to generate a migration)
-- **`ui`** - The shadcn/ui CLI. (e.g. `pnpm ui add button` to add the button component)
-- **`format`** and **`lint`** - Run Prettier and ESLint.
-- **`deps`** - Selectively upgrade dependencies via npm-check-updates.
-
-#### Utilities
-
-- [`auth-guard.ts`](./src/lib/middleware/auth-guard.ts) - Sample middleware for forcing authentication on server functions. ([see #5](https://github.com/dotnize/react-tanstarter/issues/5))
-- [`ThemeToggle.tsx`](./src/components/ThemeToggle.tsx) - A simple component to toggle between light and dark mode. ([#7](https://github.com/dotnize/react-tanstarter/issues/7))
-
-## Building for production
-
-Read the [hosting docs](https://tanstack.com/start/latest/docs/framework/react/hosting) for information on how to deploy your TanStack Start app.
+- **ビルド**: Netlify Production デプロイ（本番用環境変数）
+- **DB**: GitHub Actions → Neon production-dbへマイグレーション適用

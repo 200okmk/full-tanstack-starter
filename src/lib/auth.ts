@@ -1,15 +1,15 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { reactStartCookies } from "better-auth/react-start";
 import { oAuthProxy } from "better-auth/plugins";
+import { reactStartCookies } from "better-auth/react-start";
 
-import { db } from "~/lib/db";
-import { usersTable } from "~/lib/db/schemas/public.schema";
+import { db } from "~/db";
 import {
-  sessionsTable,
   accountsTable,
-  verificationTokensTable
-} from "~/lib/db/schemas/auth.schema";
+  sessionsTable,
+  usersTable,
+  verificationTokensTable,
+} from "~/db/schema";
 import { getOAuthRedirectURL, getProductionURL } from "~/lib/utils";
 
 const productionURL = getProductionURL();

@@ -5,7 +5,7 @@ import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { drizzle as drizzlePg } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
-import * as schema from "./schemas";
+import * as schema from "./schema";
 
 // DBの型定義
 type Database = PostgresJsDatabase<typeof schema> | NeonHttpDatabase<typeof schema>;

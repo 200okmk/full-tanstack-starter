@@ -27,9 +27,9 @@ function Home() {
         </div>
       </div>
 
-      {user ? (
+      {user && (
         <div className="flex flex-col items-center gap-2">
-          <p>Welcome back, {user.name}!</p>
+          <p>Welcome back, {user?.name}!</p>
           <Button type="button" asChild className="mb-2 w-fit" size="lg">
             <Link to="/dashboard">Go to Dashboard</Link>
           </Button>
@@ -56,7 +56,9 @@ function Home() {
             Sign out
           </Button>
         </div>
-      ) : (
+      )}
+
+      {!user && (
         <div className="flex flex-col items-center gap-2">
           <p>You are not signed in.</p>
           <Button type="button" asChild className="w-fit" size="lg">
