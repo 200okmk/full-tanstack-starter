@@ -58,11 +58,11 @@ src/
 ├── react.mdc                     # React 19 + Compiler 原則
 ├── tanstack-integration.mdc      # TanStack エコシステム統合
 ├── tanstack-start.mdc            # TanStack Start機能関連
-├── tanstack-integration.mdc      # TanStack Router機能関連
+├── tanstack-router.mdc           # TanStack Router機能関連
 ├── project-architecture.mdc      # プロジェクト構造・設計原則
 ├── authentication.mdc             # Better Auth 認証認可戦略
 ├── drizzle-zod.mdc                # Drizzle ORM + drizzle-zod統合
-├── ui.mdc              # Tailwind v4 + shadcn/ui + アクセシビリティ
+├── ui.mdc                         # Tailwind v4 + shadcn/ui + アクセシビリティ
 ├── typescript.mdc                 # TypeScript/JavaScript 規約
 ├── development-workflow.mdc       # プリコミットフック + ブランチ戦略
 ├── testing.mdc                    # Vitest テスト戦略
