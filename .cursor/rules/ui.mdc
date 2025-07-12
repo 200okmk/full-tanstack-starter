@@ -1,0 +1,887 @@
+---
+description:
+globs: src/**/*.tsx
+alwaysApply: false
+---
+
+# UI Components Integration Rule
+
+このルールは、TanStack StartプロジェクトにおけるUIコンポーネント統合戦略を定義します。Shadcn/ui + Tailwind v4を中心とした一貫性のあるデザインシステム、アクセシビリティ対応、TanStack Form統合、そして必須のSkeleton実装パターンを規定します。
+
+## 🔗 関連Rule参照と境界線
+
+### 関連Rule参照
+- **@react.mdc**: React 19根本原理・純粋関数・Suspense基盤・コンポーネント合成原則
+- **@tanstack-router.mdc**: Search Params基本状態管理・型安全ナビゲーション
+- **@drizzle-zod.mdc**: 型安全なスキーマ統合
+
+### 境界線定義
+| 概念 | @react.mdc | @ui.mdc |
+|------|-----------|---------|
+| コンポーネント合成 | HOC・Render Props（抽象原理） | shadcn/ui data-slot・具体実装 |
+| 条件付きレンダリング | 早期リターンパターン（原則） | UI状態・Skeleton実装（具体例） |
+| 状態管理 | React State原則（不変性） | Search Params + TanStack Form |
+| Suspense | 根本的な境界設計 | Skeleton・Loading具体実装 |
+
+---
+
+## 🎨 1. Shadcn/ui既存ベースのデザインシステム拡張
+
+### **app.css基盤の活用**
+
+```css
+/* src/lib/styles/app.css - 既存実装をベースに拡張 */
+@import "tailwindcss" source("../../");
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* 既存のshadcn/ui CSS変数定義を活用・拡張 */
+@theme inline {
+  /* 既存のshadcn/ui変数マッピング保持 */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  /* プロジェクト固有のデザイントークン拡張 */
+  --breakpoint-3xl: 120rem;
+  --breakpoint-4xl: 160rem;
+
+  /* カスタムアニメーション */
+  --ease-fluid: cubic-bezier(0.3, 0, 0, 1);
+  --ease-snappy: cubic-bezier(0.2, 0, 0, 1);
+
+  /* カスタムSpacing */
+  --space-18: 4.5rem;
+  --space-22: 5.5rem;
+  --space-26: 6.5rem;
+
+  /* プロジェクト固有のタイポグラフィ */
+  --text-display: 3.5rem;
+  --text-display--line-height: 1.1;
+  --text-display--font-weight: 800;
+}
+
+/* 既存のライト・ダークテーマCSS変数を保持 */
+:root {
+  /* shadcn/ui既存変数定義をそのまま活用 */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.141 0.005 285.823);
+  /* ... 既存の変数定義 ... */
+}
+
+.dark {
+  /* shadcn/ui既存ダークテーマ変数をそのまま活用 */
+  --background: oklch(0.141 0.005 285.823);
+  --foreground: oklch(0.985 0 0);
+  /* ... 既存の変数定義 ... */
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /* カスタムベーススタイル */
+  .typography {
+    p {
+      @apply text-base text-foreground leading-7;
+    }
+
+    h1 {
+      @apply text-display font-display text-foreground tracking-tight;
+    }
+
+    h2 {
+      @apply text-2xl font-semibold text-foreground tracking-tight;
+    }
+  }
+}
+```
+
+### **デザイントークン拡張戦略**
+
+```css
+/* カスタムデザイントークンの体系的定義 */
+@theme {
+  /* ブランドカラー */
+  --color-brand-50: oklch(0.99 0.01 210);
+  --color-brand-100: oklch(0.96 0.03 210);
+  --color-brand-500: oklch(0.6 0.15 210);
+  --color-brand-900: oklch(0.25 0.08 210);
+
+  /* 機能的カラー */
+  --color-success-50: oklch(0.98 0.02 140);
+  --color-success-500: oklch(0.7 0.18 140);
+  --color-warning-50: oklch(0.98 0.02 60);
+  --color-warning-500: oklch(0.75 0.15 60);
+
+  /* レスポンシブコンテナクエリ */
+  --container-2xs: 16rem;
+  --container-xs: 20rem;
+  --container-sm: 24rem;
+  --container-md: 28rem;
+  --container-lg: 32rem;
+  --container-xl: 36rem;
+  --container-2xl: 42rem;
+  --container-3xl: 48rem;
+}
+```
+
+---
+
+## 📱 2. レスポンシブデザイン体系
+
+### **モバイルファーストアプローチ**
+
+```tsx
+// レスポンシブコンポーネント実装パターン
+function ResponsiveCard({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="
+      w-full p-4
+      sm:p-6 sm:max-w-md
+      md:p-8 md:max-w-lg
+      lg:p-10 lg:max-w-2xl
+      xl:p-12 xl:max-w-4xl
+      3xl:p-16 3xl:max-w-6xl
+    ">
+      {children}
+    </div>
+  )
+}
+
+// コンテナクエリ活用パターン
+function AdaptiveLayout() {
+  return (
+    <div className="@container">
+      <div className="
+        grid grid-cols-1
+        @sm:grid-cols-2
+        @md:grid-cols-3
+        @lg:grid-cols-4
+      ">
+        {/* コンテンツ */}
+      </div>
+    </div>
+  )
+}
+
+// オリエンテーション対応
+function OrientationAware() {
+  return (
+    <div className="
+      h-screen flex flex-col
+      portrait:justify-center portrait:items-center
+      landscape:flex-row landscape:justify-between
+    ">
+      {/* コンテンツ */}
+    </div>
+  )
+}
+```
+
+### **ブレークポイント戦略**
+
+| ブレークポイント | 幅 | 用途 |
+|----------------|----|----|
+| `xs` | 480px | 小型スマートフォン |
+| `sm` | 640px | スマートフォン |
+| `md` | 768px | タブレット |
+| `lg` | 1024px | 小型デスクトップ |
+| `xl` | 1280px | デスクトップ |
+| `2xl` | 1536px | 大型デスクトップ |
+| `3xl` | 1920px | ウルトラワイド |
+
+---
+
+## ♿ 3. アクセシビリティ統合戦略
+
+### **セマンティックHTML徹底**
+
+```tsx
+// 正しいセマンティック構造
+function AccessibleForm() {
+  return (
+    <main>
+      <header>
+        <h1>ユーザー登録</h1>
+        <p>アカウントを作成してサービスをご利用ください</p>
+      </header>
+
+      <form>
+        <fieldset>
+          <legend>基本情報</legend>
+
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="username">ユーザー名</Label>
+              <Input
+                id="username"
+                name="username"
+                type="text"
+                required
+                aria-describedby="username-help"
+              />
+              <p id="username-help" className="text-sm text-muted-foreground">
+                3文字以上で入力してください
+              </p>
+            </div>
+          </div>
+        </fieldset>
+
+        <div className="mt-6">
+          <Button type="submit">
+            アカウント作成
+          </Button>
+        </div>
+      </form>
+    </main>
+  )
+}
+```
+
+### **ARIA属性統合パターン**
+
+```tsx
+// エラー状態のアクセシブル対応
+function AccessibleField({
+  error,
+  children
+}: {
+  error?: string;
+  children: React.ReactNode;
+}) {
+  const fieldId = useId()
+  const errorId = useId()
+
+  return (
+    <div>
+      <div
+        className={cn(
+          "transition-colors",
+          error && "border-destructive focus-within:border-destructive"
+        )}
+      >
+        {React.cloneElement(children as React.ReactElement, {
+          id: fieldId,
+          'aria-invalid': !!error,
+          'aria-describedby': error ? errorId : undefined,
+        })}
+      </div>
+
+      {error && (
+        <p
+          id={errorId}
+          className="mt-2 text-sm text-destructive"
+          role="alert"
+          aria-live="polite"
+        >
+          {error}
+        </p>
+      )}
+    </div>
+  )
+}
+
+// キーボードナビゲーション対応
+function AccessibleNavigation() {
+  return (
+    <nav aria-label="メインナビゲーション">
+      <ul className="flex space-x-4">
+        <li>
+          <Link
+            to="/dashboard"
+            className="focus-visible:ring-2 focus-visible:ring-ring rounded-md p-2"
+          >
+            ダッシュボード
+          </Link>
+        </li>
+        <li>
+          <Link
+            to="/profile"
+            className="focus-visible:ring-2 focus-visible:ring-ring rounded-md p-2"
+          >
+            プロフィール
+          </Link>
+        </li>
+      </ul>
+    </nav>
+  )
+}
+```
+
+---
+
+## 📝 4. TanStack Form統一実装
+
+### **基本フォーム実装パターン**
+
+```tsx
+import { useForm } from '@tanstack/react-form'
+import { zodValidator } from '@tanstack/zod-form-adapter'
+import { userInsertSchema } from '~/db/schema'
+import { Button } from '~/components/ui/button'
+import { Input } from '~/components/ui/input'
+import { Label } from '~/components/ui/label'
+
+function UserForm() {
+  const form = useForm({
+    defaultValues: {
+      name: '',
+      email: '',
+      age: 0,
+    },
+    validatorAdapter: zodValidator(),
+    validators: {
+      onChange: userInsertSchema,
+    },
+    onSubmit: async ({ value }) => {
+      // Server Function呼び出し
+      await createUser(value)
+    },
+  })
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        form.handleSubmit()
+      }}
+      className="space-y-6"
+    >
+      <form.Field
+        name="name"
+        children={(field) => (
+          <div className="space-y-2">
+            <Label htmlFor={field.name}>名前</Label>
+            <Input
+              id={field.name}
+              name={field.name}
+              value={field.state.value}
+              onChange={(e) => field.handleChange(e.target.value)}
+              onBlur={field.handleBlur}
+              aria-invalid={!field.state.meta.isValid}
+              aria-describedby={`${field.name}-error`}
+            />
+            {!field.state.meta.isValid && (
+              <p
+                id={`${field.name}-error`}
+                className="text-sm text-destructive"
+                role="alert"
+              >
+                {field.state.meta.errors.join(', ')}
+              </p>
+            )}
+          </div>
+        )}
+      />
+
+      <form.Field
+        name="email"
+        children={(field) => (
+          <div className="space-y-2">
+            <Label htmlFor={field.name}>メールアドレス</Label>
+            <Input
+              id={field.name}
+              name={field.name}
+              type="email"
+              value={field.state.value}
+              onChange={(e) => field.handleChange(e.target.value)}
+              onBlur={field.handleBlur}
+              aria-invalid={!field.state.meta.isValid}
+            />
+            {!field.state.meta.isValid && (
+              <p className="text-sm text-destructive" role="alert">
+                {field.state.meta.errors.join(', ')}
+              </p>
+            )}
+          </div>
+        )}
+      />
+
+      <form.Subscribe
+        selector={(state) => [state.canSubmit, state.isSubmitting]}
+        children={([canSubmit, isSubmitting]) => (
+          <Button
+            type="submit"
+            disabled={!canSubmit}
+            className="w-full"
+          >
+            {isSubmitting ? 'Processing...' : 'Submit'}
+          </Button>
+        )}
+      />
+    </form>
+  )
+}
+```
+
+### **複雑なフォーム（ネストフィールド）**
+
+```tsx
+function AdvancedForm() {
+  const form = useForm({
+    defaultValues: {
+      user: {
+        name: '',
+        email: '',
+      },
+      address: {
+        street: '',
+        city: '',
+        postalCode: '',
+      },
+      preferences: {
+        newsletter: false,
+        notifications: true,
+      },
+    },
+    validators: {
+      onChange: ({ value }) => {
+        // カスタムクロスフィールド検証
+        if (value.user.email && !value.preferences.newsletter) {
+          return {
+            form: 'ニュースレター購読をお勧めします',
+            fields: {
+              'preferences.newsletter': undefined,
+            },
+          }
+        }
+        return undefined
+      },
+    },
+  })
+
+  return (
+    <form onSubmit={(e) => {
+      e.preventDefault()
+      form.handleSubmit()
+    }}>
+      <fieldset className="space-y-4">
+        <legend className="text-lg font-semibold">ユーザー情報</legend>
+
+        <form.Field
+          name="user.name"
+          children={(field) => (
+            <div>
+              <Label htmlFor={field.name}>名前</Label>
+              <Input
+                id={field.name}
+                value={field.state.value}
+                onChange={(e) => field.handleChange(e.target.value)}
+              />
+            </div>
+          )}
+        />
+
+        <form.Field
+          name="user.email"
+          children={(field) => (
+            <div>
+              <Label htmlFor={field.name}>メール</Label>
+              <Input
+                id={field.name}
+                type="email"
+                value={field.state.value}
+                onChange={(e) => field.handleChange(e.target.value)}
+              />
+            </div>
+          )}
+        />
+      </fieldset>
+
+      <fieldset className="mt-6 space-y-4">
+        <legend className="text-lg font-semibold">住所</legend>
+
+        <form.Field
+          name="address.street"
+          children={(field) => (
+            <div>
+              <Label htmlFor={field.name}>住所</Label>
+              <Input
+                id={field.name}
+                value={field.state.value}
+                onChange={(e) => field.handleChange(e.target.value)}
+              />
+            </div>
+          )}
+        />
+      </fieldset>
+    </form>
+  )
+}
+```
+
+---
+
+## 🔄 5. Skeleton必須実装パターン
+
+### **基本Skeleton実装**
+
+```tsx
+import { Skeleton } from '~/components/ui/skeleton'
+
+// 基本的なSkeletonパターン
+function CardSkeleton() {
+  return (
+    <div className="space-y-3">
+      <Skeleton className="h-[125px] w-full rounded-xl" />
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-[250px]" />
+        <Skeleton className="h-4 w-[200px]" />
+      </div>
+    </div>
+  )
+}
+
+// リスト用Skeletonパターン
+function ListSkeleton({ count = 5 }: { count?: number }) {
+  return (
+    <div className="space-y-4">
+      {Array.from({ length: count }).map((_, index) => (
+        <div key={index} className="flex items-center space-x-4">
+          <Skeleton className="h-12 w-12 rounded-full" />
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-[200px]" />
+            <Skeleton className="h-4 w-[150px]" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// テーブル用Skeletonパターン
+function TableSkeleton({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) {
+  return (
+    <div className="rounded-md border">
+      <div className="border-b p-4">
+        <div className="flex space-x-4">
+          {Array.from({ length: cols }).map((_, index) => (
+            <Skeleton key={index} className="h-4 flex-1" />
+          ))}
+        </div>
+      </div>
+
+      {Array.from({ length: rows }).map((_, rowIndex) => (
+        <div key={rowIndex} className="border-b last:border-b-0 p-4">
+          <div className="flex space-x-4">
+            {Array.from({ length: cols }).map((_, colIndex) => (
+              <Skeleton key={colIndex} className="h-4 flex-1" />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+```
+
+### **コンポーネント別Skeleton実装義務**
+
+```tsx
+// ユーザープロフィールコンポーネント
+function UserProfile({ userId }: { userId: string }) {
+  return (
+    <Suspense fallback={<UserProfileSkeleton />}>
+      <UserProfileContent userId={userId} />
+    </Suspense>
+  )
+}
+
+function UserProfileSkeleton() {
+  return (
+    <div className="space-y-6 p-6">
+      {/* ヘッダー部分 */}
+      <div className="flex items-center space-x-4">
+        <Skeleton className="h-16 w-16 rounded-full" />
+        <div className="space-y-2">
+          <Skeleton className="h-6 w-[200px]" />
+          <Skeleton className="h-4 w-[150px]" />
+        </div>
+      </div>
+
+      {/* 統計情報 */}
+      <div className="grid grid-cols-3 gap-4">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <div key={index} className="space-y-2">
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-4 w-3/4 mx-auto" />
+          </div>
+        ))}
+      </div>
+
+      {/* コンテンツエリア */}
+      <div className="space-y-4">
+        <Skeleton className="h-6 w-[100px]" />
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <Skeleton key={index} className="h-4 w-full" />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// 投稿リストコンポーネント
+function PostList() {
+  return (
+    <Suspense fallback={<PostListSkeleton />}>
+      <PostListContent />
+    </Suspense>
+  )
+}
+
+function PostListSkeleton() {
+  return (
+    <div className="space-y-6">
+      {Array.from({ length: 5 }).map((_, index) => (
+        <div key={index} className="border rounded-lg p-4 space-y-3">
+          <div className="flex items-center space-x-3">
+            <Skeleton className="h-10 w-10 rounded-full" />
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-[120px]" />
+              <Skeleton className="h-3 w-[80px]" />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Skeleton className="h-5 w-[80%]" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-[60%]" />
+          </div>
+
+          <div className="flex space-x-4">
+            <Skeleton className="h-8 w-[60px]" />
+            <Skeleton className="h-8 w-[80px]" />
+            <Skeleton className="h-8 w-[70px]" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+```
+
+---
+
+## 🎯 6. UI状態管理統合
+
+### **Search Params基本パターン**
+
+```tsx
+import { useSearch, useNavigate } from '@tanstack/react-router'
+
+// Search Paramsを活用したUI状態管理
+function SearchableList() {
+  const search = useSearch({ from: '/posts/' })
+  const navigate = useNavigate({ from: '/posts' })
+
+  const updateSearch = (updates: Partial<typeof search>) => {
+    navigate({
+      search: { ...search, ...updates },
+    })
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex space-x-4">
+        <Input
+          placeholder="検索..."
+          value={search.query || ''}
+          onChange={(e) => updateSearch({ query: e.target.value, page: 1 })}
+        />
+
+        <Select
+          value={search.category || 'all'}
+          onValueChange={(value) => updateSearch({ category: value, page: 1 })}
+        >
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="カテゴリ" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">すべて</SelectItem>
+            <SelectItem value="tech">技術</SelectItem>
+            <SelectItem value="design">デザイン</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <Suspense fallback={<ListSkeleton />}>
+        <PostResults search={search} />
+      </Suspense>
+    </div>
+  )
+}
+```
+
+### **Zustand補完的使用パターン**
+
+```tsx
+import { create } from 'zustand'
+
+// 短期間のUI状態のみZustandで管理
+interface UIStore {
+  sidebarOpen: boolean
+  toggleSidebar: () => void
+
+  theme: 'light' | 'dark' | 'system'
+  setTheme: (theme: 'light' | 'dark' | 'system') => void
+
+  notifications: Array<{ id: string; message: string; type: 'success' | 'error' }>
+  addNotification: (notification: Omit<UIStore['notifications'][0], 'id'>) => void
+  removeNotification: (id: string) => void
+}
+
+const useUIStore = create<UIStore>((set) => ({
+  sidebarOpen: false,
+  toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
+
+  theme: 'system',
+  setTheme: (theme) => set({ theme }),
+
+  notifications: [],
+  addNotification: (notification) =>
+    set((state) => ({
+      notifications: [
+        ...state.notifications,
+        { ...notification, id: Math.random().toString(36) },
+      ],
+    })),
+  removeNotification: (id) =>
+    set((state) => ({
+      notifications: state.notifications.filter((n) => n.id !== id),
+    })),
+}))
+
+// UIストア使用例
+function Layout({ children }: { children: React.ReactNode }) {
+  const { sidebarOpen, toggleSidebar } = useUIStore()
+
+  return (
+    <div className="flex">
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 w-64 bg-background transition-transform",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        {/* サイドバーコンテンツ */}
+      </aside>
+
+      <main className="flex-1">
+        <Button onClick={toggleSidebar}>
+          サイドバー切り替え
+        </Button>
+        {children}
+      </main>
+    </div>
+  )
+}
+```
+
+---
+
+## 🔧 7. 実装時のベストプラクティス
+
+### **必須チェックリスト**
+
+#### **新規コンポーネント作成時**
+- [ ] セマンティックHTMLの使用
+- [ ] ARIA属性の適切な設定
+- [ ] キーボードナビゲーション対応
+- [ ] レスポンシブデザイン実装
+- [ ] Skeletonローディング状態実装
+- [ ] エラーバウンダリ設定
+- [ ] 適切なfocus管理
+
+#### **フォーム実装時**
+- [ ] TanStack Form使用
+- [ ] Zodスキーマ統合（@drizzle-zod.mdcから）
+- [ ] フィールドレベル・フォームレベル検証
+- [ ] アクセシブルなエラー表示
+- [ ] Loading状態とSubmission状態管理
+- [ ] 適切なHTMLフォーム要素使用
+
+#### **状態管理実装時**
+- [ ] Search Params優先使用
+- [ ] Zustandは短期間UI状態のみ
+- [ ] URL状態とUIの同期
+- [ ] 適切なデフォルト値設定
+
+### **パフォーマンス最適化**
+
+```tsx
+// コンポーネント分割最適化
+const ExpensiveComponent = React.memo(function ExpensiveComponent({
+  data,
+}: {
+  data: Data[]
+}) {
+  return (
+    <div>
+      {data.map((item) => (
+        <HeavyItem key={item.id} item={item} />
+      ))}
+    </div>
+  )
+})
+
+// Suspense境界での効率的なローディング
+function OptimizedPage() {
+  return (
+    <div>
+      <Header />
+
+      {/* 重要なコンテンツ */}
+      <Suspense fallback={<MainContentSkeleton />}>
+        <MainContent />
+      </Suspense>
+
+      {/* 補助的なコンテンツ */}
+      <Suspense fallback={<SidebarSkeleton />}>
+        <Sidebar />
+      </Suspense>
+    </div>
+  )
+}
+```
+
+### **アクセシビリティテスト**
+
+```tsx
+// 開発時のアクセシビリティチェック
+function AccessibilityCheckedComponent() {
+  React.useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      // focus-visible要素の確認
+      const focusableElements = document.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      )
+
+      console.log('フォーカス可能要素数:', focusableElements.length)
+    }
+  }, [])
+
+  return (
+    <div>
+      {/* コンポーネント内容 */}
+    </div>
+  )
+}
+```
+
+---
+
+このルールに従うことで、shadcn/ui + Tailwind v4ベースの一貫性のあるUIコンポーネント実装、必須のアクセシビリティ対応、TanStack Form統合、そして適切なSkeleton実装を実現できます。
+globs: src/components/**/*.tsx,src/lib/styles/app.css
+alwaysApply: false
+---

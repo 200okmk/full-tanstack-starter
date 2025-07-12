@@ -30,8 +30,11 @@ src/
 │   │   └── $userId.tsx       # 動的ユーザーページ
 │   └── api/                  # API ルート
 │       └── auth/
-│           └── $.ts         # 認証API（Better Auth）
-├── server/                  # サーバー関数
+│           └── $.ts          # 認証API（Better Auth）
+├── server/                   # Drizzleスキーマで定義したEntityごとのサーバー関数を格納
+│   ├── users.ts              # ユーザー関連
+│   ├── comments.ts           # コメント関連
+│   └── posts.tsx             # ポスト関連
 ├── db/                      # Drizzle
 │   ├── schema.ts            # DBスキーマ
 │   ├── index.ts             # DBインスタンス設定
@@ -40,7 +43,7 @@ src/
 │   ├── auth.ts              # Better Auth設定ファイル
 │   └── utils.ts             # 一般的なユーティリティヘルパー関数
 └── components/              # 再利用可能コンポーネント
-    ├── ui/                  # UI コンポーネント
+    ├── ui/                  # カスタムコンポーネント作成時の元になるPrimitiveなUIコンポーネント群
     └── **.tsx               # カスタムコンポーネント
 ```
 
@@ -58,12 +61,12 @@ src/
 ├── tanstack-integration.mdc      # TanStack Router機能関連
 ├── project-architecture.mdc      # プロジェクト構造・設計原則
 ├── authentication.mdc             # Better Auth 認証認可戦略
-├── database.mdc                   # Drizzle ORM + PostgreSQL戦略
-├── ui-components.mdc              # Tailwind + shadcn/ui + アクセシビリティ
+├── drizzle-zod.mdc                # Drizzle ORM + drizzle-zod統合
+├── ui.mdc              # Tailwind v4 + shadcn/ui + アクセシビリティ
 ├── typescript.mdc                 # TypeScript/JavaScript 規約
-├── development-workflow.mdc       # ESLint + Git + ブランチ戦略
+├── development-workflow.mdc       # プリコミットフック + ブランチ戦略
 ├── testing.mdc                    # Vitest テスト戦略
-└── deployment.mdc                 # Netlify + Neon インフラ運用
+└── deployment.mdc                 # Netlify, Neon インフラ運用 + CDパイプライン（Github Actions）
 ```
 
 ### 🎯 各Ruleの適用戦略
