@@ -588,23 +588,56 @@ function PageLayout() {
   )
 }
 
-// ✅ 推奨：Articleコンポーネントの例
+// ✅ 推奨：shadcn/ui Cardとセマンティックタグの統合
 function ProductCard({ product }: { product: Product }) {
   return (
-    <article className="rounded-lg border p-6">
-      <header>
-        <h3 className="text-lg font-semibold">{product.name}</h3>
-      </header>
+    <article className="@container"> {/* セマンティックな親要素 */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{product.name}</CardTitle>
+          <CardDescription>{product.description}</CardDescription>
+        </CardHeader>
 
-      <div className="mt-2">
-        <p className="text-muted-foreground">{product.description}</p>
-        <p className="mt-2 font-bold">${product.price}</p>
-      </div>
+        <CardContent>
+          <p className="text-2xl font-bold">${product.price}</p>
+        </CardContent>
 
-      <footer className="mt-4">
-        <Button>Add to Cart</Button>
-      </footer>
+        <CardFooter>
+          <Button>Add to Cart</Button>
+        </CardFooter>
+      </Card>
     </article>
+  )
+}
+
+// ✅ 推奨：コンテンツ種別に応じたセマンティックタグ選択
+function SettingsCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="@container"> {/* 設定UIは通常のdiv */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{title}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {children}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="@container"> {/* フォームセクションはsection */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{title}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {children}
+        </CardContent>
+      </Card>
+    </section>
   )
 }
 ```
