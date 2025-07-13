@@ -146,7 +146,7 @@ xl: 80rem (1280px)  /* デスクトップ */
 function ResponsiveGrid() {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {/* モバイル：1列、タブレット：2列、デスクトップ：3-4列 */}
+      {/* モバイル：1列、タブレット：2列、デスクトップ：3-4列 */} 
     </div>
   )
 }
