@@ -61,18 +61,18 @@ routes/
 
 ```tsx
 // routes/
-// ├── __root.tsx          // ルートレイアウト
-// ├── index.tsx           // / (ホームページ)
+// ├── __root.tsx          // アプリルートレイアウト
+// ├── index.tsx           // ホームページ
 // ├── (auth)/             // Route Group (認証関連)
-// │   ├── route.tsx       // レイアウトルート
-// │   ├── login.tsx       // /login
-// │   └── signup.tsx      // /signup
-// ├── dashboard/          // 保護されたパスの一例
-// │   ├── route.tsx       // レイアウトルート
-// │   └── index.tsx       // /dashboard
+// │   ├── route.tsx       // 認証レイアウト
+// │   ├── login.tsx       // ログインページ
+// │   └── signup.tsx      // サインアップページ
+// ├── dashboard/          // 保護されたパスの一例(ダッシュボードパス配下)
+// │   ├── route.tsx       // ダッシュボードレイアウト
+// │   └── index.tsx       // /dashboardルートページ
 // └── api/                // API Routes
-//     └── auth/
-//         └── $.ts         // API エンドポイント
+//     └── auth/           // 認証関連APIパス
+//         └── $.ts         // 各種認証エンドポイント（Better Auth準拠）
 ```
 
 ### Route Groups で意味的グルーピングを行い開発者体験にとって理解しやすくする
@@ -563,6 +563,80 @@ function PostComponent() {
 
 ## 🔍 Search Parameters（基本活用）
 
+### Search Parameters適用指針
+
+#### **✅ Search Paramsが適切な状態**（URLで共有可能・永続的）
+
+```tsx
+// 共有可能で永続的な状態のみをSearch Paramsで管理
+const appropriateSearchParams = {
+  // データフィルタリング
+  page: z.number().catch(1),
+  limit: z.number().catch(10),
+  category: z.string().optional(),
+  brand: z.array(z.string()).optional(),
+  priceRange: z.array(z.number()).optional(),
+
+  // 検索・ソート
+  query: z.string().catch(''),
+  sort: z.enum(['newest', 'oldest', 'price']).catch('newest'),
+
+  // 表示設定
+  view: z.enum(['grid', 'list']).catch('grid'),
+  showFilters: z.boolean().catch(false),
+
+  // 条件付きレンダリング
+  tab: z.enum(['all', 'active', 'completed']).catch('all'),
+  section: z.string().optional(),
+}
+```
+
+#### **❌ Search Paramsが不適切な状態**（一時的・プライベート）
+
+```tsx
+// 以下の状態はSearch Paramsではなく、他の状態管理手法を使用
+const inappropriateForSearchParams = {
+  // 一時的なUI状態 → useState
+  isModalOpen: boolean,
+  isDropdownOpen: boolean,
+  hoveredItem: string | null,
+
+  // フォーム入力中の状態 → TanStack Form + useState
+  formData: FormData,
+  validationErrors: ValidationError[],
+  isDirty: boolean,
+
+  // 認証・セッション状態 → RouterContext
+  currentUser: User | null,
+  isAuthenticated: boolean,
+
+  // サーバー由来のデータ → TanStack Query
+  users: User[],
+  posts: Post[],
+  comments: Comment[],
+
+  // 短時間の状態 → useState
+  isLoading: boolean,
+  error: Error | null,
+
+  // プライベートな状態 → React Context
+  userPreferences: UserPreferences,
+  notifications: Notification[],
+  themeSettings: ThemeSettings,
+}
+```
+
+#### **🎯 判断基準**
+
+Search Parametersを使用する前に、以下の条件をすべて満たすかを確認：
+
+1. **URLで共有可能か？** - 他のユーザーがURLを共有して同じ状態を再現できるか
+2. **永続的か？** - ページリロードしても保持されるべき状態か
+3. **ブックマーク可能か？** - ブックマークして後で同じ状態に戻れるべきか
+4. **プライベートでない？** - 認証情報や個人的な設定ではないか
+
+上記すべてに「はい」と答えられる場合のみ、Search Paramsを使用します。
+
 ### 基本的なSearch Parameters実装
 
 ```tsx
@@ -742,6 +816,11 @@ export const Route = createFileRoute('/posts/$postId')({
 4. **パフォーマンス**: 大きなルートツリーでは object syntax を使用
 
 ### 避けるべきパターン
+
+1. **JSXベースの設定**: `<Router><Route /></Router>` パターンは型安全性が失われる
+2. **順序違反**: `loader` を `beforeLoad` より先に定義すると型推論が正しく動作しない
+3. **過度な複雑化**: Search Parametersの過度な使用は保守性を損なう
+
 
 1. **JSXベースの設定**: `<Router><Route /></Router>` パターンは型安全性が失われる
 2. **順序違反**: `loader` を `beforeLoad` より先に定義すると型推論が正しく動作しない

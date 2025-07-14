@@ -1067,3 +1067,70 @@ function AuthLayoutSkeleton() {
 
 このルールに従うことで、TanStack Startプロジェクトにおける一貫性のあるUI実装を実現し、保守性とユーザー体験を向上させることができます。
 
+### **React Context軽量グローバル状態管理**
+
+#### **基本方針**
+
+Search Paramsや個別のuseStateでは管理が困難な軽量なグローバル状態については、React Contextを使用します。
+
+#### **✅ React Contextが適切な状態**
+
+```tsx
+// 軽量なグローバル状態の例
+interface AppContextType {
+  // UI設定・表示状態
+  sidebarOpen: boolean
+  setSidebarOpen: (open: boolean) => void
+
+  // 通知システム
+  notifications: Notification[]
+  addNotification: (notification: Notification) => void
+  removeNotification: (id: string) => void
+
+  // アプリケーション設定
+  userPreferences: {
+    theme: 'light' | 'dark'
+    language: string
+    compactMode: boolean
+  }
+  updatePreferences: (prefs: Partial<UserPreferences>) => void
+}
+```
+
+#### **❌ React Contextが不適切な状態**
+
+```tsx
+// 以下の状態はReact Contextではなく、他の状態管理手法を使用
+const inappropriateForReactContext = {
+  // URLで共有可能な状態 → Search Params
+  filters: FilterOptions,
+  page: number,
+  sort: SortOption,
+
+  // サーバー由来のデータ → TanStack Query
+  users: User[],
+  posts: Post[],
+
+  // 一時的なUI状態 → useState
+  isModalOpen: boolean,
+  hoveredItem: string | null,
+
+  // 高頻度更新の状態 → useState（パフォーマンス問題）
+  mousePosition: { x: number, y: number },
+  scrollPosition: number,
+}
+```
+
+#### **🔄 状態管理手法の優先順位**
+
+1. **Search Params** - 共有可能・永続的な状態
+2. **TanStack Query** - サーバー状態・キャッシュ管理
+3. **useState/useReducer** - ローカル状態・一時的UI状態
+4. **React Context** - 軽量なグローバル状態
+
+この順序で検討し、適切な手法を選択します。複雑なクライアント状態の場合のみ、個別に状態管理ライブラリを検討します。
+
+---
+
+このルールに従うことで、TanStack Startプロジェクトにおける一貫性のあるUI実装を実現し、保守性とユーザー体験を向上させることができます。
+

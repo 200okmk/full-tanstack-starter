@@ -312,6 +312,72 @@ export const Route = createFileRoute('/posts/$postId')({
 })
 ```
 
+## 📊 状態管理統合戦略
+
+### 基本方針：4つの状態管理手法の担当範囲
+
+TanStack Startプロジェクトでは、以下4つの状態管理手法で**95%以上のケースをカバー**し、複雑な専用状態管理ライブラリ（Zustand等）への依存を最小限に抑えます。
+
+#### **1. Search Params (TanStack Router)** - 共有可能・永続的な状態
+```tsx
+// ✅ 適用場面
+- ページネーション（page, limit）
+- フィルタリング（category, brand, price range）
+- ソート（sort order）
+- 検索クエリ（query）
+- 表示設定（view mode: grid/list）
+- 条件付きレンダリング（tab selection）
+```
+
+#### **2. TanStack Query** - サーバー状態・キャッシュ管理
+```tsx
+// ✅ 適用場面
+- データベースから取得するすべてのデータ
+- mutation によるデータ更新
+- 楽観的更新・キャッシュ無効化
+- リアルタイム同期（WebSocket等）
+```
+
+#### **3. useState/useReducer** - ローカル状態・一時的UI状態
+```tsx
+// ✅ 適用場面
+- 一時的なUI状態（modal open/close, dropdown状態）
+- フォーム入力中の状態
+- ローカルな表示状態（hover, focus）
+- コンポーネント内で完結する状態
+```
+
+#### **4. React Context** - 軽量なグローバル状態
+```tsx
+// ✅ 適用場面
+- アプリケーション設定（theme, language）
+- 通知システム（notifications）
+- 軽量なグローバル共有状態
+- 永続化が必要だがURLには含めたくない状態
+```
+
+### 状態管理の実装パターン参照
+
+- **Search Params 実装**: `@tanstack-router.mdc` のSearch Parameters セクション参照
+- **TanStack Query 実装**: 本ファイルの既存セクション参照
+- **UI状態管理 実装**: `@ui.mdc` のUI状態管理戦略セクション参照
+- **Form状態管理 実装**: `@ui.mdc` のTanStack Form統一実装パターン参照
+
+### 例外的なケース
+
+以下のような**複雑なクライアント状態**が発生した場合のみ、個別に状態管理ライブラリの導入を検討：
+
+```tsx
+// 例：ショッピングカート、複雑なフォーム状態、高頻度更新が必要な状態
+interface ComplexClientState {
+  // 複雑な状態変更ロジック
+  // 複数コンポーネント間での頻繁な共有
+  // 永続化が必要な複雑な構造
+}
+```
+
+この場合でも、まず**4つの基本手法の組み合わせ**での解決を検討し、それでも不十分な場合のみ追加ライブラリを導入します。
+
 ## 🛡️ 認証統合戦略
 
 ### 認証保護ルートの実装
@@ -659,6 +725,11 @@ function RootDocument({ children }: { readonly children: React.ReactNode }) {
       </body>
     </html>
   );
+}
+```
+
+このルールに従うことで、TanStack Start・Router・Queryの3つのライブラリを効率的に統合し、高性能で保守性の高いフルスタックReactアプリケーションを構築できます。
+
 }
 ```
 
