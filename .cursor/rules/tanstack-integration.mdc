@@ -1,11 +1,9 @@
 ---
-description:
+description: TanStack Start・Router・Queryの3つのライブラリを統合した現代的なフルスタックReactアプリケーションの実装パターンを定義します。Render-as-you-fetchパターンの徹底、型安全性の確保、パフォーマンス最適化を重視した設計戦略を採用します。
 globs:
 alwaysApply: true
 ---
 # TanStack Integration Rule
-
-このルールは、TanStack Start・Router・Queryの3つのライブラリを統合した現代的なフルスタックReactアプリケーションの実装パターンを定義します。Render-as-you-fetchパターンの徹底、型安全性の確保、パフォーマンス最適化を重視した設計戦略を採用します。
 
 ## 🏗️ 基本統合設定
 

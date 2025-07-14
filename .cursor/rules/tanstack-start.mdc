@@ -1,11 +1,9 @@
 ---
-description: TanStack Start Server Functions, Middleware, SSR, and API Routes implementation patterns
+description: TanStack Startにおけるサーバー関数、ミドルウェア、SSR/ストリーミング、APIルートの実装パターンを定義します。型安全性、パフォーマンス、保守性を重視した実装戦略を採用します。
 globs:
 alwaysApply: false
 ---
 # TanStack Start Rule
-
-このルールは、TanStack Startにおけるサーバー関数、ミドルウェア、SSR/ストリーミング、APIルートの実装パターンを定義します。型安全性、パフォーマンス、保守性を重視した実装戦略を採用します。
 
 ## 🔧 Server Functions設計パターン
 

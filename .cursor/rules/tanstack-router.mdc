@@ -1,5 +1,5 @@
 ---
-description:
+description: TanStack Routerにおけるファイルベースルーティング、レイアウトルート、認証ガード、型安全ナビゲーションの実装パターンを定義します。現在のプロジェクト実装をベースに、拡張性と保守性を重視した設計指針を採用します。
 globs: src/routes/**/*.tsx,src/router.tsx
 alwaysApply: false
 ---
