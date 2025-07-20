@@ -13,7 +13,7 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
 import { auth } from "~/lib/auth";
-import appCss from "~/lib/styles/app.css?url";
+import appCss from "~/styles/app.css?url";
 
 const getSessionUser = createServerFn({ method: "GET" }).handler(async () => {
   const { headers } = getWebRequest()!;

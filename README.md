@@ -13,38 +13,40 @@
 
 ## アーキテクチャ
 
-### プロジェクト構造
+### デフォルトのディレクトリ構造
 
 ```
 src/
-├── routes/                   # 柔軟にMixed Flat and Directory Routes方式でファイルベースルーティングを行う（tanstack-router.mdcに定義）
+├── routes/                   # 柔軟にMixed Flat and Directory Routes方式でファイルベースルーティングを行う（詳細はtanstack-router.mdcに定義）
 │   ├── __root.tsx            # ルートレイアウト・グローバル設定
-│   ├── index.tsx             # ホームページ
+│   ├── index.tsx             # 認証保護なしのランディングホームページ
 │   ├── (auth)/               # 認証関連のルートグループ
 │   │   ├── route.tsx         # 認証レイアウト
 │   │   ├── login.tsx         # ログインページ
 │   │   └── signup.tsx        # サインアップページ
-│   ├── dashboard/            # ルーティング例(/dashboardパス)
-│   │   ├── route.tsx         # ダッシュボードレイアウト
-│   │   ├── index.tsx         # ダッシュボードホーム
+│   ├── dashboard/            # 認証保護下のパス例(/dashboardパス)
+│   │   ├── route.tsx         # パスレイアウト
+│   │   ├── index.tsx         # パスホーム
 │   │   └── $userId.tsx       # 動的ユーザーページ
-│   └── api/                  # API ルート
-│       └── auth/
+│   └── api/                  # API Route
+│       └── auth/             # 認証関連
 │           └── $.ts          # 認証API（Better Auth）
-├── server/                   # Drizzleスキーマで定義したEntityごとのサーバー関数を格納
-│   ├── users.ts              # ユーザー関連
-│   ├── comments.ts           # コメント関連
-│   └── posts.tsx             # ポスト関連
-├── db/                      # Drizzle
-│   ├── schema.ts            # DBスキーマ
+├── db/                      # 主にDrizzleORM関連
+│   ├── schema.ts            # Drizzleスキーマ
 │   ├── index.ts             # DBインスタンス設定
-├── lib/                     # 共通ライブラリ
-│   ├── middleware/          # Tanstack StartのMiddleware
+├── styles/                  # スタイリング関連
+│   ├── app.css              # プロジェクトの統一的なCSS
+├── lib/                     # プロジェクト固有の再利用可能なコード
+│   ├── server-functions/    # 主にDrizzleスキーマで定義したEntityごとのServer Functions
+│   |   ├── comments.ts      # コメント関連CRUD
+│   |   └── posts.tsx        # ポスト関連CRUD
+│   ├── middlewares.ts       # Tanstack StartのMiddleware
 │   ├── auth.ts              # Better Auth設定ファイル
+│   ├── auth-client.ts       # Better Authが提供する認証関連メソッド（signin, signoutなど）
 │   └── utils.ts             # 一般的なユーティリティヘルパー関数
 └── components/              # 再利用可能コンポーネント
-    ├── ui/                  # カスタムコンポーネント作成時の元になるPrimitiveなUIコンポーネント群
-    └── **.tsx               # カスタムコンポーネント
+    ├── ui/                  # 再利用可能でPrimitiveなUIコンポーネント群（主にShadcn/uiが提供するもの）
+    └── */**/*.tsx           # カスタムコンポーネント
 ```
 
 ## Project Rules
