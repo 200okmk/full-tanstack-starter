@@ -83,38 +83,51 @@ src/
 - **ビルド**: Netlify Production デプロイ（本番用環境変数）
 - **DB**: GitHub Actions → Neon production-dbへマイグレーション適用
 
-## 🔐 BetterAuth + DrizzleORMによる認証認可実装
-
-本プロジェクトでは、Better AuthとDrizzle ORMを活用したDBベースのセッション管理を採用しています。
+## 🔐 Better Auth + Drizzle ORM による認証基盤
 
 ### 実装済み基盤
 
 - ✅ サインイン・サインアップフォーム、サインアウトボタン
 - ✅ OAuth認証（Google, GitHub）
 - ✅ Email/Password認証
-- ✅ PostgreSQL + Drizzleでのセッション管理
-- ✅ TanStack Router Context統合によるユーザーセッション取得
+- ✅ PostgreSQL + Drizzle ORM でのセッション管理
+- ✅ TanStack Router Context統合
 - ✅ Server Functions認証ミドルウェア
 
-### 🛠️ Better Auth CLI活用
+### 📋 開発フロー
 
-#### 定期実行推奨コマンド
+#### **Better Auth設定変更時**
 
 ```bash
-# スキーマ同期（Better Authアップデート時）
-npx @better-auth/cli@latest generate
+# Better Auth CLI でスキーマ更新
+pnpm auth:generate
 
-# DB migration適用
-npx @better-auth/cli@latest migrate
-
-# 新しいSecret key生成
-npx @better-auth/cli@latest secret
+# 新しいマイグレーション生成・適用
+pnpm db generate
+pnpm db migrate
 ```
 
-### 📚 関連Cursor Rules
+#### **アプリケーションスキーマ変更時**
 
-認証関連の実装パターンは以下のルールに分散して記載：
+```bash
+# 通常のDrizzle Kit操作
+pnpm db generate     # マイグレーション生成
+pnpm db migrate      # ローカルDB適用
+```
 
-- `@tanstack-router.mdc`: 認証ガード・Route Context統合
-- `@tanstack-start.mdc`: Server Functions認証ミドルウェア
-- `@tanstack-integration.mdc`: 認証状態管理・キャッシング戦略
+### 🏗️ Single Schema Strategy
+
+すべてのエンティティ設計定義とそれに依存するZodスキーマ生成とTS型生成を `src/db/schema.ts` で一元管理（詳細は`drizzle-zod.mdc`ルールを参照）：
+
+- Better Auth認証テーブル
+- アプリケーションテーブル
+- リレーション定義
+- Zodスキーマ生成
+- TS型生成
+
+### 🚀 本番デプロイ
+
+GitHub Actions により以下が自動実行：
+
+- プレビュー環境: develop ブランチ → Neon development DB
+- 本番環境: main ブランチ → Neon production DB
