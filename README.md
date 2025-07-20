@@ -17,7 +17,7 @@
 
 ```
 src/
-├── routes/                   # ファイルベースルーティング
+├── routes/                   # 柔軟にMixed Flat and Directory Routes方式でファイルベースルーティングを行う（tanstack-router.mdcに定義）
 │   ├── __root.tsx            # ルートレイアウト・グローバル設定
 │   ├── index.tsx             # ホームページ
 │   ├── (auth)/               # 認証関連のルートグループ
@@ -60,29 +60,11 @@ src/
 ├── tanstack-start.mdc            # TanStack Start機能関連
 ├── tanstack-router.mdc           # TanStack Router機能関連
 ├── project-architecture.mdc      # プロジェクト構造・設計原則
-├── authentication.mdc             # Better Auth 認証認可戦略
 ├── drizzle-zod.mdc                # Drizzle ORM + drizzle-zod統合
 ├── ui.mdc                         # Tailwind v4 + shadcn/ui + アクセシビリティ
 ├── typescript.mdc                 # TypeScript/JavaScript 規約
-├── development-workflow.mdc       # プリコミットフック + ブランチ戦略
-├── testing.mdc                    # Vitest テスト戦略
-└── deployment.mdc                 # Netlify, Neon インフラ運用 + CDパイプライン（Github Actions）
+└── testing.mdc                    # Vitest テスト戦略
 ```
-
-### 🎯 各Ruleの適用戦略
-
-| ルール                     | 適用タイプ          | 適用条件                                                                             | 主な責務                                                        |
-| -------------------------- | ------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
-| `tanstack-integration.mdc` | **Auto Attached**   | `src/routes/**/*.tsx`<br/>`src/router.tsx`<br/>`src/ssr.tsx`                         | Start+Router+Query統合パターン<br/>サーバー機能・ストリーミング |
-| `react.mdc`                | **Auto Attached**   | `src/**/*.tsx`<br/>`src/**/*.ts`                                                     | React 19 + Compiler原則<br/>Suspense/use API活用                |
-| `project-architecture.mdc` | **Auto Attached**   | `src/**/*`<br/>`*.config.*`<br/>`package.json`                                       | ディレクトリ構造・命名規則<br/>設計原則・拡張戦略               |
-| `authentication.mdc`       | **Auto Attached**   | `src/lib/auth*.ts`<br/>`src/routes/(auth)/**/*.tsx`<br/>`src/lib/middleware/**/*.ts` | Better Auth認証フロー<br/>認可・セキュリティ戦略                |
-| `database.mdc`             | **Auto Attached**   | `src/lib/db/**/*.ts`<br/>`drizzle.config.ts`<br/>`src/lib/schemas/**/*.ts`           | Drizzle ORM最適化<br/>マイグレーション戦略                      |
-| `ui-components.mdc`        | **Auto Attached**   | `src/components/**/*.tsx`<br/>`src/lib/styles/**/*.css`                              | Tailwind + shadcn/ui<br/>デザインシステム一貫性                 |
-| `typescript.mdc`           | **Agent Requested** | 必要時適用                                                                           | 型安全性・コード品質向上<br/>最適化パターン                     |
-| `development-workflow.mdc` | **Agent Requested** | 必要時適用                                                                           | ESLint設定・Git戦略<br/>CI/CD・ブランチ運用                     |
-| `testing.mdc`              | **Agent Requested** | 必要時適用                                                                           | Vitest テスト設計<br/>品質保証戦略                              |
-| `deployment.mdc`           | **Agent Requested** | 必要時適用                                                                           | Netlify + Neon運用<br/>インフラ最適化                           |
 
 ### 🚀 ブランチビルド運用戦略
 
@@ -100,3 +82,39 @@ src/
 
 - **ビルド**: Netlify Production デプロイ（本番用環境変数）
 - **DB**: GitHub Actions → Neon production-dbへマイグレーション適用
+
+## 🔐 BetterAuth + DrizzleORMによる認証認可実装
+
+本プロジェクトでは、Better AuthとDrizzle ORMを活用したDBベースのセッション管理を採用しています。
+
+### 実装済み基盤
+
+- ✅ サインイン・サインアップフォーム、サインアウトボタン
+- ✅ OAuth認証（Google, GitHub）
+- ✅ Email/Password認証
+- ✅ PostgreSQL + Drizzleでのセッション管理
+- ✅ TanStack Router Context統合によるユーザーセッション取得
+- ✅ Server Functions認証ミドルウェア
+
+### 🛠️ Better Auth CLI活用
+
+#### 定期実行推奨コマンド
+
+```bash
+# スキーマ同期（Better Authアップデート時）
+npx @better-auth/cli@latest generate
+
+# DB migration適用
+npx @better-auth/cli@latest migrate
+
+# 新しいSecret key生成
+npx @better-auth/cli@latest secret
+```
+
+### 📚 関連Cursor Rules
+
+認証関連の実装パターンは以下のルールに分散して記載：
+
+- `@tanstack-router.mdc`: 認証ガード・Route Context統合
+- `@tanstack-start.mdc`: Server Functions認証ミドルウェア
+- `@tanstack-integration.mdc`: 認証状態管理・キャッシング戦略
