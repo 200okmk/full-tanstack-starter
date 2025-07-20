@@ -424,7 +424,7 @@ export const Route = createFileRoute('/posts/$postId')({
 const getPost = createServerFn({ method: 'GET' })
   .validator(z.string())
   .handler(async ({ data: postId }) => {
-    return db.select().from(posts).where(eq(posts.id, postId))
+    return db.select().from(postsTable).where(eq(postsTable.id, postId))
   })
 
 // ✅ 通常のfetch（外部API等）

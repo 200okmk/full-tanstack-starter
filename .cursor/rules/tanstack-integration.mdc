@@ -258,24 +258,19 @@ export const getPostWithMetrics = createServerFn({
     // 並列でデータ取得
     const [post, metrics, relatedPosts] = await Promise.all([
       // Drizzle ORM SQL-like方式
-      db.select().from(posts).where(eq(posts.id, postId)),
+      db.select().from(postsTable).where(eq(postsTable.id, postId)),
 
       // メトリクスの集計
       db.select({
-        views: count(postViews.id),
-        likes: count(postLikes.id),
+        commentCount: count(commentsTable.id),
       })
-        .from(postViews)
-        .leftJoin(postLikes, eq(postViews.postId, postLikes.postId))
-        .where(eq(postViews.postId, postId)),
+        .from(commentsTable)
+        .where(eq(commentsTable.postId, postId)),
 
       // 関連投稿
       db.select()
-        .from(posts)
-        .where(and(
-          ne(posts.id, postId),
-          eq(posts.published, true)
-        ))
+        .from(postsTable)
+        .where(ne(postsTable.id, postId))
         .limit(3),
     ])
 
@@ -584,8 +579,9 @@ export const createPost = createServerFn({
   method: 'POST',
 })
   .validator(createPostSchema)
+  .middleware([authMiddleware])  // ✅ 認証ミドルウェア必須適用
   .handler(async ({ data, context }) => {
-    const newPost = await db.insert(posts).values({
+    const newPost = await db.insert(postsTable).values({
       ...data,
       authorId: context.sessionUser.id,
       createdAt: new Date(),
@@ -740,8 +736,8 @@ export const getPost = createServerFn({
     try {
       const [post] = await db
         .select()
-        .from(posts)
-        .where(eq(posts.id, postId))
+        .from(postsTable)
+        .where(eq(postsTable.id, postId))
 
       if (!post) {
         setResponseStatus(404)

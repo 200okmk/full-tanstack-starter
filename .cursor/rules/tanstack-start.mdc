@@ -16,7 +16,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { eq } from 'drizzle-orm'
 import { db } from '~/lib/db'
-import { users, profiles } from '~/lib/db/schemas'
+import { usersTable, postsTable, commentsTable } from '~/lib/db/schemas'
 
 // バリデーションスキーマの定義
 const getUserSchema = z.object({
@@ -34,14 +34,14 @@ export const getUser = createServerFn({
 
     try {
       // Drizzle ORM SQL-like方式でのクエリ
-      let query = db.select().from(users).where(eq(users.id, id))
+      let query = db.select().from(usersTable).where(eq(usersTable.id, id))
 
       if (includeProfile) {
         query = db
           .select()
-          .from(users)
-          .leftJoin(profiles, eq(users.id, profiles.userId))
-          .where(eq(users.id, id))
+          .from(usersTable)
+          .leftJoin(postsTable, eq(usersTable.id, postsTable.userId))
+          .where(eq(usersTable.id, id))
       }
 
       const result = await query
@@ -106,15 +106,13 @@ export const createPost = createServerFn({
       content: content.toString()
     }
   })
+  .middleware([authMiddleware])  // ✅ 認証ミドルウェア必須適用
   .handler(async ({ data, context }) => {
-    // 認証チェック
-    if (!context.sessionUser) {
-      throw new Error('Authentication required')
-    }
+    // context.sessionUserは認証済み保証
 
     // Drizzle ORM SQL-like方式でのinsert
     const [newPost] = await db
-      .insert(posts)
+      .insert(postsTable)  // ✅ 正しいテーブル名
       .values({
         ...data,
         authorId: context.sessionUser.id,
@@ -216,7 +214,7 @@ export const badGetUserProfile = createServerFn()
       throw new Error('Authentication required') // 脆弱
     }
 
-    return db.select().from(profiles).where(eq(profiles.userId, context.sessionUser.id))
+    return db.select().from(postsTable).where(eq(postsTable.userId, context.sessionUser.id))
   })
 
 // ❌ さらに危険：認証チェック一切なし
@@ -224,7 +222,7 @@ export const veryBadDeletePost = createServerFn()
   .validator(z.string())
   .handler(async ({ data: postId }) => {
     // 誰でも削除可能！非常に危険
-    return db.delete(posts).where(eq(posts.id, postId))
+    return db.delete(postsTable).where(eq(postsTable.id, postId))
   })
 ```
 
@@ -276,7 +274,7 @@ export const deleteUser = createServerFn()
   ])
   .handler(async ({ data: userId, context }) => {
     // context.sessionUser は認証済み且つ管理者である事が保証済み
-    return db.delete(users).where(eq(users.id, userId))
+    return db.delete(usersTable).where(eq(usersTable.id, userId))
   })
 ```
 
@@ -388,7 +386,7 @@ import { createAPIFileRoute } from '@tanstack/react-start/api'
 import { z } from 'zod'
 import { eq } from 'drizzle-orm'
 import { db } from '~/lib/db'
-import { users } from '~/lib/db/schemas'
+import { usersTable } from '~/lib/db/schemas'
 
 const getUserParamsSchema = z.object({
   id: z.string()
@@ -407,8 +405,8 @@ export const APIRoute = createAPIFileRoute('/api/users/$')({
       // Drizzle ORM SQL-like方式でのselect
       const [user] = await db
         .select()
-        .from(users)
-        .where(eq(users.id, id))
+        .from(usersTable)
+        .where(eq(usersTable.id, id))
 
       if (!user) {
         return new Response('User not found', { status: 404 })
@@ -427,7 +425,7 @@ export const APIRoute = createAPIFileRoute('/api/users/$')({
 
       // Drizzle ORM SQL-like方式でのinsert
       const [newUser] = await db
-        .insert(users)
+        .insert(usersTable)
         .values(userData)
         .returning()
 
@@ -478,8 +476,8 @@ export const APIRoute = createAPIFileRoute('/api/posts/$')({
       // Drizzle ORM SQL-like方式でのselect
       const [post] = await db
         .select()
-        .from(posts)
-        .where(eq(posts.id, params.id))
+        .from(postsTable)
+        .where(eq(postsTable.id, params.id))
 
       if (!post) {
         return createErrorResponse('Post not found', 404)
@@ -534,40 +532,39 @@ function PostsPage() {
 export const getDashboardData = createServerFn({
   method: 'GET'
 })
+  .middleware([authMiddleware])  // ✅ 認証ミドルウェア必須適用
   .handler(async ({ context }) => {
-    if (!context.sessionUser) {
-      throw new Error('Authentication required')
-    }
+    // context.sessionUserは認証済み保証
 
     // Drizzle ORM SQL-like方式での複数クエリ
     const [userPosts, userComments, userStats] = await Promise.all([
       // 投稿一覧
       db.select()
-        .from(posts)
-        .where(eq(posts.authorId, context.sessionUser.id))
-        .orderBy(desc(posts.createdAt))
+        .from(postsTable)
+        .where(eq(postsTable.userId, context.sessionUser.id))
+        .orderBy(desc(postsTable.createdAt))
         .limit(10),
 
       // コメント一覧（投稿情報も含む）
       db.select({
-        id: comments.id,
-        content: comments.content,
-        createdAt: comments.createdAt,
-        postTitle: posts.title
+        id: commentsTable.id,
+        content: commentsTable.content,
+        createdAt: commentsTable.createdAt,
+        postTitle: postsTable.title
       })
-        .from(comments)
-        .leftJoin(posts, eq(comments.postId, posts.id))
-        .where(eq(comments.authorId, context.sessionUser.id))
+        .from(commentsTable)
+        .leftJoin(postsTable, eq(commentsTable.postId, postsTable.id))
+        .where(eq(postsTable.userId, context.sessionUser.id))
         .limit(5),
 
       // 統計情報
       db.select({
-        totalPosts: count(posts.id),
-        totalComments: count(comments.id)
+        totalPosts: count(postsTable.id),
+        totalComments: count(commentsTable.id)
       })
-        .from(posts)
-        .leftJoin(comments, eq(posts.id, comments.postId))
-        .where(eq(posts.authorId, context.sessionUser.id))
+        .from(postsTable)
+        .leftJoin(commentsTable, eq(postsTable.id, commentsTable.postId))
+        .where(eq(postsTable.userId, context.sessionUser.id))
     ])
 
     return {
