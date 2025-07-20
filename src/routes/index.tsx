@@ -44,7 +44,9 @@ function Home() {
             onClick={() => {
               void (async () => {
                 await signOut();
+                // Tanstack Queryのキャッシュを無効化
                 await queryClient.invalidateQueries({ queryKey: ["user"] });
+                // ローダーデータに関連する変更が行われた場合、router.invalidate を使用して、ページを再読み込みしてルーターをリフレッシュさせることができます（https://tanstack.com/router/latest/docs/framework/react/guide/data-mutations#invalidating-tanstack-router-after-a-mutation）。
                 await router.invalidate();
               })();
             }}

@@ -496,7 +496,7 @@ export const APIRoute = createAPIFileRoute('/api/posts/$')({
 
 ## 🔄 データフェッチパターン
 
-### Server FunctionとReact Queryの統合
+### Server FunctionとTanstack Queryの統合
 
 ```tsx
 // src/routes/posts/index.tsx

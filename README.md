@@ -60,10 +60,10 @@ src/
 ├── tanstack-start.mdc            # TanStack Start機能関連
 ├── tanstack-router.mdc           # TanStack Router機能関連
 ├── project-architecture.mdc      # プロジェクト構造・設計原則
-├── drizzle-zod.mdc                # Drizzle ORM + drizzle-zod統合
-├── ui.mdc                         # Tailwind v4 + shadcn/ui + アクセシビリティ
-├── typescript.mdc                 # TypeScript/JavaScript 規約
-└── testing.mdc                    # Vitest テスト戦略
+├── drizzle-zod.mdc               # Drizzle ORM + drizzle-zod統合
+├── ui.mdc                        # Tailwind v4 + shadcn/ui + アクセシビリティ
+├── typescript.mdc                # TypeScript/JavaScript 規約
+└── testing.mdc                   # Vitest テスト戦略（未定義・未実装）
 ```
 
 ### 🚀 ブランチビルド運用戦略

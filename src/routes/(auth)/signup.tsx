@@ -50,6 +50,7 @@ function SignupForm() {
           setIsLoading(false);
         },
         onSuccess: async () => {
+          // Tanstack Queryのキャッシュを無効化
           await queryClient.invalidateQueries({ queryKey: ["user"] });
           void navigate({ to: redirectUrl });
         },
