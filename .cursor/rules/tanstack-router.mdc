@@ -86,7 +86,7 @@ export const Route = createFileRoute('/(auth)')({
   component: AuthLayoutComponent,
   beforeLoad: ({ context }) => {
     // 既にログイン済みの場合はダッシュボードにリダイレクト
-    if (context.user) {
+    if (context.sessionUser) {
       throw redirect({ to: '/dashboard' })
     }
 
@@ -118,7 +118,7 @@ export const Route = createFileRoute('/dashboard')({
   component: DashboardLayoutComponent,
   beforeLoad: ({ context }) => {
     // 認証チェック
-    if (!context.user) {
+    if (!context.sessionUser) {
       throw redirect({ to: '/login' })
     }
   }
@@ -147,7 +147,7 @@ import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
 export const Route = createFileRoute('/_authenticated')({
   component: AuthenticatedLayoutComponent,
   beforeLoad: ({ context }) => {
-    if (!context.user) {
+    if (!context.sessionUser) {
       throw redirect({ to: '/login' })
     }
   }
@@ -175,7 +175,7 @@ function AuthenticatedLayoutComponent() {
 export const Route = createFileRoute('/protected-route')({
   beforeLoad: ({ context, location }) => {
     // 1. 認証状態チェック
-    if (!context.user) {
+    if (!context.sessionUser) {
       throw redirect({
         to: '/login',
         search: {
@@ -186,13 +186,13 @@ export const Route = createFileRoute('/protected-route')({
     }
 
     // 2. 権限チェック（必要に応じて）
-    if (!context.user.roles?.includes('admin')) {
+    if (!context.sessionUser.roles?.includes('admin')) {
       throw redirect({ to: '/unauthorized' })
     }
 
     // 3. 追加のコンテキスト提供
     return {
-      userPermissions: getUserPermissions(context.user)
+      userPermissions: getUserPermissions(context.sessionUser)
     }
   },
   component: ProtectedComponent
@@ -207,16 +207,16 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/')({
   loader: ({ context }) => {
-    return { user: context.user }
+    return { sessionUser: context.sessionUser }
   },
   component: Home
 })
 
 function Home() {
-  const { user } = Route.useLoaderData()
+  const { sessionUser } = Route.useLoaderData()
   const { queryClient } = Route.useRouteContext()
 
-  if (user) {
+  if (sessionUser) {
     return (
       <div>
         <h1>Welcome back, {user.name}!</h1>
@@ -242,7 +242,7 @@ function Home() {
 // ✅ パターン1: 認証チェックのみ（シンプルなケース）
 export const Route = createFileRoute('/posts/$postId')({
   beforeLoad: ({ context }) => {
-    if (!context.user) {
+    if (!context.sessionUser) {
       throw redirect({ to: '/login' })
     }
     // 認証チェックのみの場合は何も返さない
@@ -262,12 +262,12 @@ export const Route = createFileRoute('/posts/$postId')({
 // ✅ パターン2: 権限チェックと事前計算が必要なケース
 export const Route = createFileRoute('/posts/$postId/edit')({
   beforeLoad: ({ params, context }) => {
-    if (!context.user) {
+    if (!context.sessionUser) {
       throw redirect({ to: '/login' })
     }
 
     // 実際に意味のある事前計算
-    const userRole = context.user.role
+    const userRole = context.sessionUser.role
     const canEditPost = userRole === 'admin' || userRole === 'editor'
 
     if (!canEditPost) {
@@ -364,23 +364,19 @@ function PostComponent() {
 import { createRootRouteWithContext } from '@tanstack/react-router'
 import type { QueryClient } from '@tanstack/react-query'
 
-// 型安全なコンテキスト定義
-interface RouterContext {
-  queryClient: QueryClient
-  user: User | null
-}
-
-export const Route = createRootRouteWithContext<RouterContext>()({
+export const Route = createRootRouteWithContext<{
+  queryClient: QueryClient;
+  sessionUser: Awaited<ReturnType<typeof getSessionUser>>;
+}>()({
   beforeLoad: async ({ context }) => {
-    // ユーザー情報の取得
-    const user = await context.queryClient.fetchQuery({
-      queryKey: ['user'],
-      queryFn: () => getSessionUser()
-    })
-
-    return { user }
+    const sessionUser = await context.queryClient.fetchQuery({
+      queryKey: ["session-user"],
+      queryFn: ({ signal }) => getSessionUser({ signal }),
+    }); // キャッシュにTanstack Queryを使用, router.tsxを参照
+    return { sessionUser };
   },
-  component: RootComponent
+  head: () => ({...}),
+  component: RootComponent,
 })
 ```
 

@@ -6,13 +6,13 @@ import { signOut } from "~/lib/auth-client";
 export const Route = createFileRoute("/")({
   component: Home,
   loader: ({ context }) => {
-    return { user: context.user };
+    return { sessionUser: context.sessionUser };
   },
 });
 
 function Home() {
   const { queryClient } = Route.useRouteContext();
-  const { user } = Route.useLoaderData();
+  const { sessionUser } = Route.useLoaderData();
   const router = useRouter();
 
   return (
@@ -27,16 +27,16 @@ function Home() {
         </div>
       </div>
 
-      {user && (
+      {sessionUser && (
         <div className="flex flex-col items-center gap-2">
-          <p>Welcome back, {user?.name}!</p>
+          <p>Welcome back, {sessionUser?.name}!</p>
           <Button type="button" asChild className="mb-2 w-fit" size="lg">
             <Link to="/dashboard">Go to Dashboard</Link>
           </Button>
           <div className="text-center text-xs sm:text-sm">
             Session user:
             <pre className="max-w-screen overflow-x-auto px-2 text-start">
-              {JSON.stringify(user, null, 2)}
+              {JSON.stringify(sessionUser, null, 2)}
             </pre>
           </div>
 
@@ -45,7 +45,7 @@ function Home() {
               void (async () => {
                 await signOut();
                 // Tanstack Queryのキャッシュを無効化
-                await queryClient.invalidateQueries({ queryKey: ["user"] });
+                await queryClient.invalidateQueries({ queryKey: ["session-user"] });
                 // ローダーデータに関連する変更が行われた場合、router.invalidate を使用して、ページを再読み込みしてルーターをリフレッシュさせることができます（https://tanstack.com/router/latest/docs/framework/react/guide/data-mutations#invalidating-tanstack-router-after-a-mutation）。
                 await router.invalidate();
               })();
@@ -60,7 +60,7 @@ function Home() {
         </div>
       )}
 
-      {!user && (
+      {!sessionUser && (
         <div className="flex flex-col items-center gap-2">
           <p>You are not signed in.</p>
           <Button type="button" asChild className="w-fit" size="lg">

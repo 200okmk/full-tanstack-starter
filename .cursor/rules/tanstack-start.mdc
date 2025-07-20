@@ -108,7 +108,7 @@ export const createPost = createServerFn({
   })
   .handler(async ({ data, context }) => {
     // 認証チェック
-    if (!context.user) {
+    if (!context.sessionUser) {
       throw new Error('Authentication required')
     }
 
@@ -117,7 +117,7 @@ export const createPost = createServerFn({
       .insert(posts)
       .values({
         ...data,
-        authorId: context.user.id,
+        authorId: context.sessionUser.id,
       })
       .returning()
 
@@ -199,18 +199,85 @@ export const authMiddleware = createMiddleware().server(async ({ next }) => {
   return next({ context: { user: session.user } })
 })
 
-// オプショナル認証ミドルウェア
-export const optionalAuthMiddleware = createMiddleware().server(async ({ next }) => {
-  const { headers } = getWebRequest()!
+```
 
-  const session = await auth.api.getSession({ headers })
+#### **🚨 重要：認証が必要なServer Functionには必ずauthMiddlewareを適用**
 
-  return next({
-    context: {
-      user: session?.user ?? null
+  **基本原則**: ログイン状態が必要な全てのServer Functionには、**例外なく`authMiddleware`を適用**することが必須です。
+
+#### **❌ 危険：認証チェックなしのServer Function**
+
+```tsx
+// ❌ 避けるべき：認証状態チェックが手動で脆弱
+export const badGetUserProfile = createServerFn()
+  .handler(async ({ context }) => {
+    // 手動チェックは漏れやすい
+    if (!context.sessionUser) {
+      throw new Error('Authentication required') // 脆弱
     }
+
+    return db.select().from(profiles).where(eq(profiles.userId, context.sessionUser.id))
   })
+
+// ❌ さらに危険：認証チェック一切なし
+export const veryBadDeletePost = createServerFn()
+  .validator(z.string())
+  .handler(async ({ data: postId }) => {
+    // 誰でも削除可能！非常に危険
+    return db.delete(posts).where(eq(posts.id, postId))
+  })
+```
+
+#### **適用判断のチェックリスト**
+
+Server Function作成時は以下をチェック：
+
+- ☑️ **ユーザー固有データにアクセスする？** → `authMiddleware`必須
+- ☑️ **データの作成・更新・削除を行う？** → `authMiddleware`必須
+- ☑️ **所有者チェックが必要？** → `authMiddleware`必須
+- ☑️ **管理者のみアクセス可能？** → `authMiddleware` + `adminMiddleware`必須
+
+### ミドルウェアの組み合わせパターン
+
+```tsx
+// 複数ミドルウェアの使用例
+export const protectedServerFn = createServerFn()
+  .middleware([
+    loggingMiddleware,
+    errorHandlingMiddleware,
+    authMiddleware
+  ])
+  .handler(async ({ context }) => {
+    // context.sessionUser は型安全にアクセス可能
+    return `Hello, ${context.sessionUser.name}!`
+  })
+```
+
+
+### **権限レベル別ミドルウェア戦略**
+
+```tsx
+// 管理者専用ミドルウェア
+export const adminMiddleware = createMiddleware().server(async ({ next, context }) => {
+  if (!context.sessionUser?.isAdmin) {
+    setResponseStatus(403)
+    throw new Error('Admin access required')
+  }
+
+  return next({ context })
 })
+
+// 使用例：段階的権限チェック
+export const deleteUser = createServerFn()
+  .validator(z.string())
+  .middleware([
+    authMiddleware,   // 1. 認証チェック
+    adminMiddleware   // 2. 管理者権限チェック
+  ])
+  .handler(async ({ data: userId, context }) => {
+    // context.sessionUser は認証済み且つ管理者である事が保証済み
+    return db.delete(users).where(eq(users.id, userId))
+  })
 ```
 
 ### バリデーションミドルウェア
@@ -235,76 +302,8 @@ export const createValidationMiddleware = <T>(schema: z.ZodSchema<T>) => {
 }
 ```
 
-### ログミドルウェア
 
-```tsx
-// src/lib/middleware/logging.ts
-import { createMiddleware } from '@tanstack/react-start'
 
-export const loggingMiddleware = createMiddleware().server(async ({ next }) => {
-  const startTime = Date.now()
-  const requestId = Math.random().toString(36).substr(2, 9)
-
-  console.log(`[${requestId}] Server function started at ${new Date().toISOString()}`)
-
-  try {
-    const result = await next()
-    console.log(`[${requestId}] Completed in ${Date.now() - startTime}ms`)
-    return result
-  } catch (error) {
-    console.error(`[${requestId}] Failed in ${Date.now() - startTime}ms:`, error)
-    throw error
-  }
-})
-```
-
-### エラー処理ミドルウェア
-
-```tsx
-// src/lib/middleware/error-handling.ts
-import { createMiddleware } from '@tanstack/react-start'
-import { setResponseStatus } from '@tanstack/react-start/server'
-
-export const errorHandlingMiddleware = createMiddleware().server(async ({ next }) => {
-  try {
-    return await next()
-  } catch (error) {
-    // エラーの種類に応じてステータスコードを設定
-    if (error.message.includes('Authentication')) {
-      setResponseStatus(401)
-    } else if (error.message.includes('Validation')) {
-      setResponseStatus(400)
-    } else if (error.message.includes('Not found')) {
-      setResponseStatus(404)
-    } else {
-      setResponseStatus(500)
-    }
-
-    // 本番環境では詳細なエラーを隠す
-    const message = process.env.NODE_ENV === 'production'
-      ? 'Internal server error'
-      : error.message
-
-    throw new Error(message)
-  }
-})
-```
-
-### ミドルウェアの組み合わせパターン
-
-```tsx
-// 複数ミドルウェアの使用例
-export const protectedServerFn = createServerFn()
-  .middleware([
-    loggingMiddleware,
-    errorHandlingMiddleware,
-    authMiddleware
-  ])
-  .handler(async ({ context }) => {
-    // context.user は型安全にアクセス可能
-    return `Hello, ${context.user.name}!`
-  })
-```
 
 ## 🌊 SSR/Streaming戦略
 
@@ -536,7 +535,7 @@ export const getDashboardData = createServerFn({
   method: 'GET'
 })
   .handler(async ({ context }) => {
-    if (!context.user) {
+    if (!context.sessionUser) {
       throw new Error('Authentication required')
     }
 
@@ -545,7 +544,7 @@ export const getDashboardData = createServerFn({
       // 投稿一覧
       db.select()
         .from(posts)
-        .where(eq(posts.authorId, context.user.id))
+        .where(eq(posts.authorId, context.sessionUser.id))
         .orderBy(desc(posts.createdAt))
         .limit(10),
 
@@ -558,7 +557,7 @@ export const getDashboardData = createServerFn({
       })
         .from(comments)
         .leftJoin(posts, eq(comments.postId, posts.id))
-        .where(eq(comments.authorId, context.user.id))
+        .where(eq(comments.authorId, context.sessionUser.id))
         .limit(5),
 
       // 統計情報
@@ -568,7 +567,7 @@ export const getDashboardData = createServerFn({
       })
         .from(posts)
         .leftJoin(comments, eq(posts.id, comments.postId))
-        .where(eq(posts.authorId, context.user.id))
+        .where(eq(posts.authorId, context.sessionUser.id))
     ])
 
     return {

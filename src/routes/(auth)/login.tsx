@@ -42,7 +42,7 @@ function LoginForm() {
         },
         onSuccess: async () => {
           // Tanstack Queryのキャッシュを無効化
-          await queryClient.invalidateQueries({ queryKey: ["user"] });
+          await queryClient.invalidateQueries({ queryKey: ["session-user"] });
           await navigate({ to: redirectUrl });
         },
       },
