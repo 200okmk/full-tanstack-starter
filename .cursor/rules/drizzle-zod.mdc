@@ -12,12 +12,12 @@ alwaysApply: true
 ```ts
 // src/db/schema.ts - `schema.ts`ファイル内では上から順にテーブル定義（認証関連、アプリ本体Entity）、リレーション定義、Zodスキーマ生成、TS型生成の順番にコメントアウトでわかりやすくセクション化しながら記述していく。また各セクションの冒頭に定義した命名規則を徹底する。
 
-// =============================================================================
-// Schema Factory設定（プロジェクト全体で統一的なルールを適用。型強制coerceの自動適用など）
-// =============================================================================
 import { createSchemaFactory } from 'drizzle-zod';
 import { z } from 'zod';
 
+// =============================================================================
+// Schema Factory設定（プロジェクト全体で統一的なルールを適用。型強制coerceの自動適用など）
+// =============================================================================
 const { createInsertSchema, createSelectSchema, createUpdateSchema } = createSchemaFactory({
   coerce: {
     date: true, // 日付型の自動変換を有効化
@@ -78,9 +78,6 @@ export const commentsTable = pgTable("comments", {
     .$onUpdateFn(() => new Date()),
   postId: integer("post_id").references(() => postsTable.id, { onDelete: "cascade" }),
 });
-
-// タグテーブル
-export const tagsTable = pgTable("tags", { /* ... */ });
 
 
 // =============================================================================
