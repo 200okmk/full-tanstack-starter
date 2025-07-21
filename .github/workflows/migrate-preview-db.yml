@@ -48,6 +48,10 @@ jobs:
         run: |
           echo "🔧 マイグレーション処理を開始します"
 
+          # Better Auth CLI でスキーマ更新
+          echo "🔧 Better Auth CLI でDBスキーマ更新中..."
+          pnpm auth:generate
+
           # マイグレーション生成
           echo "🔧 マイグレーション生成中..."
           pnpm drizzle-kit generate

@@ -4,7 +4,7 @@ import { Button } from "~/components/ui/button";
 export const Route = createFileRoute("/dashboard")({
   component: DashboardLayout,
   beforeLoad: ({ context }) => {
-    if (!context.user) {
+    if (!context.sessionUser) {
       throw redirect({ to: "/login" });
     }
 

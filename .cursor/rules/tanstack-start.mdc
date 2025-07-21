@@ -1,10 +1,9 @@
 ---
-description: TanStack Start Server Functions, Middleware, SSR, and API Routes implementation patterns
+description: TanStack Startにおけるサーバー関数、ミドルウェア、SSR/ストリーミング、APIルートの実装パターンを定義します。型安全性、パフォーマンス、保守性を重視した実装戦略を採用します。
 globs:
 alwaysApply: false
 ---
 # TanStack Start Rule
-
 このルールは、TanStack Startにおけるサーバー関数、ミドルウェア、SSR/ストリーミング、APIルートの実装パターンを定義します。型安全性、パフォーマンス、保守性を重視した実装戦略を採用します。
 
 ## 🔧 Server Functions設計パターン
@@ -17,7 +16,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { eq } from 'drizzle-orm'
 import { db } from '~/lib/db'
-import { users, profiles } from '~/lib/db/schemas'
+import { usersTable, postsTable, commentsTable } from '~/lib/db/schemas'
 
 // バリデーションスキーマの定義
 const getUserSchema = z.object({
@@ -35,14 +34,14 @@ export const getUser = createServerFn({
 
     try {
       // Drizzle ORM SQL-like方式でのクエリ
-      let query = db.select().from(users).where(eq(users.id, id))
+      let query = db.select().from(usersTable).where(eq(usersTable.id, id))
 
       if (includeProfile) {
         query = db
           .select()
-          .from(users)
-          .leftJoin(profiles, eq(users.id, profiles.userId))
-          .where(eq(users.id, id))
+          .from(usersTable)
+          .leftJoin(postsTable, eq(usersTable.id, postsTable.userId))
+          .where(eq(usersTable.id, id))
       }
 
       const result = await query
@@ -107,20 +106,16 @@ export const createPost = createServerFn({
       content: content.toString()
     }
   })
+  .middleware([authMiddleware])  // ✅ 認証ミドルウェア必須適用
   .handler(async ({ data, context }) => {
-    // 認証チェック
-    if (!context.user) {
-      throw new Error('Authentication required')
-    }
+    // context.sessionUserは認証済み保証
 
     // Drizzle ORM SQL-like方式でのinsert
     const [newPost] = await db
-      .insert(posts)
+      .insert(postsTable)  // ✅ 正しいテーブル名
       .values({
         ...data,
-        authorId: context.user.id,
-        createdAt: new Date(),
-        updatedAt: new Date()
+        authorId: context.sessionUser.id,
       })
       .returning()
 
@@ -202,18 +197,85 @@ export const authMiddleware = createMiddleware().server(async ({ next }) => {
   return next({ context: { user: session.user } })
 })
 
-// オプショナル認証ミドルウェア
-export const optionalAuthMiddleware = createMiddleware().server(async ({ next }) => {
-  const { headers } = getWebRequest()!
+```
 
-  const session = await auth.api.getSession({ headers })
+#### **🚨 重要：認証が必要なServer Functionには必ずauthMiddlewareを適用**
 
-  return next({
-    context: {
-      user: session?.user ?? null
+  **基本原則**: ログイン状態が必要な全てのServer Functionには、**例外なく`authMiddleware`を適用**することが必須です。
+
+#### **❌ 危険：認証チェックなしのServer Function**
+
+```tsx
+// ❌ 避けるべき：認証状態チェックが手動で脆弱
+export const badGetUserProfile = createServerFn()
+  .handler(async ({ context }) => {
+    // 手動チェックは漏れやすい
+    if (!context.sessionUser) {
+      throw new Error('Authentication required') // 脆弱
     }
+
+    return db.select().from(postsTable).where(eq(postsTable.userId, context.sessionUser.id))
   })
+
+// ❌ さらに危険：認証チェック一切なし
+export const veryBadDeletePost = createServerFn()
+  .validator(z.string())
+  .handler(async ({ data: postId }) => {
+    // 誰でも削除可能！非常に危険
+    return db.delete(postsTable).where(eq(postsTable.id, postId))
+  })
+```
+
+#### **適用判断のチェックリスト**
+
+Server Function作成時は以下をチェック：
+
+- ☑️ **ユーザー固有データにアクセスする？** → `authMiddleware`必須
+- ☑️ **データの作成・更新・削除を行う？** → `authMiddleware`必須
+- ☑️ **所有者チェックが必要？** → `authMiddleware`必須
+- ☑️ **管理者のみアクセス可能？** → `authMiddleware` + `adminMiddleware`必須
+
+### ミドルウェアの組み合わせパターン
+
+```tsx
+// 複数ミドルウェアの使用例
+export const protectedServerFn = createServerFn()
+  .middleware([
+    loggingMiddleware,
+    errorHandlingMiddleware,
+    authMiddleware
+  ])
+  .handler(async ({ context }) => {
+    // context.sessionUser は型安全にアクセス可能
+    return `Hello, ${context.sessionUser.name}!`
+  })
+```
+
+
+### **権限レベル別ミドルウェア戦略**
+
+```tsx
+// 管理者専用ミドルウェア
+export const adminMiddleware = createMiddleware().server(async ({ next, context }) => {
+  if (!context.sessionUser?.isAdmin) {
+    setResponseStatus(403)
+    throw new Error('Admin access required')
+  }
+
+  return next({ context })
 })
+
+// 使用例：段階的権限チェック
+export const deleteUser = createServerFn()
+  .validator(z.string())
+  .middleware([
+    authMiddleware,   // 1. 認証チェック
+    adminMiddleware   // 2. 管理者権限チェック
+  ])
+  .handler(async ({ data: userId, context }) => {
+    // context.sessionUser は認証済み且つ管理者である事が保証済み
+    return db.delete(usersTable).where(eq(usersTable.id, userId))
+  })
 ```
 
 ### バリデーションミドルウェア
@@ -238,76 +300,8 @@ export const createValidationMiddleware = <T>(schema: z.ZodSchema<T>) => {
 }
 ```
 
-### ログミドルウェア
 
-```tsx
-// src/lib/middleware/logging.ts
-import { createMiddleware } from '@tanstack/react-start'
 
-export const loggingMiddleware = createMiddleware().server(async ({ next }) => {
-  const startTime = Date.now()
-  const requestId = Math.random().toString(36).substr(2, 9)
-
-  console.log(`[${requestId}] Server function started at ${new Date().toISOString()}`)
-
-  try {
-    const result = await next()
-    console.log(`[${requestId}] Completed in ${Date.now() - startTime}ms`)
-    return result
-  } catch (error) {
-    console.error(`[${requestId}] Failed in ${Date.now() - startTime}ms:`, error)
-    throw error
-  }
-})
-```
-
-### エラー処理ミドルウェア
-
-```tsx
-// src/lib/middleware/error-handling.ts
-import { createMiddleware } from '@tanstack/react-start'
-import { setResponseStatus } from '@tanstack/react-start/server'
-
-export const errorHandlingMiddleware = createMiddleware().server(async ({ next }) => {
-  try {
-    return await next()
-  } catch (error) {
-    // エラーの種類に応じてステータスコードを設定
-    if (error.message.includes('Authentication')) {
-      setResponseStatus(401)
-    } else if (error.message.includes('Validation')) {
-      setResponseStatus(400)
-    } else if (error.message.includes('Not found')) {
-      setResponseStatus(404)
-    } else {
-      setResponseStatus(500)
-    }
-
-    // 本番環境では詳細なエラーを隠す
-    const message = process.env.NODE_ENV === 'production'
-      ? 'Internal server error'
-      : error.message
-
-    throw new Error(message)
-  }
-})
-```
-
-### ミドルウェアの組み合わせパターン
-
-```tsx
-// 複数ミドルウェアの使用例
-export const protectedServerFn = createServerFn()
-  .middleware([
-    loggingMiddleware,
-    errorHandlingMiddleware,
-    authMiddleware
-  ])
-  .handler(async ({ context }) => {
-    // context.user は型安全にアクセス可能
-    return `Hello, ${context.user.name}!`
-  })
-```
 
 ## 🌊 SSR/Streaming戦略
 
@@ -392,7 +386,7 @@ import { createAPIFileRoute } from '@tanstack/react-start/api'
 import { z } from 'zod'
 import { eq } from 'drizzle-orm'
 import { db } from '~/lib/db'
-import { users } from '~/lib/db/schemas'
+import { usersTable } from '~/lib/db/schemas'
 
 const getUserParamsSchema = z.object({
   id: z.string()
@@ -411,8 +405,8 @@ export const APIRoute = createAPIFileRoute('/api/users/$')({
       // Drizzle ORM SQL-like方式でのselect
       const [user] = await db
         .select()
-        .from(users)
-        .where(eq(users.id, id))
+        .from(usersTable)
+        .where(eq(usersTable.id, id))
 
       if (!user) {
         return new Response('User not found', { status: 404 })
@@ -431,7 +425,7 @@ export const APIRoute = createAPIFileRoute('/api/users/$')({
 
       // Drizzle ORM SQL-like方式でのinsert
       const [newUser] = await db
-        .insert(users)
+        .insert(usersTable)
         .values(userData)
         .returning()
 
@@ -482,8 +476,8 @@ export const APIRoute = createAPIFileRoute('/api/posts/$')({
       // Drizzle ORM SQL-like方式でのselect
       const [post] = await db
         .select()
-        .from(posts)
-        .where(eq(posts.id, params.id))
+        .from(postsTable)
+        .where(eq(postsTable.id, params.id))
 
       if (!post) {
         return createErrorResponse('Post not found', 404)
@@ -499,7 +493,7 @@ export const APIRoute = createAPIFileRoute('/api/posts/$')({
 
 ## 🔄 データフェッチパターン
 
-### Server FunctionとReact Queryの統合
+### Server FunctionとTanstack Queryの統合
 
 ```tsx
 // src/routes/posts/index.tsx
@@ -538,40 +532,39 @@ function PostsPage() {
 export const getDashboardData = createServerFn({
   method: 'GET'
 })
+  .middleware([authMiddleware])  // ✅ 認証ミドルウェア必須適用
   .handler(async ({ context }) => {
-    if (!context.user) {
-      throw new Error('Authentication required')
-    }
+    // context.sessionUserは認証済み保証
 
     // Drizzle ORM SQL-like方式での複数クエリ
     const [userPosts, userComments, userStats] = await Promise.all([
       // 投稿一覧
       db.select()
-        .from(posts)
-        .where(eq(posts.authorId, context.user.id))
-        .orderBy(desc(posts.createdAt))
+        .from(postsTable)
+        .where(eq(postsTable.userId, context.sessionUser.id))
+        .orderBy(desc(postsTable.createdAt))
         .limit(10),
 
       // コメント一覧（投稿情報も含む）
       db.select({
-        id: comments.id,
-        content: comments.content,
-        createdAt: comments.createdAt,
-        postTitle: posts.title
+        id: commentsTable.id,
+        content: commentsTable.content,
+        createdAt: commentsTable.createdAt,
+        postTitle: postsTable.title
       })
-        .from(comments)
-        .leftJoin(posts, eq(comments.postId, posts.id))
-        .where(eq(comments.authorId, context.user.id))
+        .from(commentsTable)
+        .leftJoin(postsTable, eq(commentsTable.postId, postsTable.id))
+        .where(eq(postsTable.userId, context.sessionUser.id))
         .limit(5),
 
       // 統計情報
       db.select({
-        totalPosts: count(posts.id),
-        totalComments: count(comments.id)
+        totalPosts: count(postsTable.id),
+        totalComments: count(commentsTable.id)
       })
-        .from(posts)
-        .leftJoin(comments, eq(posts.id, comments.postId))
-        .where(eq(posts.authorId, context.user.id))
+        .from(postsTable)
+        .leftJoin(commentsTable, eq(postsTable.id, commentsTable.postId))
+        .where(eq(postsTable.userId, context.sessionUser.id))
     ])
 
     return {

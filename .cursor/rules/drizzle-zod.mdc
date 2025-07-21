@@ -1,11 +1,9 @@
 ---
+description: Drizzle ORM・drizzle-zod統合による現代的なデータベース操作パターンを定義します。Single Source of Truthの徹底実現、型安全性の確保、TanStack Start Server Functions統合を重視した設計戦略を採用します。
 alwaysApply: true
-
 ---
 
 # Drizzle Zod Rule
-
-このルールは、Drizzle ORM・drizzle-zod統合による現代的なデータベース操作パターンを定義します。Single Source of Truthの徹底実現、型安全性の確保、TanStack Start Server Functions統合を重視した設計戦略を採用します。
 
 ## 🛡️ drizzle-zod統合戦略（schema.ts を Single Source of Truth としてZodスキーマ定義とTS型生成も管理する。コードベース全体でそれらをimportして使用することで独自定義を避ける）
 
@@ -32,6 +30,7 @@ const { createInsertSchema, createSelectSchema, createUpdateSchema } = createSch
 // =============================================================================
 // 命名規則: 各テーブルのTSオブジェクト名は{entity}Table、各カラムのプロパティ名はやcreatedAtなどcamelCaseにする。一方、DB上の実テーブル名（pgTableの第1引数など）はusers, verification_tokensのようにsnake_caseにする。
 // 認証関連
+// ユーザー定義
 export const usersTable = pgTable("users", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -386,13 +385,13 @@ export const createPost = createServerFn({
   .validator(postInsertSchema.omit({ userId: true }))
   .handler(async ({ data, context }) => {
     // 認証チェック（@tanstack-start.mdcのミドルウェア統合を活用）
-    if (!context.user) {
+    if (!context.sessionUser) {
       throw new Error("認証が必要です");
     }
 
     const [post] = await db
       .insert(postsTable)
-      .values({ ...data, userId: context.user.id })
+      .values({ ...data, userId: context.sessionUser.id })
       .returning();
 
     return post;

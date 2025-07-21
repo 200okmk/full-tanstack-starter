@@ -1,11 +1,9 @@
 ---
-description:
+description: React 19とReact Compilerを活用した現代的なReact開発における根本的な設計原理を定義します。表面的なコーディングスタイルではなく、Reactの本質的な概念と最適化戦略に焦点を当てます。
 globs: src/**/*.tsx
 alwaysApply: false
 ---
 # React 19 + React Compiler 核心設計原則
-
-このルールは、React 19とReact Compilerを活用した現代的なReact開発における根本的な設計原理を定義します。表面的なコーディングスタイルではなく、Reactの本質的な概念と最適化戦略に焦点を当てます。
 
 ## 🎯 React Compiler 最適化戦略
 

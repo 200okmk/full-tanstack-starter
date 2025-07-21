@@ -1,12 +1,9 @@
 ---
-description:
+description: TanStack StartプロジェクトにおけるUIコンポーネント統合戦略を定義します。Shadcn/ui + Tailwind v4を中心とした一貫性のあるデザインシステム、基本的なアクセシビリティ対応、TanStack Form統合、必須のSkeleton実装パターンを規定します。
 globs: src/**/*.tsx
 alwaysApply: false
 ---
-
 # UI Components Integration Rule
-
-このルールは、TanStack StartプロジェクトにおけるUIコンポーネント統合戦略を定義します。Shadcn/ui + Tailwind v4を中心とした一貫性のあるデザインシステム、基本的なアクセシビリティ対応、TanStack Form統合、必須のSkeleton実装パターンを規定します。
 
 ## 🔗 関連Rule参照と境界線
 
@@ -26,9 +23,63 @@ alwaysApply: false
 
 ---
 
-## 🎨 1. Shadcn/ui既存ベースのデザインシステム拡張
+## 🎨 1. Shadcn/uiプリミティブコンポーネント基盤の設計戦略
 
-### **app.css基盤の活用**
+### **基本方針：プリミティブコンポーネントの優先使用**
+
+**🚨 重要**: Shadcn/uiによって `@/components/ui` ディレクトリに追加されるプリミティブな基本UIコンポーネント（Button、Input、Label、Card、Dialog等）を基本的に使用しながら、カスタムUIコンポーネントを作成していくことを最重要方針とします。
+
+### **Shadcn/uiプリミティブコンポーネントの保護原則**
+
+```tsx
+// ✅ 推奨：既存のshadcn/uiコンポーネントを基盤にカスタムコンポーネントを作成
+import { Button } from "~/components/ui/button"
+import { Input } from "~/components/ui/input"
+import { Label } from "~/components/ui/label"
+import { Card } from "~/components/ui/card"
+
+// カスタムコンポーネントの作成
+function CustomFormCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <Card className="w-full max-w-md">
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {children}
+      </CardContent>
+    </Card>
+  )
+}
+
+// ❌ 避けるべき：基本コンポーネントの根本的な変更
+// src/components/ui/button.tsx を直接大幅改変することは慎重に検討する
+```
+
+### **プリミティブコンポーネントのスタイリング変更における慎重な方針**
+
+```tsx
+// ✅ 推奨：プロジェクト全体で統一的に必要なスタイリング要件がある場合のみ変更
+// 例：プロジェクト全体でのフォーカスリング統一、ブランドカラー統一など
+
+// src/components/ui/button.tsx (プロジェクト全体でのブランド統一が必要な場合のみ)
+const buttonVariants = cva(
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2", // ブランドカラー統一
+  {
+    variants: {
+      variant: {
+        default: "bg-brand-primary text-brand-primary-foreground hover:bg-brand-primary/90", // ブランドカラー統一
+        // ... 他のバリエーション
+      }
+    }
+  }
+)
+
+// ❌ 避けるべき：個別機能のための基本コンポーネント変更
+// 特定の画面・機能のためだけに基本コンポーネントを変更するのは避ける
+```
+
+### **app.css基盤の活用とshadcn/ui統合**
 
 ```css
 /* src/lib/styles/app.css - 既存実装をベースに拡張 */
@@ -39,7 +90,7 @@ alwaysApply: false
 
 /* 既存の @theme inline 構造を維持 */
 @theme inline {
-  /* 既存のカラーシステム拡張 */
+  /* 既存のshadcn/uiカラーシステム拡張 */
   --color-success: oklch(0.6 0.15 145);
   --color-warning: oklch(0.8 0.15 85);
   --color-info: oklch(0.65 0.15 230);
@@ -55,7 +106,7 @@ alwaysApply: false
 
 /* 既存のrootセクション拡張 */
 :root {
-  /* 既存の色変数に追加 */
+  /* 既存のshadcn/ui色変数に追加 */
   --success: var(--color-success);
   --warning: var(--color-warning);
   --info: var(--color-info);
@@ -80,7 +131,7 @@ alwaysApply: false
 }
 ```
 
-### **Shadcn/ui コンポーネント拡張パターン**
+### **data-slot活用のコンポーネント拡張パターン**
 
 ```tsx
 // data-slot活用のコンポーネント拡張例
@@ -126,7 +177,11 @@ export function Card({ className, variant, size, ...props }: CardProps) {
 
 ---
 
-## 📱 2. レスポンシブデザイン体系（Tailwind公式ブレークポイント）
+## 📱 2. レスポンシブデザイン体系（Tailwind v4公式方針準拠）
+
+### **基本戦略：メディアクエリ＋コンテナクエリ統合**
+
+**🎯 コード生成時の必須原則**: メディアクエリで大枠のレイアウトを組み、その内部の再利用すべき各コンポーネントのスタイルはコンテナクエリに任せる
 
 ### **公式ブレークポイント戦略**
 
@@ -139,61 +194,109 @@ xl: 80rem (1280px)  /* デスクトップ */
 2xl: 96rem (1536px) /* 大きなデスクトップ */
 ```
 
-### **モバイルファーストレスポンシブパターン**
+### **レスポンシブ実装パターン（一貫性保証）**
+
+**🎯 ページレベルブレイクポイント最低要件**: ページレベルの大枠レイアウトでは、モバイル（~767px,特に375pxを基準とする）とタブレット以上（768px+）の明確な区別のため、最低でも `md:` (768px) ブレイクポイントと `lg:` (1024px) でデスクトップ向けレイアウトも含める。
 
 ```tsx
-// ✅ 推奨：モバイルファースト設計
-function ResponsiveGrid() {
+// ✅ 推奨：メディアクエリ（ページレベルの大枠マクロレイアウト）+ コンテナクエリ（再利用コンポーネントにてミクロレイアウト）
+function ResponsiveLayout() {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {/* モバイル：1列、タブレット：2列、デスクトップ：3-4列 */} 
-    </div>
-  )
-}
-
-// ✅ コンテナクエリ対応
-function ResponsiveCard() {
-  return (
-    <div className="@container">
-      <div className="p-4 @md:p-6 @lg:flex @lg:gap-6">
-        <img className="w-full @lg:w-48" />
-        <div className="mt-4 @lg:mt-0">
-          {/* コンテンツ */}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ✅ TanStack Router Search Params統合
-function ResponsiveProductGrid() {
-  const search = Route.useSearch() // @tanstack-router.mdcパターン
-  const navigate = useNavigate({ from: Route.fullPath })
-
-  return (
-    <div className="space-y-4">
-      {/* フィルター（モバイルで折りたたみ、デスクトップで展開） */}
-      <div className="lg:hidden">
-        <Button onClick={() => navigate({ search: { ...search, showFilters: !search.showFilters } })}>
-          Toggle Filters
-        </Button>
-      </div>
-
-      <div className="lg:flex lg:gap-6">
-        {/* サイドバーフィルター */}
-        <aside className={cn(
-          "lg:w-64 lg:block",
-          search.showFilters ? "block" : "hidden lg:block"
-        )}>
-          <ProductFilters />
+    <div className="min-h-screen">
+      {/* メディアクエリ：大枠レイアウト（最低でもmd:, lg:を含む） */}
+      <div className="grid grid-cols-1 md:grid-cols-8 lg:grid-cols-12 gap-4 md:gap-6">
+        {/* サイドバー */}
+        <aside className="md:col-span-2 lg:col-span-3">
+          <NavigationSidebar />
         </aside>
 
-        {/* 商品グリッド */}
-        <main className="flex-1">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {/* 商品カード */}
+        {/* メインコンテンツ */}
+        <main className="md:col-span-6 lg:col-span-9">
+          <div className="space-y-4 md:space-y-6">
+            {/* 再利用コンポーネントはコンテナクエリで内部調整 */}
+            <ProductGrid />
+            <UserCardList />
           </div>
         </main>
+      </div>
+    </div>
+  )
+}
+
+// ✅ 再利用コンポーネント：コンテナクエリで内部スタイル調整
+function ProductCard({ product }: { product: Product }) {
+  return (
+    <div className="@container"> {/* コンテナクエリの基点 */}
+      <Card className="overflow-hidden">
+        <div className="@md:flex @md:gap-4">
+          <img
+            src={product.image}
+            alt={product.name}
+            className="w-full @md:w-32 @md:h-32 object-cover"
+          />
+          <div className="p-4 @md:p-0 @md:py-2 @md:flex-1">
+            <h3 className="font-semibold @lg:text-lg">{product.name}</h3>
+            <p className="text-sm text-muted-foreground @md:text-xs @lg:text-sm">
+              {product.description}
+            </p>
+            <div className="mt-2 @md:mt-4 flex items-center justify-between">
+              <span className="font-bold @lg:text-lg">${product.price}</span>
+              <Button size="sm" className="@md:px-2 @lg:px-4">
+                Add to Cart
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Card>
+    </div>
+  )
+}
+
+// ✅ リスト・グリッド：メディアクエリで大枠構造、コンテナクエリで各アイテム
+function ProductGrid() {
+  const { data: products } = useQuery({
+    queryKey: ['products'],
+    queryFn: getProducts,
+  })
+
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {products?.map((product) => (
+        <ProductCard key={product.id} product={product} />
+      ))}
+    </div>
+  )
+}
+```
+
+### **❌ 避けるべきパターン**
+
+```tsx
+// ❌ 避けるべき：再利用コンポーネントでメディアクエリ依存
+function BadProductCard({ product }: { product: Product }) {
+  return (
+    <Card className="overflow-hidden">
+      {/* メディアクエリで特定の画面サイズに依存 - 再利用性が低い */}
+      <div className="md:flex md:gap-4">
+        <img
+          src={product.image}
+          alt={product.name}
+          className="w-full md:w-32 md:h-32 object-cover"
+        />
+        <div className="p-4 md:p-0 md:py-2 md:flex-1">
+          {/* ... */}
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+// ❌ 避けるべき：大枠レイアウトでコンテナクエリ使用
+function BadLayout() {
+  return (
+    <div className="@container"> {/* 大枠レイアウトでコンテナクエリは不適切 */}
+      <div className="@lg:grid @lg:grid-cols-12 @lg:gap-6">
+        {/* ... */}
       </div>
     </div>
   )
@@ -202,32 +305,344 @@ function ResponsiveProductGrid() {
 
 ---
 
-## ♿ 3. 基本的なアクセシビリティ対応
+## 📊 3. UI状態管理戦略（TanStack Router Search Params優先）
+
+### **基本方針：Search Paramsを優先したUI状態管理**
+
+TanStack Router Search ParamsがUI状態管理実装で優先されるべき考慮事項であるというスタンスを維持します。
+
+### **Search Params統合UI状態管理パターン**
+
+```tsx
+// ✅ 推奨：Search Paramsを中心とした状態管理
+function ProductListingPage() {
+  const search = Route.useSearch() // @tanstack-router.mdcパターン
+  const navigate = useNavigate({ from: Route.fullPath })
+
+  return (
+    <div className="container mx-auto py-6">
+      <div className="space-y-6">
+        {/* 検索・フィルター */}
+        <ProductSearchForm />
+
+        {/* レスポンシブレイアウト */}
+        <div className="lg:flex lg:gap-6">
+          {/* サイドバーフィルター */}
+          <aside className={cn(
+            "lg:w-64 lg:block",
+            search.showFilters ? "block" : "hidden lg:block"
+          )}>
+            <ProductFilters />
+          </aside>
+
+          {/* 商品グリッド */}
+          <main className="flex-1">
+            <div className="space-y-4">
+              {/* モバイルフィルタートグル */}
+              <div className="lg:hidden">
+                <Button
+                  variant="outline"
+                  onClick={() => navigate({
+                    search: { ...search, showFilters: !search.showFilters }
+                  })}
+                >
+                  {search.showFilters ? 'Hide' : 'Show'} Filters
+                </Button>
+              </div>
+
+              {/* 商品一覧 */}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <Suspense fallback={<ProductGridSkeleton />}>
+                  <ProductGrid />
+                </Suspense>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    </div>
+  )
+}
+```
+
+### **Search Params統合フォーム**
+
+```tsx
+// @tanstack-router.mdcパターンとの統合
+function ProductSearchForm() {
+  const search = Route.useSearch()
+  const navigate = useNavigate({ from: Route.fullPath })
+
+  const form = useForm({
+    defaultValues: {
+      query: search.query || '',
+      category: search.category || '',
+      sort: search.sort || 'newest',
+      priceRange: search.priceRange || [0, 1000],
+    },
+    onSubmit: async ({ value }) => {
+      navigate({
+        search: (prev) => ({ ...prev, ...value, page: 1 })
+      })
+    },
+  })
+
+  return (
+    <Card className="p-6">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          form.handleSubmit()
+        }}
+        className="space-y-4"
+      >
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <form.Field
+            name="query"
+            children={(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Search</Label>
+                <Input
+                  id={field.name}
+                  placeholder="Search products..."
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+              </div>
+            )}
+          />
+
+          <form.Field
+            name="category"
+            children={(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Category</Label>
+                <Select
+                  value={field.state.value}
+                  onValueChange={field.handleChange}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    <SelectItem value="electronics">Electronics</SelectItem>
+                    <SelectItem value="clothing">Clothing</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          />
+
+          <form.Field
+            name="sort"
+            children={(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Sort By</Label>
+                <Select
+                  value={field.state.value}
+                  onValueChange={field.handleChange}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="newest">Newest</SelectItem>
+                    <SelectItem value="price-low">Price: Low to High</SelectItem>
+                    <SelectItem value="price-high">Price: High to Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          />
+
+          <div className="flex items-end">
+            <Button type="submit" className="w-full">
+              Search
+            </Button>
+          </div>
+        </div>
+      </form>
+    </Card>
+  )
+}
+```
+
+### **UI状態のリアルタイム同期**
+
+```tsx
+// リアルタイムSearch Params同期
+function ProductFilters() {
+  const search = Route.useSearch()
+  const navigate = useNavigate({ from: Route.fullPath })
+
+  // Search Paramsの変更をリアルタイムで反映
+  const handleFilterChange = (key: string, value: any) => {
+    navigate({
+      search: (prev) => ({ ...prev, [key]: value, page: 1 })
+    })
+  }
+
+  return (
+    <Card className="p-6">
+      <div className="space-y-6">
+        <div>
+          <h3 className="font-semibold mb-3">Price Range</h3>
+          <PriceRangeSlider
+            value={search.priceRange || [0, 1000]}
+            onValueChange={(value) => handleFilterChange('priceRange', value)}
+          />
+        </div>
+
+        <div>
+          <h3 className="font-semibold mb-3">Brands</h3>
+          <div className="space-y-2">
+            {brands.map((brand) => (
+              <div key={brand.id} className="flex items-center space-x-2">
+                <Checkbox
+                  id={brand.id}
+                  checked={search.brands?.includes(brand.id)}
+                  onCheckedChange={(checked) => {
+                    const newBrands = checked
+                      ? [...(search.brands || []), brand.id]
+                      : search.brands?.filter(b => b !== brand.id) || []
+                    handleFilterChange('brands', newBrands)
+                  }}
+                />
+                <Label htmlFor={brand.id}>{brand.name}</Label>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </Card>
+  )
+}
+```
+
+---
+
+## ♿ 4. 基本的なアクセシビリティ対応
 
 ### **セマンティックHTML基盤**
 
+**🎯 セマンティックタグの必須使用原則**: HTMLは意味に基づいて構造化し、以下のランドマーク要素とセマンティックタグを適切に使用することを必須とします：
+
+#### **ランドマーク要素の適切な使用**
+- `<main>`: **ページ全体で1つのみ**、主要なコンテンツ領域に使用
+- `<nav>`: ナビゲーション領域（主要ナビ、パンくずリスト等）
+- `<aside>`: 補足的なコンテンツ（サイドバー、関連リンク等）
+- `<header>`: セクションやページのヘッダー
+- `<footer>`: セクションやページのフッター
+
+#### **セクション・コンテンツ要素の適切な使用**
+- `<section>`: テーマ的にまとまったコンテンツ（必ず見出しを含む）
+- `<article>`: 独立したコンテンツ単位（ブログ記事、カード、投稿等）
+- `<h1>` ~ `<h6>`: 階層的な見出し構造（h1は必ずページに1つ）
+
+#### **コンテンツ構造の明確化**
+- リスト構造には `<ul>`, `<ol>`, `<li>` を使用
+- フォーム要素には `<form>`を使用
+- 強調には `<strong>` (重要性) と `<em>` (アクセント) を使い分け
+
 ```tsx
-// ✅ 基本的なセマンティック構造
-function AccessibleCard({ title, description, action }: CardProps) {
+// ✅ 推奨：セマンティックHTML基盤の例
+function PageLayout() {
   return (
-    <article className="rounded-lg border p-6" role="article">
-      <header>
-        <h3 className="text-lg font-semibold">{title}</h3>
+    <div className="min-h-screen">
+      <header className="border-b">
+        <nav className="container mx-auto px-4 py-3">
+          <h1 className="text-xl font-bold">App Name</h1>
+          {/* ナビゲーション要素 */}
+        </nav>
       </header>
 
-      <main className="mt-2">
-        <p className="text-muted-foreground">{description}</p>
+      <main className="container mx-auto px-4 py-6">
+        <section>
+          <h2 className="text-2xl font-semibold mb-4">Products</h2>
+          <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {products.map((product) => (
+              <li key={product.id}>
+                <ProductCard product={product} />
+              </li>
+            ))}
+          </ul>
+        </section>
       </main>
 
-      {action && (
-        <footer className="mt-4">
-          {action}
-        </footer>
-      )}
+      <aside className="border-l">
+        <section>
+          <h3 className="text-lg font-semibold mb-3">Related Links</h3>
+          {/* 関連リンク */}
+        </section>
+      </aside>
+
+      <footer className="border-t mt-8">
+        <div className="container mx-auto px-4 py-6">
+          {/* フッターコンテンツ */}
+        </div>
+      </footer>
+    </div>
+  )
+}
+
+// ✅ 推奨：shadcn/ui Cardとセマンティックタグの統合
+function ProductCard({ product }: { product: Product }) {
+  return (
+    <article className="@container"> {/* セマンティックな親要素 */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{product.name}</CardTitle>
+          <CardDescription>{product.description}</CardDescription>
+        </CardHeader>
+
+        <CardContent>
+          <p className="text-2xl font-bold">${product.price}</p>
+        </CardContent>
+
+        <CardFooter>
+          <Button>Add to Cart</Button>
+        </CardFooter>
+      </Card>
     </article>
   )
 }
 
+// ✅ 推奨：コンテンツ種別に応じたセマンティックタグ選択
+function SettingsCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="@container"> {/* 設定UIは通常のdiv */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{title}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {children}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="@container"> {/* フォームセクションはsection */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{title}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {children}
+        </CardContent>
+      </Card>
+    </section>
+  )
+}
+```
+
+### **フォーカス管理とキーボードナビゲーション**
+
+```tsx
 // ✅ フォーカス管理とキーボードナビゲーション
 function AccessibleDropdown() {
   const [isOpen, setIsOpen] = useState(false)
@@ -327,7 +742,7 @@ function AccessibleButton({ isLoading, children, ...props }: ButtonProps) {
 
 ---
 
-## 📝 4. TanStack Form統一実装パターン
+## 📝 5. TanStack Form統一実装パターン
 
 ### **基本フォーム実装**
 
@@ -425,61 +840,9 @@ function UserForm() {
 }
 ```
 
-### **Search Params統合フォーム**
-
-```tsx
-// @tanstack-router.mdcパターンとの統合
-function SearchForm() {
-  const search = Route.useSearch()
-  const navigate = useNavigate({ from: Route.fullPath })
-
-  const form = useForm({
-    defaultValues: {
-      query: search.query || '',
-      category: search.category || '',
-      sort: search.sort || 'newest',
-    },
-    onSubmit: async ({ value }) => {
-      navigate({
-        search: (prev) => ({ ...prev, ...value, page: 1 })
-      })
-    },
-  })
-
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault()
-        form.handleSubmit()
-      }}
-      className="flex flex-col gap-4 sm:flex-row sm:items-end"
-    >
-      <form.Field
-        name="query"
-        children={(field) => (
-          <div className="flex-1">
-            <Label htmlFor={field.name}>Search</Label>
-            <Input
-              id={field.name}
-              placeholder="Search products..."
-              value={field.state.value}
-              onChange={(e) => field.handleChange(e.target.value)}
-            />
-          </div>
-        )}
-      />
-
-      <Button type="submit" className="sm:w-auto">
-        Search
-      </Button>
-    </form>
-  )
-}
-```
-
 ---
 
-## 🔄 5. Skeleton必須実装パターン
+## 🔄 6. Skeleton必須実装パターン
 
 ### **基本原則**
 
@@ -491,32 +854,36 @@ import { Skeleton } from "~/components/ui/skeleton"
 // ✅ データカード + Skeleton例
 function UserCard({ user }: { user: User }) {
   return (
-    <div className="rounded-lg border p-4">
-      <div className="flex items-center gap-3">
-        <img
-          src={user.image}
-          alt={user.name}
-          className="h-10 w-10 rounded-full"
-        />
-        <div>
-          <h3 className="font-medium">{user.name}</h3>
-          <p className="text-sm text-muted-foreground">{user.email}</p>
+    <div className="@container">
+      <Card className="p-4">
+        <div className="flex items-center gap-3">
+          <img
+            src={user.image}
+            alt={user.name}
+            className="h-10 w-10 rounded-full @md:h-12 @md:w-12"
+          />
+          <div>
+            <h3 className="font-medium @md:text-lg">{user.name}</h3>
+            <p className="text-sm text-muted-foreground @md:text-base">{user.email}</p>
+          </div>
         </div>
-      </div>
+      </Card>
     </div>
   )
 }
 
 function UserCardSkeleton() {
   return (
-    <div className="rounded-lg border p-4">
-      <div className="flex items-center gap-3">
-        <Skeleton className="h-10 w-10 rounded-full" />
-        <div className="space-y-2">
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-3 w-32" />
+    <div className="@container">
+      <Card className="p-4">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-10 w-10 rounded-full @md:h-12 @md:w-12" />
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-24 @md:h-5 @md:w-32" />
+            <Skeleton className="h-3 w-32 @md:h-4 @md:w-40" />
+          </div>
         </div>
-      </div>
+      </Card>
     </div>
   )
 }
@@ -558,7 +925,7 @@ function UserListContent() {
 
 ---
 
-## 🎯 6. TanStack Start統合パターン
+## 🎯 7. TanStack Start統合パターン
 
 ### **Server Functions統合UI**
 
@@ -672,22 +1039,25 @@ function AuthLayoutSkeleton() {
 
 ---
 
-## 🛠️ 7. 実装時の注意点
+## 🛠️ 8. 実装時の注意点
 
 ### **必須事項**
 
-1. **既存app.css構造維持**: `@theme inline`パターンの踏襲
-2. **Tailwind公式ブレークポイント**: カスタムブレークポイント追加禁止
-3. **Suspense + Skeleton**: 非同期UIには必ずSkeletonをセット実装
-4. **TanStack Form統一**: フォーム処理は全てTanStack Formで実装
-5. **型安全性確保**: @drizzle-zod.mdcスキーマとの統合
+1. **Shadcn/uiプリミティブ優先**: Shadcn/uiが`~/components/ui`ディレクトリに追加するプリミティブなUIコンポーネントを利用してプロジェクト独自のカスタムコンポーネントを構築していく。プロジェクト全体で統一的な変更の必要な生じた場合のみ、`~/components/ui`配下のこれらプリミティブUIコンポーネントを慎重に変更する。基本的には`className`に対してスタイリングユーティリティをpropsとして渡していく。この機構はユーティリティを渡される側のコンポーネントが`cn()`便利関数(`~/lib/utils.ts`)によって可変スタイリングを受け入れ可能なことよって実現される。
+2. **レスポンシブ戦略一貫性**: メディアクエリ（大枠）＋コンテナクエリ（再利用コンポーネント）を徹底
+3. **既存app.css構造維持**: `@theme inline`パターンの踏襲
+4. **Suspense + Skeleton**: 非同期UIには基本的にSkeletonローディングUIをセットで実装
+5. **TanStack Form統一**: フォーム処理は全てTanStack Formで実装
+6. **型安全性確保**: @drizzle-zod.mdcスキーマとの統合
 
 ### **ベストプラクティス**
 
 1. **data-slot活用**: shadcn/uiコンポーネントでのdata-slot一貫使用
 2. **モバイルファースト**: レスポンシブデザインの基本アプローチ
-3. **アクセシビリティ基本**: セマンティックHTML・ARIA・フォーカス管理
-4. **React Compiler対応**: @react.mdcの最適化パターンに準拠
+3. **アクセシビリティ基本**: セマンティックHTML・ARIA・フォーカス管理・キーボード操作
+4. **Search Params優先**: UI状態管理の基本戦略
+5. **React Compiler対応**: @react.mdcの最適化パターンに準拠
+5. **Tanstack Form対応**: プロジェクト全体でフォームライブラリはTanstack Formを使用
 
 ### **プロジェクト統合**
 
@@ -697,8 +1067,70 @@ function AuthLayoutSkeleton() {
 
 このルールに従うことで、TanStack Startプロジェクトにおける一貫性のあるUI実装を実現し、保守性とユーザー体験を向上させることができます。
 
+### **React Context軽量グローバル状態管理**
+
+#### **基本方針**
+
+Search Paramsや個別のuseStateでは管理が困難な軽量なグローバル状態については、React Contextを使用します。
+
+#### **✅ React Contextが適切な状態**
+
+```tsx
+// 軽量なグローバル状態の例
+interface AppContextType {
+  // UI設定・表示状態
+  sidebarOpen: boolean
+  setSidebarOpen: (open: boolean) => void
+
+  // 通知システム
+  notifications: Notification[]
+  addNotification: (notification: Notification) => void
+  removeNotification: (id: string) => void
+
+  // アプリケーション設定
+  userPreferences: {
+    theme: 'light' | 'dark'
+    language: string
+    compactMode: boolean
+  }
+  updatePreferences: (prefs: Partial<UserPreferences>) => void
+}
+```
+
+#### **❌ React Contextが不適切な状態**
+
+```tsx
+// 以下の状態はReact Contextではなく、他の状態管理手法を使用
+const inappropriateForReactContext = {
+  // URLで共有可能な状態 → Search Params
+  filters: FilterOptions,
+  page: number,
+  sort: SortOption,
+
+  // サーバー由来のデータ → TanStack Query
+  users: User[],
+  posts: Post[],
+
+  // 一時的なUI状態 → useState
+  isModalOpen: boolean,
+  hoveredItem: string | null,
+
+  // 高頻度更新の状態 → useState（パフォーマンス問題）
+  mousePosition: { x: number, y: number },
+  scrollPosition: number,
+}
+```
+
+#### **🔄 状態管理手法の優先順位**
+
+1. **Search Params** - 共有可能・永続的な状態
+2. **TanStack Query** - サーバー状態・キャッシュ管理
+3. **useState/useReducer** - ローカル状態・一時的UI状態
+4. **React Context** - 軽量なグローバル状態
+
+この順序で検討し、適切な手法を選択します。複雑なクライアント状態の場合のみ、個別に状態管理ライブラリを検討します。
 
 ---
 
-このルールに従うことで、shadcn/ui + Tailwind v4ベースの一貫性のあるUIコンポーネント実装、必須のアクセシビリティ対応、TanStack Form統合、そして適切なSkeleton実装を実現できます。
+このルールに従うことで、TanStack Startプロジェクトにおける一貫性のあるUI実装を実現し、保守性とユーザー体験を向上させることができます。
 

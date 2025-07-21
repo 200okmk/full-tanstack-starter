@@ -47,6 +47,6 @@ export const auth = betterAuth({
   },
   plugins: [
     oAuthProxy(), // Netlifyプレビュー環境の動的URL上からもOAuth認証を可能にするために本番のURLへリダイレクトする
-    reactStartCookies(), // For TanStack Start Cookie support
+    reactStartCookies(), // TanStack Start統合
   ],
 });

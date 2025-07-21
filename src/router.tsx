@@ -19,10 +19,10 @@ export function createRouter() {
   return routerWithQueryClient(
     createTanStackRouter({
       routeTree,
-      context: { queryClient, user: null },
+      context: { queryClient, sessionUser: null },
       // ホバー時にプリロード
       defaultPreload: "intent",
-      // react-queryがデータの取得とキャッシュを処理する
+      // Tanstack Queryがデータの取得とキャッシュを処理する
       // https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#passing-all-loader-events-to-an-external-cache
       // プリロード結果をキャッシュしない
       defaultPreloadStaleTime: 0,

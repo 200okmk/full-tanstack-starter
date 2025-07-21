@@ -13,7 +13,7 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
 import { auth } from "~/lib/auth";
-import appCss from "~/lib/styles/app.css?url";
+import appCss from "~/styles/app.css?url";
 
 const getSessionUser = createServerFn({ method: "GET" }).handler(async () => {
   const { headers } = getWebRequest()!;
@@ -25,14 +25,14 @@ const getSessionUser = createServerFn({ method: "GET" }).handler(async () => {
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
-  user: Awaited<ReturnType<typeof getSessionUser>>;
+  sessionUser: Awaited<ReturnType<typeof getSessionUser>>;
 }>()({
   beforeLoad: async ({ context }) => {
-    const user = await context.queryClient.fetchQuery({
-      queryKey: ["user"],
+    const sessionUser = await context.queryClient.fetchQuery({
+      queryKey: ["session-user"],
       queryFn: ({ signal }) => getSessionUser({ signal }),
     }); // キャッシュにTanstack Queryを使用, router.tsxを参照
-    return { user };
+    return { sessionUser };
   },
   head: () => ({
     meta: [
