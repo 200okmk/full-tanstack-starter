@@ -931,7 +931,7 @@ function UserListContent() {
 
 ```tsx
 // @tanstack-start.mdcとの具体的統合例
-import { createUser, updateUser } from "~/server/users"
+import { createUser, updateUser } from "~/lib/server-functions/users"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 
 function UserManagement() {
@@ -967,71 +967,6 @@ function UserManagement() {
           isUpdating={updateUserMutation.isPending}
         />
       </Suspense>
-    </div>
-  )
-}
-```
-
-### **Better Auth統合UI**
-
-```tsx
-// Better Auth + UI統合例
-import { authClient } from "~/lib/auth-client"
-import { useRouter } from "@tanstack/react-router"
-
-function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter()
-  const [user, setUser] = useState<User | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    authClient.getSession().then((session) => {
-      setUser(session?.user ?? null)
-      setIsLoading(false)
-    })
-  }, [])
-
-  if (isLoading) {
-    return <AuthLayoutSkeleton />
-  }
-
-  if (!user) {
-    router.navigate({ to: '/login' })
-    return null
-  }
-
-  return (
-    <div className="min-h-screen">
-      <header className="border-b">
-        <nav className="container mx-auto flex items-center justify-between px-4 py-3">
-          <Link to="/dashboard" className="text-xl font-bold">
-            Dashboard
-          </Link>
-
-          <UserMenu user={user} />
-        </nav>
-      </header>
-
-      <main className="container mx-auto px-4 py-6">
-        {children}
-      </main>
-    </div>
-  )
-}
-
-function AuthLayoutSkeleton() {
-  return (
-    <div className="min-h-screen">
-      <header className="border-b">
-        <nav className="container mx-auto flex items-center justify-between px-4 py-3">
-          <Skeleton className="h-7 w-24" />
-          <Skeleton className="h-8 w-8 rounded-full" />
-        </nav>
-      </header>
-
-      <main className="container mx-auto px-4 py-6">
-        <Skeleton className="h-[400px] w-full" />
-      </main>
     </div>
   )
 }
