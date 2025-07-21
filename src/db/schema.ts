@@ -9,9 +9,11 @@ import { z } from "zod";
 const { createInsertSchema, createSelectSchema, createUpdateSchema } =
   createSchemaFactory({
     coerce: {
-      date: true, // 日付型の自動変換を有効化
+      date: true, // 日付型（文字列→Date）
+      number: true, //数値型（文字列→数値）
+      boolean: true, // ブール値の（"true"→true）
     },
-    zodInstance: z, // 拡張インスタンスを使用
+    // zodInstance: z, // インポートした拡張インスタンスを使用したい場合はここで指定する。
   });
 
 // =============================================================================
@@ -19,7 +21,7 @@ const { createInsertSchema, createSelectSchema, createUpdateSchema } =
 // =============================================================================
 // 命名規則: 各テーブルのTSオブジェクト名は{entity}Table、各カラムのプロパティ名はやcreatedAtなどcamelCaseにする。一方、DB上の実テーブル名（pgTableの第1引数など）はusers, verification_tokensのようにsnake_caseにする。
 
-// Drizzle ORMでは、PostgreSQLの「public」スキーマは特別扱いされており、pgSchema("public")は使えないため、pgTableを直接使用してテーブルを定義していく。
+// Drizzle ORMでは、PostgreSQLの”public”スキーマは特別扱いされており、pgSchema("public")は使えないため、pgTableを直接使用してテーブルを定義していく。
 
 // 認証関連
 // ユーザー定義

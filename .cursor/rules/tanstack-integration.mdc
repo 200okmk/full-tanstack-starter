@@ -249,12 +249,27 @@ export const Route = createFileRoute('/dashboard')({
 ### Server Functions統合パターン
 
 ```tsx
-// Server Functionの定義
+// ✅ Server Function の定義（schema.ts完全準拠）
+import { createServerFn } from "@tanstack/react-start";
+import { eq, ne, count, desc } from "drizzle-orm";
+import { z } from "zod";
+import { db } from "~/db";
+import {
+  postsTable,
+  commentsTable,
+  postSelectSchema,
+  postInsertSchema,
+  userSelectSchema,
+  userUpdateSchema,
+  usersTable,
+} from "~/db/schema"; // ✅ schema.tsからインポート
+import { authMiddleware } from "~/lib/middlewares";
+
 export const getPostWithMetrics = createServerFn({
   method: 'GET',
 })
-  .validator(z.string())
-  .handler(async ({ data: postId, context }) => {
+  .validator(postSelectSchema.pick({ id: true })) // ✅ schema.tsのスキーマ使用
+  .handler(async ({ data: { id: postId } }) => {
     // 並列でデータ取得
     const [post, metrics, relatedPosts] = await Promise.all([
       // Drizzle ORM SQL-like方式
@@ -286,14 +301,14 @@ export const Route = createFileRoute('/posts/$postId')({
   loader: async ({ context, params }) => {
     await context.queryClient.ensureQueryData({
       queryKey: ['post-with-metrics', params.postId],
-      queryFn: () => getPostWithMetrics(params.postId),
+      queryFn: () => getPostWithMetrics({ id: parseInt(params.postId) }),
     })
   },
   component: () => {
     const params = Route.useParams()
     const { data } = useSuspenseQuery({
       queryKey: ['post-with-metrics', params.postId],
-      queryFn: () => getPostWithMetrics(params.postId),
+      queryFn: () => getPostWithMetrics({ id: parseInt(params.postId) }),
     })
 
     return (
@@ -417,27 +432,24 @@ export const Route = createFileRoute('/dashboard')({
 ### データ変更時のクエリ管理
 
 ```tsx
-// ユーザープロフィール更新のServer Function
+// ✅ ユーザープロフィール更新のServer Function（schema.ts完全準拠）
+import { userUpdateSchema, usersTable } from "~/db/schema"; // ✅ schema.tsからインポート
+
 export const updateUserProfile = createServerFn({
   method: 'POST',
 })
-  .validator(z.object({
-    name: z.string(),
-    bio: z.string().optional(),
-    avatar: z.string().optional(),
-  }))
+  .validator(userUpdateSchema.pick({ name: true, image: true })) // ✅ schema.tsのスキーマ使用
+  .middleware([authMiddleware])  // ✅ 認証ミドルウェア必須適用
   .handler(async ({ data, context }) => {
-    if (!context.sessionUser) {
-      throw new Error('Authentication required')
-    }
+    // context.sessionUserは認証済み保証（ミドルウェアで確認済み）
 
-    const updatedUser = await db
-      .update(users)
+    const [updatedUser] = await db
+      .update(usersTable) // ✅ 正しいテーブル名
       .set({ ...data, updatedAt: new Date() })
-      .where(eq(users.id, context.sessionUser.id))
+      .where(eq(usersTable.id, context.sessionUser.id))
       .returning()
 
-    return updatedUser[0]
+    return updatedUser
   })
 
 // クライアントサイドでの使用
@@ -574,20 +586,21 @@ function CriticalDashboardData() {
 ### 効率的なキャッシュ戦略
 
 ```tsx
-// キャッシュ無効化の効率的なパターン
+// ✅ キャッシュ無効化の効率的なパターン（schema.ts完全準拠）
+import { postInsertSchema, postsTable } from "~/db/schema"; // ✅ schema.tsからインポート
+
 export const createPost = createServerFn({
   method: 'POST',
 })
-  .validator(createPostSchema)
+  .validator(postInsertSchema.omit({ userId: true, id: true })) // ✅ schema.tsのスキーマ使用
   .middleware([authMiddleware])  // ✅ 認証ミドルウェア必須適用
   .handler(async ({ data, context }) => {
-    const newPost = await db.insert(postsTable).values({
+    const [newPost] = await db.insert(postsTable).values({
       ...data,
-      authorId: context.sessionUser.id,
-      createdAt: new Date(),
+      userId: context.sessionUser.id,
     }).returning()
 
-    return newPost[0]
+    return newPost
   })
 
 // クライアントサイドでの使用
@@ -727,12 +740,15 @@ export const Route = createFileRoute('/posts/$postId')({
 ### Server Function エラーハンドリング
 
 ```tsx
-// エラーレスポンスの標準化
+// ✅ エラーレスポンスの標準化（schema.ts完全準拠）
+import { setResponseStatus } from '@tanstack/react-start/server';
+import { postSelectSchema, postsTable } from "~/db/schema"; // ✅ schema.tsからインポート
+
 export const getPost = createServerFn({
   method: 'GET',
 })
-  .validator(z.string())
-  .handler(async ({ data: postId }) => {
+  .validator(postSelectSchema.pick({ id: true })) // ✅ schema.tsのスキーマ使用
+  .handler(async ({ data: { id: postId } }) => {
     try {
       const [post] = await db
         .select()
@@ -801,4 +817,3 @@ function RootDocument({ children }: { readonly children: React.ReactNode }) {
 ```
 
 このルールに従うことで、TanStack Start・Router・Queryの3つのライブラリを効率的に統合し、高性能で保守性の高いフルスタックReactアプリケーションを構築できます。
-

@@ -6,7 +6,7 @@ import { auth } from "~/lib/auth";
 // This is a sample middleware that you can use in your server functions.
 
 /**
- * Server Functionで認証を強制し、ユーザーをコンテキストに追加するミドルウェア
+ * Server Functionなどにて認証を行い、ユーザーをコンテキストに追加するミドルウェア
  */
 export const authMiddleware = createMiddleware().server(async ({ next }) => {
   const { headers } = getWebRequest()!;
@@ -24,5 +24,5 @@ export const authMiddleware = createMiddleware().server(async ({ next }) => {
     throw new Error("Unauthorized");
   }
 
-  return next({ context: { user: session.user } });
+  return next({ context: { sessionUser: session.user } });
 });
