@@ -1,18 +1,24 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { GalleryVerticalEnd, LoaderCircle } from "lucide-react";
 import { useState } from "react";
+import { z } from "zod";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { signIn } from "~/lib/auth-client";
 
 export const Route = createFileRoute("/(auth)/login")({
+  validateSearch: z.object({
+    redirect: z.string().optional(),
+  }),
   component: LoginForm,
 });
 
 function LoginForm() {
+  // redirectUrlは定数として事前に設定しておいたリダイレクト先(/dashboard)
   const { redirectUrl, queryClient } = Route.useRouteContext();
-  const navigate = useNavigate();
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: "/login" });
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -33,7 +39,8 @@ function LoginForm() {
       {
         email,
         password,
-        callbackURL: redirectUrl,
+        // 元のURLまたはデフォルト値を使用
+        callbackURL: search.redirect ?? redirectUrl,
       },
       {
         onError: (ctx) => {
@@ -43,7 +50,8 @@ function LoginForm() {
         onSuccess: async () => {
           // Tanstack Queryのキャッシュを無効化
           await queryClient.invalidateQueries({ queryKey: ["session-user"] });
-          await navigate({ to: redirectUrl });
+          // 元のURLまたはデフォルト値にリダイレクト
+          await navigate({ to: search.redirect ?? redirectUrl });
         },
       },
     );
@@ -108,7 +116,7 @@ function LoginForm() {
                 void signIn.social(
                   {
                     provider: "github",
-                    callbackURL: redirectUrl,
+                    callbackURL: search.redirect ?? redirectUrl,
                   },
                   {
                     onRequest: () => {
@@ -140,7 +148,7 @@ function LoginForm() {
                 void signIn.social(
                   {
                     provider: "google",
-                    callbackURL: redirectUrl,
+                    callbackURL: search.redirect ?? redirectUrl,
                   },
                   {
                     onRequest: () => {

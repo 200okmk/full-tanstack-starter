@@ -1,5 +1,6 @@
+import { redirect } from "@tanstack/react-router";
 import { createMiddleware } from "@tanstack/react-start";
-import { getWebRequest, setResponseStatus } from "@tanstack/react-start/server";
+import { getWebRequest } from "@tanstack/react-start/server";
 import { auth } from "~/lib/auth";
 
 // https://tanstack.com/start/latest/docs/framework/react/middleware
@@ -9,10 +10,10 @@ import { auth } from "~/lib/auth";
  * Server Functionなどにて認証を行い、ユーザーをコンテキストに追加するミドルウェア
  */
 export const authMiddleware = createMiddleware().server(async ({ next }) => {
-  const { headers } = getWebRequest()!;
+  const request = getWebRequest()!;
 
   const session = await auth.api.getSession({
-    headers,
+    headers: request.headers, // ✅ 正しい：request.headersを直接渡す
     query: {
       // https://www.better-auth.com/docs/concepts/session-management#session-caching
       disableCookieCache: true,
@@ -20,8 +21,13 @@ export const authMiddleware = createMiddleware().server(async ({ next }) => {
   });
 
   if (!session) {
-    setResponseStatus(401);
-    throw new Error("Unauthorized");
+    // ✅ エラーではなくログインページにリダイレクト
+    throw redirect({
+      to: "/login",
+      search: {
+        redirect: request.url,
+      },
+    });
   }
 
   return next({ context: { sessionUser: session.user } });
