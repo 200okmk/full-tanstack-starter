@@ -12,7 +12,7 @@ export const Route = createFileRoute("/(auth)/signup")({
 
 function SignupForm() {
   const { redirectUrl, queryClient } = Route.useRouteContext();
-  const navigate = useNavigate();
+  const navigate = useNavigate({ from: "/signup" });
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");

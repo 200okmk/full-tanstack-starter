@@ -5,22 +5,25 @@ alwaysApply: true
 
 # Drizzle Zod Rule
 
-## 🛡️ drizzle-zod統合戦略（schema.ts を Single Source of Truth としてZodスキーマ定義とTS型生成も管理する。コードベース全体でそれらをimportして使用することで独自定義を避ける）
+## 🛡️ drizzle-zod統合戦略（schema.ts を Single Source of Truth としてZodスキーマ定義とTS型生成も管理する。コードベース全体でそれらをimportして使用することで独自定義を避ける。）
 
 ### **🏗️ Drizzleスキーマの構造と命名規則**
 
 ```ts
 // src/db/schema.ts - `schema.ts`ファイル内では上から順にテーブル定義（認証関連、アプリ本体Entity）、リレーション定義、Zodスキーマ生成、TS型生成の順番にコメントアウトでわかりやすくセクション化しながら記述していく。また各セクションの冒頭に定義した命名規則を徹底する。
 
-// =============================================================================
-// Schema Factory設定（プロジェクト全体で統一的なルールを適用。型強制coerceの自動適用など）
-// =============================================================================
 import { createSchemaFactory } from 'drizzle-zod';
 import { z } from 'zod';
 
+// =============================================================================
+// Schema Factory設定（プロジェクト全体で統一的なルールを適用。型強制coerceの自動適用など）
+// =============================================================================
 const { createInsertSchema, createSelectSchema, createUpdateSchema } = createSchemaFactory({
+  // 以下の自動変換を有効化
   coerce: {
-    date: true, // 日付型の自動変換を有効化
+    date: true, // 日付型（文字列→Date）
+    number: true, //数値型（文字列→数値）
+    boolean: true, // ブール値の（"true"→true）
   },
   zodInstance: z // 拡張インスタンスを使用
 });
@@ -78,9 +81,6 @@ export const commentsTable = pgTable("comments", {
     .$onUpdateFn(() => new Date()),
   postId: integer("post_id").references(() => postsTable.id, { onDelete: "cascade" }),
 });
-
-// タグテーブル
-export const tagsTable = pgTable("tags", { /* ... */ });
 
 
 // =============================================================================
@@ -167,7 +167,6 @@ export type PostUpdate = z.infer<typeof postUpdateSchema>;
 - Server Function出力検証（レスポンス型安全性）
 - createServerFn validator統合
 - 認証保護されたServer Functions
-- ファイルアップロード検証
 
 **⚛️ TanStack Router統合**
 - Route loader検証（URL params, search params）
@@ -198,7 +197,7 @@ export type PostUpdate = z.infer<typeof postUpdateSchema>;
 - API レスポンス検証
 - E2Eテスト用データ準備
 
-**☁️ 外部サービス統合（AWS SDK）**
+**☁️ 外部サービス統合（AWS SDKなど）**
 - 外部API連携時の型変換
 - 設定値・環境変数検証
 - AWS service request/response検証
@@ -220,26 +219,16 @@ const customUserSchema = z.object({
 
 // ✅ 推奨: schema.tsからインポート
 import { userInsertSchema, userSelectSchema, User, UserInsert } from "~/db/schema";
-
-// ユーティリティ関数統合
-export function validateUserData(data: unknown): UserInsert | null {
-  const result = userInsertSchema.safeParse(data);
-  return result.success ? result.data : null;
-}
-
-// 型ガード関数
-export function isValidUser(data: unknown): data is User {
-  return userSelectSchema.safeParse(data).success;
-}
 ```
 
 ## 🔧 TanStack Start統合実装パターン
 
-### **src/server/ディレクトリ管理戦略**
+### **src/lib/server-functions/ディレクトリ管理戦略**
 
+`schema.ts`で定めたEntityごとに、CRUD操作するServer Functionsを作成して格納
 ```
-src/
-├── server/
+lib/
+├── server-functions/
 │   ├── users.ts          # ユーザー関連 Server Functions
 │   ├── posts.ts          # 投稿関連 Server Functions
 │   ├── comments.ts       # コメント関連 Server Functions
@@ -249,25 +238,29 @@ src/
 ### **📋 Entityごとの標準実装パターン**
 
 ```tsx
-// src/server/users.ts - ユーザー関連 Server Functions
+// lib/server-functions/users.ts - ユーザー関連 Server Functions
 import { createServerFn } from "@tanstack/react-start";
-import { eq, like, desc, count } from "drizzle-orm";
+import { eq, like, desc, count, and } from "drizzle-orm";
+import { z } from "zod";
 import { db } from "~/db";
 import {
   usersTable,
   postsTable,
   userInsertSchema,
+  userSelectSchema,
   userUpdateSchema,
   type User,
   type UserInsert,
   type UserUpdate,
-} from "~/db/schema";
+} from "~/db/schema"; // ✅ schema.tsからインポート
+import { authMiddleware } from "~/lib/middlewares";
 
 // ✅ CREATE - バリデーション + 重複チェック + トランザクション
 export const createUser = createServerFn({
   method: "POST",
 })
-  .validator(userInsertSchema)
+  .validator(userInsertSchema) // ✅ schema.tsのスキーマ使用
+  .middleware([authMiddleware]) // ✅ 認証ミドルウェア必須適用（管理者のみの場合）
   .handler(async ({ data }) => {
     return await db.transaction(async (tx) => {
       // 重複チェック
@@ -287,7 +280,7 @@ export const createUser = createServerFn({
     });
   });
 
-// ✅ READ - JOIN + 集計 + ページング
+// ✅ READ - JOIN + 集計 + ページング（認証なしGET）
 export const getUsers = createServerFn({
   method: "GET",
 })
@@ -295,6 +288,7 @@ export const getUsers = createServerFn({
     page: z.number().min(1).default(1),
     limit: z.number().min(1).max(100).default(10),
     search: z.string().optional(),
+    // 注：ページング用パラメータ（DBに保存されないクエリパラメータのため独自スキーマ許可）
   }))
   .handler(async ({ data: { page, limit, search } }) => {
     const offset = (page - 1) * limit;
@@ -318,13 +312,14 @@ export const getUsers = createServerFn({
 
 // ✅ UPDATE - 部分更新 + 楽観的ロック
 export const updateUser = createServerFn({
-  method: "PUT",
+  method: "POST",
 })
   .validator(z.object({
-    id: z.string(),
-    data: userUpdateSchema,
-    version: z.number().optional(),
+    id: userSelectSchema.shape.id, // ✅ schema.tsのスキーマから個別フィールド使用
+    data: userUpdateSchema.partial(), // ✅ schema.tsのスキーマ使用
+    version: z.number().optional(), // 楽観的ロック用（一時的データ）
   }))
+  .middleware([authMiddleware]) // ✅ 認証ミドルウェア必須適用
   .handler(async ({ data: { id, data, version } }) => {
     return await db.transaction(async (tx) => {
       // 楽観的ロック（version指定時）
@@ -356,11 +351,10 @@ export const updateUser = createServerFn({
 
 // ✅ DELETE - カスケード削除対応
 export const deleteUser = createServerFn({
-  method: "DELETE",
+  method: "POST", // DELETEではなくPOSTを使用（TanStack Start推奨）
 })
-  .validator(z.object({
-    id: z.string(),
-  }))
+  .validator(userSelectSchema.pick({ id: true })) // ✅ schema.tsのスキーマ使用
+  .middleware([authMiddleware]) // ✅ 認証ミドルウェア必須適用
   .handler(async ({ data: { id } }) => {
     const [deletedUser] = await db
       .delete(usersTable)
@@ -375,39 +369,106 @@ export const deleteUser = createServerFn({
   });
 ```
 
-### **認証統合パターン**
+### **投稿関連Server Functions（schema.tsスキーマ徹底使用）**
 
 ```tsx
-// 認証保護されたServer Function
+// lib/server-functions/posts.ts - 投稿関連 Server Functions
+import { createServerFn } from "@tanstack/react-start";
+import { eq, desc, and } from "drizzle-orm";
+import { z } from "zod";
+import { db } from "~/db";
+import {
+  postsTable,
+  usersTable,
+  postInsertSchema,
+  postSelectSchema,
+  postUpdateSchema,
+  userSelectSchema,
+  type Post,
+  type PostInsert,
+} from "~/db/schema"; // ✅ schema.tsからインポート
+import { authMiddleware } from "~/lib/middlewares";
+
+// ✅ CREATE - 投稿作成（認証必須）
 export const createPost = createServerFn({
   method: "POST",
 })
-  .validator(postInsertSchema.omit({ userId: true }))
+  .validator(postInsertSchema.omit({ userId: true, id: true })) // ✅ schema.tsのスキーマ使用
+  .middleware([authMiddleware]) // ✅ 認証ミドルウェア必須適用
   .handler(async ({ data, context }) => {
-    // 認証チェック（@tanstack-start.mdcのミドルウェア統合を活用）
-    if (!context.sessionUser) {
-      throw new Error("認証が必要です");
-    }
+    // context.sessionUserは認証済み保証
 
     const [post] = await db
       .insert(postsTable)
-      .values({ ...data, userId: context.sessionUser.id })
+      .values({
+        ...data,
+        userId: context.sessionUser.id // 認証ユーザーのIDを自動設定
+      })
       .returning();
 
     return post;
   });
-```
 
-### **複雑なクエリパターン**
+// ✅ READ - 投稿詳細取得
+export const getPost = createServerFn({
+  method: "GET",
+})
+  .validator(postSelectSchema.pick({ id: true })) // ✅ schema.tsのスキーマ使用
+  .handler(async ({ data: { id } }) => {
+    const [post] = await db
+      .select()
+      .from(postsTable)
+      .where(eq(postsTable.id, id))
+      .limit(1);
 
-```tsx
-// リレーション + 条件フィルタ
+    if (!post) {
+      throw new Error("投稿が見つかりません");
+    }
+
+    return post;
+  });
+
+// ✅ UPDATE - 投稿更新（認証＋所有者チェック）
+export const updatePost = createServerFn({
+  method: "POST",
+})
+  .validator(z.object({
+    id: postSelectSchema.shape.id, // ✅ schema.tsのスキーマから個別フィールド使用
+    data: postUpdateSchema.pick({ title: true, content: true, published: true }), // ✅ 更新可能フィールドのみ
+  }))
+  .middleware([authMiddleware]) // ✅ 認証ミドルウェア必須適用
+  .handler(async ({ data: { id, data }, context }) => {
+    // 所有者チェック
+    const [existingPost] = await db
+      .select({ userId: postsTable.userId })
+      .from(postsTable)
+      .where(eq(postsTable.id, id))
+      .limit(1);
+
+    if (!existingPost) {
+      throw new Error("投稿が見つかりません");
+    }
+
+    if (existingPost.userId !== context.sessionUser.id) {
+      throw new Error("この投稿を編集する権限がありません");
+    }
+
+    const [updatedPost] = await db
+      .update(postsTable)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(postsTable.id, id))
+      .returning();
+
+    return updatedPost;
+  });
+
+// ✅ リレーション + 条件フィルタ（複雑なクエリパターン）
 export const getUserWithPosts = createServerFn({
   method: "GET",
 })
   .validator(z.object({
-    userId: z.string(),
-    includeUnpublished: z.boolean().default(false),
+    userId: userSelectSchema.shape.id, // ✅ schema.tsのスキーマから個別フィールド使用
+    includeUnpublished: z.boolean().default(false), // クエリオプション（一時的データ）
   }))
   .handler(async ({ data: { userId, includeUnpublished } }) => {
     const [user] = await db
@@ -435,148 +496,84 @@ export const getUserWithPosts = createServerFn({
   });
 ```
 
-## 🚨 エラーハンドリング統合戦略
 
-### **エラー分類と標準化**
 
-```tsx
-// src/lib/errors.ts - 統一的なエラーハンドリング
-export class ValidationError extends Error {
-  constructor(message: string, public field?: string) {
-    super(message);
-    this.name = 'ValidationError';
-  }
-}
-
-export class NotFoundError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'NotFoundError';
-  }
-}
-
-export class ConflictError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'ConflictError';
-  }
-}
-```
-
-### **Server Functions エラーハンドリング**
+### **FormData処理パターン（schema.ts最終検証）**
 
 ```tsx
-// 統一的なエラーハンドリングパターン
-export const createUser = createServerFn({
+// FormData処理でもschema.tsスキーマで最終検証
+export const createPostFromForm = createServerFn({
   method: "POST",
 })
-  .validator(userInsertSchema)
-  .handler(async ({ data }) => {
-    try {
-      return await db.transaction(async (tx) => {
-        const existing = await tx
-          .select({ id: usersTable.id })
-          .from(usersTable)
-          .where(eq(usersTable.email, data.email))
-          .limit(1);
-
-        if (existing.length > 0) {
-          throw new ConflictError("メールアドレスが既に存在します");
-        }
-
-        const [user] = await tx.insert(usersTable).values(data).returning();
-        return user;
-      });
-    } catch (error) {
-      // エラーログ
-      console.error('User creation failed:', error);
-
-      // 型に応じたエラーレスポンス
-      if (error instanceof ConflictError) {
-        throw error;
-      }
-
-      throw new Error('ユーザー作成に失敗しました');
+  .validator((formData) => {
+    if (!(formData instanceof FormData)) {
+      throw new Error("Invalid form data");
     }
+
+    // FormDataをオブジェクトに変換
+    const rawData = {
+      title: formData.get("title")?.toString(),
+      content: formData.get("content")?.toString(),
+      published: formData.get("published") === "true",
+    };
+
+    // ✅ schema.tsのスキーマで最終検証
+    return postInsertSchema.omit({ userId: true, id: true }).parse(rawData);
+  })
+  .middleware([authMiddleware]) // ✅ 認証ミドルウェア必須適用
+  .handler(async ({ data, context }) => {
+    const [post] = await db
+      .insert(postsTable)
+      .values({
+        ...data,
+        userId: context.sessionUser.id,
+      })
+      .returning();
+
+    return post;
   });
 ```
 
-### **クライアントサイドエラーハンドリング**
+### **🚨 重要：Single Source of Truth原則の徹底**
+
+#### **✅ 推奨パターン**
 
 ```tsx
-// TanStack Query mutation での統一エラーハンドリング
-export function useCreateUser() {
-  const queryClient = useQueryClient();
+// ✅ 正しい：schema.tsのスキーマを使用
+.validator(userSelectSchema.pick({ id: true }))
+.validator(postInsertSchema.omit({ userId: true }))
+.validator(userUpdateSchema.partial())
 
-  return useMutation({
-    mutationFn: createUser,
-    onSuccess: (user) => {
-      // 成功時のキャッシュ更新
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      queryClient.setQueryData(['user', user.id], user);
-    },
-    onError: (error) => {
-      // エラー種別に応じた処理
-      if (error.name === 'ConflictError') {
-        // 重複エラーの場合の処理
-        console.error('Conflict error:', error.message);
-      } else if (error.name === 'ValidationError') {
-        // バリデーションエラーの場合の処理
-        console.error('Validation error:', error.message);
-      } else {
-        // その他のエラー
-        console.error('Unexpected error:', error);
-      }
-    }
-  });
-}
+// ✅ 正しい：schema.tsのスキーマから個別フィールド使用
+.validator(z.object({
+  userId: userSelectSchema.shape.id,
+  data: postUpdateSchema.pick({ title: true, content: true })
+}))
 ```
 
-### **統合エラーバウンダリ**
+#### **❌ 避けるべきパターン**
 
 ```tsx
-// エラーバウンダリでの統一エラーハンドリング
-export function ApiErrorBoundary({ children }: { children: React.ReactNode }) {
-  return (
-    <ErrorBoundary
-      fallback={({ error, reset }) => {
-        if (error.name === 'NotFoundError') {
-          return <NotFoundComponent />;
-        }
+// ❌ 間違い：独自Zodスキーマ作成（Single Source of Truth違反）
+.validator(z.object({
+  name: z.string(),
+  email: z.string().email()
+}))
 
-        if (error.name === 'ValidationError') {
-          return <ValidationErrorComponent error={error} reset={reset} />;
-        }
-
-        return <GenericErrorComponent error={error} reset={reset} />;
-      }}
-    >
-      {children}
-    </ErrorBoundary>
-  );
-}
+// ❌ 間違い：schema.tsと重複する定義
+.validator(z.object({
+  id: z.string(), // userSelectSchema.shape.id を使用すべき
+  title: z.string().min(1), // postSelectSchema.shape.title を使用すべき
+}))
 ```
 
-## 🔄 実装時の注意点
+#### **🎯 例外が許可されるケース**
 
-### **必須事項**
+1. **認証関連データ**（パスワード確認、一時的な認証情報）
+2. **ページング・検索パラメータ**（DBに保存されないクエリ用データ）
+3. **外部API連携データ**（DBスキーマと無関係な一時的データ）
+4. **複雑なFormData変換処理**（最終的にschema.tsで検証する場合）
 
-1. **Schema Factory設定**: プロジェクト全体で統一的な型変換ルールを適用
-2. **命名規則の徹底**: テーブル名、スキーマ名、型名の一貫性を保つ
-3. **Single Source of Truth**: 独自のZodスキーマ定義を避け、drizzle-zodで生成されたスキーマを使用
-4. **適切なエラーハンドリング**: Server Functions、クライアントサイドの両方で統一的なエラー処理
-
-### **ベストプラクティス**
-
-1. **型安全性の確保**: `$inferSelect`、`$inferInsert`、`z.infer<typeof schema>`を適切に使用
-2. **パフォーマンス最適化**: 必要最小限のデータのみを取得し、適切にインデックスを設定
-3. **トランザクション活用**: データ整合性が重要な処理では必ずトランザクションを使用
-4. **楽観的ロック**: 競合状態を考慮した更新処理の実装
-
-### **@tanstack-start.mdcとの連携**
-
-- **Server Functions**: 詳細なMiddleware実装、認証統合、ストリーミング対応は@tanstack-start.mdcを参照
-- **エラーハンドリング**: 統一的なエラーレスポンス、ログ記録、モニタリングは@tanstack-start.mdcを参照
 - **パフォーマンス**: キャッシュ戦略、並列処理、最適化手法は@tanstack-start.mdcを参照
 
 このルールに従うことで、drizzle-zodによるSingle Source of Truthを確立し、型安全で保守性の高いデータベース操作を実現できます。

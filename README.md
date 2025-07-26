@@ -1,6 +1,6 @@
-# [フルスタック Tanstack Starter🏝️]()
+# [Tanstack Start テンプレート🏝️]()
 
-フルスタックTypeScript/ReactフレームワークのTanstack Startを素早く立ち上げ、デプロイするためのテンプレート
+フルスタックTypeScript/ReactフレームワークのTanstack Startを下記の技術スタックで立ち上げ、Netlifyにデプロイするためのテンプレート
 
 ## 使用技術
 
@@ -20,7 +20,7 @@ src/
 ├── routes/                   # 柔軟にMixed Flat and Directory Routes方式でファイルベースルーティングを行う（詳細はtanstack-router.mdcに定義）
 │   ├── __root.tsx            # ルートレイアウト・グローバル設定
 │   ├── index.tsx             # 認証保護なしのランディングホームページ
-│   ├── (auth)/               # 認証関連のルートグループ
+│   ├── (auth)/               # 認証関連専用のルートグループ
 │   │   ├── route.tsx         # 認証レイアウト
 │   │   ├── login.tsx         # ログインページ
 │   │   └── signup.tsx        # サインアップページ
@@ -32,19 +32,20 @@ src/
 │       └── auth/             # 認証関連
 │           └── $.ts          # 認証API（Better Auth）
 ├── db/                      # 主にDrizzleORM関連
-│   ├── schema.ts            # Drizzleスキーマ
-│   ├── index.ts             # DBインスタンス設定
+│   ├── schema.ts            # Drizzleスキーマ（PostgresにおけるPublicスキーマ配下の各種テーブル定義）
+│   └── index.ts             # DBインスタンス設定
 ├── styles/                  # スタイリング関連
-│   ├── app.css              # プロジェクトの統一的なCSS
+│   └── app.css              # プロジェクトの統一的なCSS
 ├── lib/                     # プロジェクト固有の再利用可能なコード
-│   ├── server-functions/    # 主にDrizzleスキーマで定義したEntityごとのServer Functions
-│   |   ├── comments.ts      # コメント関連CRUD
-│   |   └── posts.tsx        # ポスト関連CRUD
+│   ├── server-functions/    # 主にDrizzleスキーマで定義したエンティティごとにCRUD操作をするServer Functions
+│   |   ├── users.ts         # ユーザー関連CRUD
+│   |   ├── comments.ts      # エンティティ関連CRUD
+│   |   └── posts.tsx        # エンティティ関連CRUD
 │   ├── middlewares.ts       # Tanstack StartのMiddleware
 │   ├── auth.ts              # Better Auth設定ファイル
 │   ├── auth-client.ts       # Better Authが提供する認証関連メソッド（signin, signoutなど）
 │   └── utils.ts             # 一般的なユーティリティヘルパー関数
-└── components/              # 再利用可能コンポーネント
+└── components/              # コンポーネント
     ├── ui/                  # 再利用可能でPrimitiveなUIコンポーネント群（主にShadcn/uiが提供するもの）
     └── */**/*.tsx           # カスタムコンポーネント
 ```
@@ -61,11 +62,9 @@ src/
 ├── tanstack-integration.mdc      # TanStack エコシステム統合
 ├── tanstack-start.mdc            # TanStack Start機能関連
 ├── tanstack-router.mdc           # TanStack Router機能関連
-├── project-architecture.mdc      # プロジェクト構造・設計原則
 ├── drizzle-zod.mdc               # Drizzle ORM + drizzle-zod統合
 ├── ui.mdc                        # Tailwind v4 + shadcn/ui + アクセシビリティ
-├── typescript.mdc                # TypeScript/JavaScript 規約
-└── testing.mdc                   # Vitest テスト戦略（未定義・未実装）
+└── testing.mdc                   # （未実装）Vitest テスト戦略
 ```
 
 ## 🚀 ブランチ・CD運用戦略

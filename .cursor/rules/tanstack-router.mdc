@@ -390,7 +390,7 @@ export const Route = createFileRoute('/posts/$postId')({
     // 🎯 ensureQueryData: 既存データがあれば使用、なければ取得
     await context.queryClient.ensureQueryData({
       queryKey: ['post', params.postId],
-      queryFn: () => getPost(params.postId) // createServerFn推奨
+      queryFn: () => getPost(params.postId) // createServerFnを指定する
     })
 
     // 🚀 prefetchQuery: バックグラウンドで非同期プリフェッチ
@@ -422,7 +422,7 @@ export const Route = createFileRoute('/posts/$postId')({
 ```tsx
 // ✅ TanStack Start推奨: createServerFn
 const getPost = createServerFn({ method: 'GET' })
-  .validator(z.string())
+  .validator(postSelectSchema)
   .handler(async ({ data: postId }) => {
     return db.select().from(postsTable).where(eq(postsTable.id, postId))
   })
