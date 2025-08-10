@@ -37,7 +37,7 @@ src/
 ├── styles/                  # スタイリング関連
 │   └── app.css              # プロジェクトの統一的なCSS
 ├── lib/                     # プロジェクト固有の再利用可能なコード
-│   ├── server-functions/    # 主にDrizzleスキーマで定義したエンティティごとにCRUD操作をするServer Functions
+│   ├── api/              # Drizzleスキーマで定義したEntityごとにCRUD操作をするServer Functionsなど
 │   |   ├── users.ts         # ユーザー関連CRUD
 │   |   ├── comments.ts      # エンティティ関連CRUD
 │   |   └── posts.tsx        # エンティティ関連CRUD

@@ -931,7 +931,7 @@ function UserListContent() {
 
 ```tsx
 // @tanstack-start.mdcとの具体的統合例
-import { createUser, updateUser } from "~/lib/server-functions/users"
+import { createUser, updateUser } from "~/lib/api/users"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 
 function UserManagement() {

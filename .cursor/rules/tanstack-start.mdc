@@ -11,7 +11,7 @@ alwaysApply: false
 ### 基本的なServer Function定義
 
 ```tsx
-// lib/server-functions/example.ts
+// lib/api/example.ts
 import { createServerFn } from '@tanstack/react-start'
 import { eq } from 'drizzle-orm'
 import { db } from '~/db'

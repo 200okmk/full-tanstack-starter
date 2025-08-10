@@ -223,12 +223,12 @@ import { userInsertSchema, userSelectSchema, User, UserInsert } from "~/db/schem
 
 ## 🔧 TanStack Start統合実装パターン
 
-### **src/lib/server-functions/ディレクトリ管理戦略**
+### **src/lib/api/ディレクトリ管理戦略**
 
 `schema.ts`で定めたEntityごとに、CRUD操作するServer Functionsを作成して格納
 ```
 lib/
-├── server-functions/
+├── api/
 │   ├── users.ts          # ユーザー関連 Server Functions
 │   ├── posts.ts          # 投稿関連 Server Functions
 │   ├── comments.ts       # コメント関連 Server Functions
@@ -238,7 +238,7 @@ lib/
 ### **📋 Entityごとの標準実装パターン**
 
 ```tsx
-// lib/server-functions/users.ts - ユーザー関連 Server Functions
+// lib/api/users.ts - ユーザー関連 Server Functions
 import { createServerFn } from "@tanstack/react-start";
 import { eq, like, desc, count, and } from "drizzle-orm";
 import { z } from "zod";
@@ -372,7 +372,7 @@ export const deleteUser = createServerFn({
 ### **投稿関連Server Functions（schema.tsスキーマ徹底使用）**
 
 ```tsx
-// lib/server-functions/posts.ts - 投稿関連 Server Functions
+// lib/api/posts.ts - 投稿関連 Server Functions
 import { createServerFn } from "@tanstack/react-start";
 import { eq, desc, and } from "drizzle-orm";
 import { z } from "zod";
