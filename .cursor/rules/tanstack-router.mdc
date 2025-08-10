@@ -561,7 +561,7 @@ function PostComponent() {
 
 ### Search Parameters適用指針
 
-#### **✅ Search Paramsが適切な状態**（URLで共有可能・永続的）
+#### **✅ Search Paramsが適切な状態**
 
 ```tsx
 // 共有可能で永続的な状態のみをSearch Paramsで管理
@@ -587,51 +587,31 @@ const appropriateSearchParams = {
 }
 ```
 
-#### **❌ Search Paramsが不適切な状態**（一時的・プライベート）
+#### **❌ Search Paramsが不適切な状態**
 
-```tsx
-// 以下の状態はSearch Paramsではなく、他の状態管理手法を使用
-const inappropriateForSearchParams = {
-  // 一時的なUI状態 → useState
-  isModalOpen: boolean,
-  isDropdownOpen: boolean,
-  hoveredItem: string | null,
+例えば以下の状態はSearch Paramsではなく、他の状態管理手法を使用
+- 一時的なUI状態 → useState
+  - モーダル開閉状態
+  - ドロップダウンメニュー開閉状態
 
-  // フォーム入力中の状態 → TanStack Form + useState
-  formData: FormData,
-  validationErrors: ValidationError[],
-  isDirty: boolean,
+- フォーム入力中の状態 → フォームライブラリ（TanStack Formを想定）
 
-  // 認証・セッション状態 → RouterContext
+- 認証・セッション状態 → RouterContext
   currentUser: User | null,
   isAuthenticated: boolean,
 
-  // サーバー由来のデータ → TanStack Query
-  users: User[],
-  posts: Post[],
-  comments: Comment[],
-
-  // 短時間の状態 → useState
-  isLoading: boolean,
-  error: Error | null,
-
-  // プライベートな状態 → React Context
-  userPreferences: UserPreferences,
-  notifications: Notification[],
-  themeSettings: ThemeSettings,
-}
-```
+- アプリ使用者の個人的な設定
+  - UIテーマ設定など
 
 #### **🎯 判断基準**
 
 Search Parametersを使用する前に、以下の条件をすべて満たすかを確認：
 
-1. **URLで共有可能か？** - 他のユーザーがURLを共有して同じ状態を再現できるか
+1. **URLで共有可能か？** - URLを共有して同じ状態を再現できるべき状態か
 2. **永続的か？** - ページリロードしても保持されるべき状態か
-3. **ブックマーク可能か？** - ブックマークして後で同じ状態に戻れるべきか
-4. **プライベートでない？** - 認証情報や個人的な設定ではないか
+3. **プライベートでない？** - 認証情報や個人的な設定ではないか
 
-上記すべてに「はい」と答えられる場合のみ、Search Paramsを使用します。
+上記全てに該当する場合、基本的にSearch Paramsを使用していく。
 
 ### 基本的なSearch Parameters実装
 
@@ -691,14 +671,15 @@ export const Route = createFileRoute('/shop/products/$productId')({
 ### loaderDepsを使った依存関係管理
 
 ```tsx
+const productSearchSchema = z.object({
+  page: z.number().catch(1),
+  category: z.string().optional(),
+  sort: z.enum(['price', 'name', 'date']).catch('name')
+})
+
 // Search Parametersに依存するローダー
 export const Route = createFileRoute('/products')({
-  validateSearch: z.object({
-    page: z.number().catch(1),
-    category: z.string().optional(),
-    sort: z.enum(['price', 'name', 'date']).catch('name')
-  }),
-
+  validateSearch: productSearchSchema,
   // Search Parametersの変更時にローダーを再実行する依存関係を定義
   loaderDeps: ({ search }) => ({
     page: search.page,
