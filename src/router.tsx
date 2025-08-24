@@ -22,9 +22,7 @@ export function createRouter() {
       context: { queryClient, sessionUser: null },
       // ホバー時にプリロード
       defaultPreload: "intent",
-      // Tanstack Queryがデータの取得とキャッシュを処理する
-      // https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#passing-all-loader-events-to-an-external-cache
-      // プリロード結果をキャッシュしない
+      // データの取得とキャッシュをTanstack Queryに管理させるため、すべてのローダーイベントを渡す設定（https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#passing-all-loader-events-to-an-external-cache）
       defaultPreloadStaleTime: 0,
       defaultErrorComponent: DefaultCatchBoundary,
       defaultNotFoundComponent: NotFound,

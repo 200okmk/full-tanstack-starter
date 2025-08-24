@@ -557,11 +557,11 @@ function PostComponent() {
 }
 ```
 
-## 🔍 Search Parameters（基本活用）
+## 🔍 Search Parameters
 
 ### Search Parameters適用指針
 
-#### **✅ Search Paramsが適切な状態**
+#### **✅ Search Paramsで管理すべき状態とは**
 
 ```tsx
 // 共有可能で永続的な状態のみをSearch Paramsで管理
@@ -570,7 +570,6 @@ const appropriateSearchParams = {
   page: z.number().catch(1),
   limit: z.number().catch(10),
   category: z.string().optional(),
-  brand: z.array(z.string()).optional(),
   priceRange: z.array(z.number()).optional(),
 
   // 検索・ソート
@@ -587,14 +586,14 @@ const appropriateSearchParams = {
 }
 ```
 
-#### **❌ Search Paramsが不適切な状態**
+#### **❌ Search Paramsが不適切な状態とは**
 
 例えば以下の状態はSearch Paramsではなく、他の状態管理手法を使用
 - 一時的なUI状態 → useState
   - モーダル開閉状態
   - ドロップダウンメニュー開閉状態
 
-- フォーム入力中の状態 → フォームライブラリ（TanStack Formを想定）
+- フォーム入力中の状態 → フォームライブラリ（TanStack Formなど）
 
 - 認証・セッション状態 → RouterContext
   currentUser: User | null,
@@ -607,11 +606,11 @@ const appropriateSearchParams = {
 
 Search Parametersを使用する前に、以下の条件をすべて満たすかを確認：
 
-1. **URLで共有可能か？** - URLを共有して同じ状態を再現できるべき状態か
+1. **URLで共有可能であるべき？** - URLを共有して同じ状態を再現できるべき状態か
 2. **永続的か？** - ページリロードしても保持されるべき状態か
 3. **プライベートでない？** - 認証情報や個人的な設定ではないか
 
-上記全てに該当する場合、基本的にSearch Paramsを使用していく。
+上記全てに該当する場合、基本的にSearch Paramss活用していく。
 
 ### 基本的なSearch Parameters実装
 

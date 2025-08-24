@@ -32,21 +32,22 @@ src/
 │       └── auth/             # 認証関連
 │           └── $.ts          # 認証API（Better Auth）
 ├── db/                      # 主にDrizzleORM関連
-│   ├── schema.ts            # Drizzleスキーマ（PostgresにおけるPublicスキーマ配下の各種テーブル定義）
+│   ├── schema.ts            # Drizzleスキーマ
+│   ├── seed.ts              # DBシード
 │   └── index.ts             # DBインスタンス設定
+│── data-access/              # Drizzleスキーマで定義したEntityごとにCRUD操作ServerFunctionsをまとめる
+│   ├── users.ts              # ユーザー関連CRUD
+│   ├── comments.ts           # エンティティ関連CRUD
+│   └── posts.tsx             # エンティティ関連CRUD
 ├── styles/                  # スタイリング関連
 │   └── app.css              # プロジェクトの統一的なCSS
 ├── lib/                     # プロジェクト固有の再利用可能なコード
-│   ├── api/              # Drizzleスキーマで定義したEntityごとにCRUD操作をするServer Functionsなど
-│   |   ├── users.ts         # ユーザー関連CRUD
-│   |   ├── comments.ts      # エンティティ関連CRUD
-│   |   └── posts.tsx        # エンティティ関連CRUD
 │   ├── middlewares.ts       # Tanstack StartのMiddleware
 │   ├── auth.ts              # Better Auth設定ファイル
 │   ├── auth-client.ts       # Better Authが提供する認証関連メソッド（signin, signoutなど）
 │   └── utils.ts             # 一般的なユーティリティヘルパー関数
 └── components/              # コンポーネント
-    ├── ui/                  # 再利用可能でPrimitiveなUIコンポーネント群（主にShadcn/uiが提供するもの）
+    ├── ui/                  # 再利用可能でPrimitiveなUIコンポーネント群（主にShadcn/uiなどを直接配置）
     └── */**/*.tsx           # カスタムコンポーネント
 ```
 
