@@ -170,7 +170,7 @@ function RootDocument({ children }: { readonly children: React.ReactNode }) {
 export const Route = createFileRoute('/posts/$postId')({
   loader: async ({ context, params }) => {
     // ★ 重要なデータは確実に取得してからレンダリング
-    await context.queryClient.ensureQueryData({
+    context.queryClient.ensureQueryData({
       queryKey: ['post', params.postId],
       queryFn: () => getPost(params.postId), // createServerFn
     })
@@ -299,7 +299,7 @@ export const getPostWithMetrics = createServerFn({
 // ルートでの使用
 export const Route = createFileRoute('/posts/$postId')({
   loader: async ({ context, params }) => {
-    await context.queryClient.ensureQueryData({
+    context.queryClient.ensureQueryData({
       queryKey: ['post-with-metrics', params.postId],
       queryFn: () => getPostWithMetrics({ id: parseInt(params.postId) }),
     })
@@ -705,18 +705,10 @@ onSuccess: (newData) => {
 // Route レベルエラーハンドリング
 export const Route = createFileRoute('/posts/$postId')({
   loader: async ({ context, params }) => {
-    try {
-      await context.queryClient.ensureQueryData({
-        queryKey: ['post', params.postId],
-        queryFn: () => getPost(params.postId),
-      })
-    } catch (error) {
-      // ★ 404エラーは適切にハンドリング
-      if (error.status === 404) {
-        throw notFound()
-      }
-      throw error
-    }
+    context.queryClient.ensureQueryData({
+      queryKey: ['post', params.postId],
+      queryFn: () => getPost(params.postId),
+    })
   },
 
   errorComponent: ({ error, reset }) => {

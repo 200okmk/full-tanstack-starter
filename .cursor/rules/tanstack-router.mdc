@@ -250,7 +250,7 @@ export const Route = createFileRoute('/posts/$postId')({
 
   loader: async ({ params }) => {
     // paramsは直接使用可能
-    await context.queryClient.ensureQueryData({
+    context.queryClient.ensureQueryData({
       queryKey: ['post', params.postId],
       queryFn: () => getPost(params.postId)
     })
@@ -388,7 +388,7 @@ export const Route = createRootRouteWithContext<{
 export const Route = createFileRoute('/posts/$postId')({
   loader: async ({ context, params }) => {
     // 🎯 ensureQueryData: 既存データがあれば使用、なければ取得
-    await context.queryClient.ensureQueryData({
+    context.queryClient.ensureQueryData({
       queryKey: ['post', params.postId],
       queryFn: () => getPost(params.postId) // createServerFnを指定する
     })
@@ -464,7 +464,7 @@ loader: async ({ context, params }) => {
 export const Route = createFileRoute('/posts')({
   loader: async ({ context }) => {
     // データを事前に取得してキャッシュ
-    await context.queryClient.ensureQueryData({
+    context.queryClient.ensureQueryData({
       queryKey: ['posts'],
       queryFn: getPosts
     })
@@ -515,7 +515,7 @@ export const Route = createFileRoute('/dashboard')({
 export const Route = createFileRoute('/posts/$postId')({
   loader: async ({ context, params }) => {
     // 重要なデータは即座に取得
-    await context.queryClient.ensureQueryData({
+    context.queryClient.ensureQueryData({
       queryKey: ['post', params.postId],
       queryFn: () => getPost(params.postId)
     })
@@ -687,7 +687,7 @@ export const Route = createFileRoute('/products')({
   }),
 
   loader: async ({ context, deps }) => {
-    await context.queryClient.ensureQueryData({
+    context.queryClient.ensureQueryData({
       queryKey: ['products', deps], // 依存関係がキーに含まれる
       queryFn: () => getProducts(deps)
     })
@@ -731,7 +731,7 @@ export const Route = createFileRoute('/heavy-page')({
 export const Route = createFileRoute('/posts/$postId')({
   loader: async ({ context, params }) => {
     // Promise<void>として推論され、型チェックが高速化
-    await context.queryClient.ensureQueryData(
+    context.queryClient.ensureQueryData(
       postQueryOptions(params.postId)
     )
   },
@@ -753,15 +753,10 @@ export const Route = createFileRoute('/posts/$postId')({
 ```tsx
 export const Route = createFileRoute('/posts/$postId')({
   loader: async ({ context, params }) => {
-    try {
-      await context.queryClient.ensureQueryData({
-        queryKey: ['post', params.postId],
-        queryFn: () => getPost(params.postId)
-      })
-    } catch (error) {
-      // カスタムエラーを投げることで適切なエラーページを表示
-      throw new NotFoundError(`Post ${params.postId} not found`)
-    }
+    context.queryClient.ensureQueryData({
+      queryKey: ['post', params.postId],
+      queryFn: () => getPost(params.postId)
+    })
   },
 
   errorComponent: ({ error }) => {

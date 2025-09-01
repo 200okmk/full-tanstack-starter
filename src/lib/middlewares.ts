@@ -13,7 +13,7 @@ export const authMiddleware = createMiddleware().server(async ({ next }) => {
   const request = getWebRequest()!;
 
   const session = await auth.api.getSession({
-    headers: request.headers, // ✅ 正しい：request.headersを直接渡す
+    headers: request.headers, // request.headersを直接渡す
     query: {
       // https://www.better-auth.com/docs/concepts/session-management#session-caching
       disableCookieCache: true,
@@ -21,7 +21,7 @@ export const authMiddleware = createMiddleware().server(async ({ next }) => {
   });
 
   if (!session) {
-    // ✅ エラーではなくログインページにリダイレクト
+    // エラーではなくログインページにリダイレクト
     throw redirect({
       to: "/login",
       search: {
