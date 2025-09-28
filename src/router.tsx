@@ -11,6 +11,7 @@ export function createRouter() {
     defaultOptions: {
       queries: {
         refetchOnWindowFocus: false,
+        // TanStack Routerのデフォルト設定（下記 ”defaultPreloadStaleTime”）を上書き
         staleTime: 1000 * 60, // 1 minute
       },
     },

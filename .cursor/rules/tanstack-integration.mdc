@@ -463,10 +463,10 @@ function ProfileUpdateForm() {
       // ★ 関連するユーザーデータキャッシュを無効化
       queryClient.invalidateQueries({ queryKey: ['user', updatedUser.id] })
       queryClient.invalidateQueries({ queryKey: ['user-profile'] })
-      queryClient.invalidateQueries({ queryKey: ['sessionUser'] }) // セッション状態も更新
+      queryClient.invalidateQueries({ queryKey: ['session-user'] }) // セッション状態も更新
 
       // ★ 楽観的更新でユーザー情報をすぐに反映
-      queryClient.setQueryData(['sessionUser'], (oldSession: any) =>
+      queryClient.setQueryData(['session-user'], (oldSession: any) =>
         oldSession ? { ...oldSession, user: updatedUser } : oldSession
       )
 

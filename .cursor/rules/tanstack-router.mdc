@@ -1,144 +1,39 @@
 ---
-description: TanStack Routerにおけるファイルベースルーティング、レイアウトルート、認証ガード、型安全ナビゲーションの実装パターンを定義します。現在のプロジェクト実装をベースに、拡張性と保守性を重視した設計指針を採用します。
+description: TanStack Routerのファイルベースルーティング指針、Routeコンテキスト、TanStack Queryとの統合、認証ガード、型安全ナビゲーションの実装パターンを定義します。
 globs: src/routes/**/*.tsx,src/router.tsx
 alwaysApply: false
 ---
 # TanStack Router Rule
 
-このルールは、TanStack Routerにおけるファイルベースルーティング、レイアウトルート、認証ガード、型安全ナビゲーションの実装パターンを定義します。現在のプロジェクト実装をベースに、拡張性と保守性を重視した設計指針を採用します。
+## 🗂️ ファイルベースルーティング基本指針
 
-## 🗂️ ファイルベースルーティング戦略
+- **基本的にディレクトリベースで設計**: Directory Routes（`/(authenticated)/dashboard/`、`posts/`などのディレクトリ）を基本的に使用してルーティング構造を構築する
+- **論理的グルーピング**: 実際のURLパスには影響を出さずに論理的グループを表現するRoute Groups（`(authenticated)/など`）も使用して開発者が直感的に理解しやすい構造にする
+- **共通レイアウト**: 共通処理や共通UIはLayout Routes（`route.tsx`）に切り出して繰り返しを避ける
 
-### パス構造に合わせて柔軟な[Mixed Flat and Directory Routes](mdc:https:/tanstack.com/router/latest/docs/framework/react/routing/file-based-routing#mixed-flat-and-directory-routes)を採用する
-
-TanStack Routerは、フラットなファイル構造（Flat Routes）とディレクトリベースの構造（Directory Routes）を柔軟に組み合わせることができます。パスのネスト具合や関連性に応じて最適な構造を選択する。
-以下は、TanStack Router公式が推奨するMixed Flat and Directory Routesの実例です：
-
-```
-routes/
-├── __root.tsx                   # ルートレイアウト
-├── index.tsx                    # / (ホームページ)
-├── about.tsx                    # /about (シンプルなページ → フラット)
-├── posts.tsx                    # /posts (レイアウトルート)
-├── posts/                       # 基本はディレクトリ構造
-│   ├── index.tsx               # /posts (exact)
-│   ├── $postId.tsx             # /posts/$postId
-│   └── $postId.edit.tsx        # /posts/$postId/edit
-├── settings.tsx                 # /settings (レイアウトルート)
-├── settings.profile.tsx         # /settings/profile (フラット記法)
-├── settings.notifications.tsx   # /settings/notifications (フラット記法)
-├── account.tsx                  # /account (レイアウトルート)
-└── account.overview.tsx         # /account/overview (フラット記法)
-```
-
-**対応するURL構造とコンポーネント出力**：
-
-| ファイルパス | URLパス | コンポーネント出力 |
-|-------------|---------|-------------------|
-| `__root.tsx` | - | `<Root>` |
-| `index.tsx` | `/` | `<Root><RootIndex>` |
-| `about.tsx` | `/about` | `<Root><About>` |
-| `posts.tsx` | `/posts` | `<Root><Posts>` |
-| `posts/index.tsx` | `/posts` (exact) | `<Root><Posts><PostsIndex>` |
-| `posts/$postId.tsx` | `/posts/$postId` | `<Root><Posts><Post>` |
-| `posts/$postId.edit.tsx` | `/posts/$postId/edit` | `<Root><Posts><Post><EditPost>` |
-| `settings.tsx` | `/settings` | `<Root><Settings>` |
-| `settings.profile.tsx` | `/settings/profile` | `<Root><Settings><Profile>` |
-| `settings.notifications.tsx` | `/settings/notifications` | `<Root><Settings><Notifications>` |
-| `account.tsx` | `/account` | `<Root><Account>` |
-| `account.overview.tsx` | `/account/overview` | `<Root><Account><Overview>` |
-
-**選択の指針**:
-- **基本的にはディレクトリ構造で設計**: Directory Routes（`dashboard/`、`posts/`）
-- **一意に深くネストされたルートが多数あり、ルートごとにディレクトリを作成したくない場合はフラット構造で設計**: Flat Routing（`about.tsx`、`blog.$slug.tsx`）
-- **論理的グルーピング**: Route Groups（`(auth)/`）
-- **共通レイアウト**: Layout Routes（`route.tsx`）
-- **深い階層**: ディレクトリ + フラット記法の組み合わせ
-
-この構造により、プロジェクトの成長に応じて柔軟にルート構造を拡張できます。
-
-### 基本的なファイル構造パターン
+### 基本的なディレクトリ構造パターン
 
 ```tsx
 // routes/
 // ├── __root.tsx          // アプリルートレイアウト
-// ├── index.tsx           // ホームページ
-// ├── (auth)/             // Route Group (認証関連)
-// │   ├── route.tsx       // 認証レイアウト
+// ├── index.tsx           // 認証保護されていないランディングホームページ
+// ├── auth/               // 認証関連Route Group
+// │   ├── route.tsx       // 認証ページレイアウト
 // │   ├── login.tsx       // ログインページ
-// │   └── signup.tsx      // サインアップページ
-// ├── dashboard/          // 保護されたパスの一例(ダッシュボードパス配下)
-// │   ├── route.tsx       // ダッシュボードレイアウト
-// │   └── index.tsx       // /dashboardルートページ
+// │   └── signup.tsx      // サインアップページ（OAuthやマジックリンク認証のみの場合はなし）
+// ├── (authenticated)/    // 認証保護される全てのパスのRoute Group
+// │   ├── route.tsx          // 認証保護処理を実行
+// │   ├── dashboard/         // 保護されたパスの一例（`/dashboard`）
+// │   │   ├── route.tsx      // ページ共通レイアウト
+// │   │   └── index.tsx      // /dashboardルートページ
+// │   ...
+// │
 // └── api/                // API Routes
-//     └── auth/           // 認証関連APIパス
-//         └── $.ts         // 各種認証エンドポイント（Better Auth準拠）
+//     ├── auth/              // 認証関連APIパス
+//     │   └── $.ts             // 各種認証エンドポイント（Better Auth準拠）
+//     ...
+//
 ```
-
-### Route Groups で意味的グルーピングを行い開発者体験にとって理解しやすくする
-
-```tsx
-// Route Groups: (auth) - URLパスに影響しない論理的グループ化
-// src/routes/(auth)/route.tsx
-import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
-
-export const Route = createFileRoute('/(auth)')({
-  component: AuthLayoutComponent,
-  beforeLoad: ({ context }) => {
-    // 既にログイン済みの場合はダッシュボードにリダイレクト
-    if (context.sessionUser) {
-      throw redirect({ to: '/dashboard' })
-    }
-
-    return {
-      redirectUrl: '/dashboard' // 認証後のリダイレクト先
-    }
-  }
-})
-
-function AuthLayoutComponent() {
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="w-full max-w-md">
-        <Outlet />
-      </div>
-    </div>
-  )
-}
-```
-
-### Layout Routes で共通レイアウトを作成
-
-```tsx
-// Layout Routes: dashboard - 特定のURLパスに対応するレイアウト
-// src/routes/dashboard/route.tsx
-import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
-
-export const Route = createFileRoute('/dashboard')({
-  component: DashboardLayoutComponent,
-  beforeLoad: ({ context }) => {
-    // 認証チェック
-    if (!context.sessionUser) {
-      throw redirect({ to: '/login' })
-    }
-  }
-})
-
-function DashboardLayoutComponent() {
-  return (
-    <div className="min-h-screen">
-      <nav className="bg-gray-800 text-white p-4">
-        <h1>Dashboard</h1>
-      </nav>
-      <main className="container mx-auto p-4">
-        <Outlet />
-      </main>
-    </div>
-  )
-}
-```
-
-### URL上に明示的なパスとして表現したくない場合は Pathless Layout Routes を活用する
 
 ```tsx
 // src/routes/_authenticated.tsx - URL上に明示的なパスとして表現したくない場合に使用する。
@@ -197,41 +92,6 @@ export const Route = createFileRoute('/protected-route')({
   },
   component: ProtectedComponent
 })
-```
-
-### 認証状態に基づく条件付きレンダリング
-
-```tsx
-// src/routes/index.tsx
-import { createFileRoute, Link } from '@tanstack/react-router'
-
-export const Route = createFileRoute('/')({
-  loader: ({ context }) => {
-    return { sessionUser: context.sessionUser }
-  },
-  component: Home
-})
-
-function Home() {
-  const { sessionUser } = Route.useLoaderData()
-  const { queryClient } = Route.useRouteContext()
-
-  if (sessionUser) {
-    return (
-      <div>
-        <h1>Welcome back, {user.name}!</h1>
-        <Link to="/dashboard">Go to Dashboard</Link>
-      </div>
-    )
-  }
-
-  return (
-    <div>
-      <h1>Welcome!</h1>
-      <Link to="/login">Log in</Link>
-    </div>
-  )
-}
 ```
 
 ## 🎯 型安全性の確保
@@ -415,7 +275,6 @@ export const Route = createFileRoute('/posts/$postId')({
 - **`ensureQueryData`**: Render-as-you-fetchパターンの基本（`useSuspenseQuery`と組み合わせ）
 - **`prefetchQuery`**: 重要でない追加データのバックグラウンド取得
 - **`fetchQuery`**: 常に最新データが必要な場合
-- **`getQueryData`**: キャッシュからの同期的データ取得
 
 ### Server Functions vs 通常のfetch
 
@@ -610,7 +469,7 @@ Search Parametersを使用する前に、以下の条件をすべて満たすか
 2. **永続的か？** - ページリロードしても保持されるべき状態か
 3. **プライベートでない？** - 認証情報や個人的な設定ではないか
 
-上記全てに該当する場合、基本的にSearch Paramss活用していく。
+上記全てに該当する場合、基本的にSearch Params活用していく。
 
 ### 基本的なSearch Parameters実装
 

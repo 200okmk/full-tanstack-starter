@@ -1,16 +1,16 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 
-export const Route = createFileRoute("/(auth)")({
+export const Route = createFileRoute("/auth")({
   component: RouteComponent,
   beforeLoad: ({ context }) => {
-    const REDIRECT_URL = "/dashboard";
+    const DEFAULT_REDIRECT_URL = "/dashboard";
     if (context.sessionUser) {
       throw redirect({
-        to: REDIRECT_URL,
+        to: DEFAULT_REDIRECT_URL,
       });
     }
     return {
-      redirectUrl: REDIRECT_URL,
+      redirectUrl: DEFAULT_REDIRECT_URL,
     };
   },
 });
