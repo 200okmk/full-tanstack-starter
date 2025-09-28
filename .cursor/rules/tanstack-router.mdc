@@ -3,13 +3,14 @@ description: TanStack Routerのファイルベースルーティング指針、R
 globs: src/routes/**/*.tsx,src/router.tsx
 alwaysApply: false
 ---
+
 # TanStack Router Rule
 
 ## 🗂️ ファイルベースルーティング基本指針
 
-- **基本的にディレクトリベースで設計**: Directory Routes（`/(authenticated)/dashboard/`、`posts/`などのディレクトリ）を基本的に使用してルーティング構造を構築する
-- **論理的グルーピング**: 実際のURLパスには影響を出さずに論理的グループを表現するRoute Groups（`(authenticated)/など`）も使用して開発者が直感的に理解しやすい構造にする
-- **共通レイアウト**: 共通処理や共通UIはLayout Routes（`route.tsx`）に切り出して繰り返しを避ける
+- **基本的にディレクトリベースで設計**: 基本的にディレクトリを使用してルーティング構造を構築する
+- **共通レイアウト**: 特定のパス配下に共通する処理やUIはLayout Routes（`route.tsx`）に切り出して繰り返しを避ける
+- **パスレスグルーピング**: 実際のURLパスには影響を出さずに、意味的グループを表現するRoute Group Directory（`(admin)/`など）や共通処理を切り出せるPathless Layout（`_authenticated/`など）も使用して開発者が直感的に理解しやすい構造にする
 
 ### 基本的なディレクトリ構造パターン
 
@@ -17,48 +18,22 @@ alwaysApply: false
 // routes/
 // ├── __root.tsx          // アプリルートレイアウト
 // ├── index.tsx           // 認証保護されていないランディングホームページ
-// ├── auth/               // 認証関連Route Group
+// ├── auth/               // 認証関連ページ
 // │   ├── route.tsx       // 認証ページレイアウト
 // │   ├── login.tsx       // ログインページ
-// │   └── signup.tsx      // サインアップページ（OAuthやマジックリンク認証のみの場合はなし）
-// ├── (authenticated)/    // 認証保護される全てのパスのRoute Group
-// │   ├── route.tsx          // 認証保護処理を実行
-// │   ├── dashboard/         // 保護されたパスの一例（`/dashboard`）
-// │   │   ├── route.tsx      // ページ共通レイアウト
+// │   └── signup.tsx      // サインアップページ（ただしOAuth認証やマジックリンク認証のみの場合は無し）
+// ├── _authenticated/    // 認証保護される全てのページを配下に持ちつつ、URLパスに影響を出さないようににPathless Layoutとする
+// │   ├── route.tsx          // 認証保護処理を実行するレイアウト
+// │   ├── dashboard/         // 保護されたパスの一例
+// │   │   ├── route.tsx      // 共通レイアウト
 // │   │   └── index.tsx      // /dashboardルートページ
 // │   ...
 // │
 // └── api/                // API Routes
 //     ├── auth/              // 認証関連APIパス
-//     │   └── $.ts             // 各種認証エンドポイント（Better Auth準拠）
+//     │   └── $.ts             // 各種認証エンドポイント（BetterAuth準拠）
 //     ...
 //
-```
-
-```tsx
-// src/routes/_authenticated.tsx - URL上に明示的なパスとして表現したくない場合に使用する。
-import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
-
-export const Route = createFileRoute('/_authenticated')({
-  component: AuthenticatedLayoutComponent,
-  beforeLoad: ({ context }) => {
-    if (!context.sessionUser) {
-      throw redirect({ to: '/login' })
-    }
-  }
-})
-
-function AuthenticatedLayoutComponent() {
-  return (
-    <div className="authenticated-layout">
-      <Outlet />
-    </div>
-  )
-}
-
-// 子ルート例
-// src/routes/_authenticated/profile.tsx -> /profile
-// src/routes/_authenticated/settings.tsx -> /settings
 ```
 
 ## 🔒 認証統合パターン
@@ -67,31 +42,31 @@ function AuthenticatedLayoutComponent() {
 
 ```tsx
 // 基本的な認証ガードパターン
-export const Route = createFileRoute('/protected-route')({
+export const Route = createFileRoute("/protected-route")({
   beforeLoad: ({ context, location }) => {
     // 1. 認証状態チェック
     if (!context.sessionUser) {
       throw redirect({
-        to: '/login',
+        to: "/login",
         search: {
           // 認証後に元のページに戻るためのリダイレクトURL
-          redirect: location.href
-        }
-      })
+          redirect: location.href,
+        },
+      });
     }
 
-    // 2. 権限チェック（必要に応じて）
-    if (!context.sessionUser.roles?.includes('admin')) {
-      throw redirect({ to: '/unauthorized' })
+    // 2. 必要に応じて権限チェックなどもする
+    if (!context.sessionUser.roles?.includes("admin")) {
+      throw redirect({ to: "/unauthorized" });
     }
 
     // 3. 追加のコンテキスト提供
     return {
-      userPermissions: getUserPermissions(context.sessionUser)
-    }
+      userPermissions: getUserPermissions(context.sessionUser),
+    };
   },
-  component: ProtectedComponent
-})
+  component: ProtectedComponent,
+});
 ```
 
 ## 🎯 型安全性の確保
@@ -100,10 +75,10 @@ export const Route = createFileRoute('/protected-route')({
 
 ```tsx
 // ✅ パターン1: 認証チェックのみ（シンプルなケース）
-export const Route = createFileRoute('/posts/$postId')({
+export const Route = createFileRoute("/posts/$postId")({
   beforeLoad: ({ context }) => {
     if (!context.sessionUser) {
-      throw redirect({ to: '/login' })
+      throw redirect({ to: "/login" });
     }
     // 認証チェックのみの場合は何も返さない
   },
@@ -111,57 +86,58 @@ export const Route = createFileRoute('/posts/$postId')({
   loader: async ({ params }) => {
     // paramsは直接使用可能
     context.queryClient.ensureQueryData({
-      queryKey: ['post', params.postId],
-      queryFn: () => getPost(params.postId)
-    })
+      queryKey: ["post", params.postId],
+      queryFn: () => getPost(params.postId),
+    });
   },
 
-  component: PostComponent
-})
+  component: PostComponent,
+});
 
 // ✅ パターン2: 権限チェックと事前計算が必要なケース
-export const Route = createFileRoute('/posts/$postId/edit')({
+export const Route = createFileRoute("/posts/$postId/edit")({
   beforeLoad: ({ params, context }) => {
     if (!context.sessionUser) {
-      throw redirect({ to: '/login' })
+      throw redirect({ to: "/login" });
     }
 
     // 実際に意味のある事前計算
-    const userRole = context.sessionUser.role
-    const canEditPost = userRole === 'admin' || userRole === 'editor'
+    const userRole = context.sessionUser.role;
+    const canEditPost = userRole === "admin" || userRole === "editor";
 
     if (!canEditPost) {
-      throw redirect({ to: '/posts/$postId', params: { postId: params.postId } })
+      throw redirect({ to: "/posts/$postId", params: { postId: params.postId } });
     }
 
     return {
       canEditPost,
       userRole,
-      editPermissions: getEditPermissions(userRole)
-    }
+      editPermissions: getEditPermissions(userRole),
+    };
   },
 
   loader: async ({ params, context }) => {
     // beforeLoadの結果とparamsの両方を使用
     await Promise.all([
       context.queryClient.ensureQueryData({
-        queryKey: ['post', params.postId],
-        queryFn: () => getPost(params.postId)
+        queryKey: ["post", params.postId],
+        queryFn: () => getPost(params.postId),
       }),
       // 編集権限がある場合のみ追加データを取得
-      context.canEditPost && context.queryClient.ensureQueryData({
-        queryKey: ['post-edit-data', params.postId],
-        queryFn: () => getPostEditData(params.postId)
-      })
-    ])
+      context.canEditPost &&
+        context.queryClient.ensureQueryData({
+          queryKey: ["post-edit-data", params.postId],
+          queryFn: () => getPostEditData(params.postId),
+        }),
+    ]);
   },
 
-  component: PostEditComponent
-})
+  component: PostEditComponent,
+});
 
 function PostEditComponent() {
-  const params = Route.useParams() // { postId: string }
-  const { canEditPost, editPermissions } = Route.useRouteContext()
+  const params = Route.useParams(); // { postId: string }
+  const { canEditPost, editPermissions } = Route.useRouteContext();
 
   return (
     <div>
@@ -169,25 +145,27 @@ function PostEditComponent() {
       {editPermissions.canChangeTitle && <input placeholder="Title" />}
       {editPermissions.canPublish && <button>Publish</button>}
     </div>
-  )
+  );
 }
 
 // ✅ パターン3: データフェッチングのみ（beforeLoad不要）
-export const Route = createFileRoute('/posts/$postId')({
+export const Route = createFileRoute("/posts/$postId")({
   loader: async ({ params }) => {
-    return getPost(params.postId)
+    return getPost(params.postId);
   },
-  component: PostComponent
-})
+  component: PostComponent,
+});
 ```
 
 **beforeLoad()を使うべき場面**:
+
 - **認証・権限チェック**: ユーザー状態に基づくアクセス制御
 - **事前計算**: paramsやcontextを使った派生データの計算
 - **条件付きリダイレクト**: 無効な状態での適切な画面遷移
 - **型安全なコンテキスト**: Route.useRouteContext()での型安全なアクセス
 
 **beforeLoad()が不要な場面**:
+
 - 単純なデータフェッチングのみ
 - paramsの値をそのまま使用する場合
 
@@ -197,23 +175,23 @@ export const Route = createFileRoute('/posts/$postId')({
 // コンポーネント内での型安全なAPI使用
 function PostComponent() {
   // Route固有のフック（型安全）
-  const params = Route.useParams()
-  const search = Route.useSearch()
-  const loaderData = Route.useLoaderData()
+  const params = Route.useParams();
+  const search = Route.useSearch();
+  const loaderData = Route.useLoaderData();
 
   // Router全体のフック（fromオプションで型安全性確保）
-  const navigate = useNavigate({ from: Route.fullPath })
+  const navigate = useNavigate({ from: Route.fullPath });
   //useRouter メソッドは、コンテキストから現在の Router インスタンスを返すフックです。このフックは、コンポーネント内の Router インスタンスにアクセスするのに役立ちます。https://tanstack.com/router/latest/docs/framework/react/api/router/useRouterHook
-  const router = useRouter()
+  const router = useRouter();
 
   const handleEdit = () => {
     navigate({
-      to: '/posts/$postId/edit',
-      params: { postId: params.postId }
-    })
-  }
+      to: "/posts/$postId/edit",
+      params: { postId: params.postId },
+    });
+  };
 
-  return <button onClick={handleEdit}>Edit Post</button>
+  return <button onClick={handleEdit}>Edit Post</button>;
 }
 ```
 
@@ -245,33 +223,34 @@ export const Route = createRootRouteWithContext<{
 ### queryClientメソッドの使い分け
 
 ```tsx
-export const Route = createFileRoute('/posts/$postId')({
+export const Route = createFileRoute("/posts/$postId")({
   loader: async ({ context, params }) => {
     // 🎯 ensureQueryData: 既存データがあれば使用、なければ取得
     context.queryClient.ensureQueryData({
-      queryKey: ['post', params.postId],
-      queryFn: () => getPost(params.postId) // createServerFnを指定する
-    })
+      queryKey: ["post", params.postId],
+      queryFn: () => getPost(params.postId), // createServerFnを指定する
+    });
 
     // 🚀 prefetchQuery: バックグラウンドで非同期プリフェッチ
     context.queryClient.prefetchQuery({
-      queryKey: ['related-posts', params.postId],
-      queryFn: () => getRelatedPosts(params.postId)
-    })
+      queryKey: ["related-posts", params.postId],
+      queryFn: () => getRelatedPosts(params.postId),
+    });
 
     // 💾 条件付きでのデータ取得
     if (needsFreshData) {
       await context.queryClient.fetchQuery({
-        queryKey: ['fresh-stats'],
-        queryFn: () => getFreshStats()
-      })
+        queryKey: ["fresh-stats"],
+        queryFn: () => getFreshStats(),
+      });
     }
   },
-  component: PostComponent
-})
+  component: PostComponent,
+});
 ```
 
 **メソッド選択指針**:
+
 - **`ensureQueryData`**: Render-as-you-fetchパターンの基本（`useSuspenseQuery`と組み合わせ）
 - **`prefetchQuery`**: 重要でない追加データのバックグラウンド取得
 - **`fetchQuery`**: 常に最新データが必要な場合
@@ -280,37 +259,38 @@ export const Route = createFileRoute('/posts/$postId')({
 
 ```tsx
 // ✅ TanStack Start推奨: createServerFn
-const getPost = createServerFn({ method: 'GET' })
+const getPost = createServerFn({ method: "GET" })
   .validator(postSelectSchema)
   .handler(async ({ data: postId }) => {
-    return db.select().from(postsTable).where(eq(postsTable.id, postId))
-  })
+    return db.select().from(postsTable).where(eq(postsTable.id, postId));
+  });
 
 // ✅ 通常のfetch（外部API等）
 const fetchExternalData = async (id: string) => {
-  const res = await fetch(`https://api.example.com/posts/${id}`)
-  if (!res.ok) throw new Error('Failed to fetch')
-  return res.json()
-}
+  const res = await fetch(`https://api.example.com/posts/${id}`);
+  if (!res.ok) throw new Error("Failed to fetch");
+  return res.json();
+};
 
 // 混在使用例
 loader: async ({ context, params }) => {
   await Promise.all([
     // サーバー関数でDB取得
     context.queryClient.ensureQueryData({
-      queryKey: ['post', params.postId],
-      queryFn: () => getPost(params.postId)
+      queryKey: ["post", params.postId],
+      queryFn: () => getPost(params.postId),
     }),
     // 外部APIでメタデータ取得
     context.queryClient.ensureQueryData({
-      queryKey: ['external-meta', params.postId],
-      queryFn: () => fetchExternalData(params.postId)
-    })
-  ])
-}
+      queryKey: ["external-meta", params.postId],
+      queryFn: () => fetchExternalData(params.postId),
+    }),
+  ]);
+};
 ```
 
 **Server Functions使用が推奨される理由**:
+
 - **型安全性**: エンドツーエンドの型推論
 - **エラーハンドリング**: リダイレクトや`notFound`の自動処理
 - **バリデーション**: Zodでの入力検証
@@ -320,25 +300,25 @@ loader: async ({ context, params }) => {
 
 ```tsx
 // 基本的なローダーパターン
-export const Route = createFileRoute('/posts')({
+export const Route = createFileRoute("/posts")({
   loader: async ({ context }) => {
     // データを事前に取得してキャッシュ
     context.queryClient.ensureQueryData({
-      queryKey: ['posts'],
-      queryFn: getPosts
-    })
+      queryKey: ["posts"],
+      queryFn: getPosts,
+    });
   },
-  component: PostsComponent
-})
+  component: PostsComponent,
+});
 
 function PostsComponent() {
   // ローダーで取得済みのデータを使用
   const { data: posts } = useSuspenseQuery({
-    queryKey: ['posts'],
-    queryFn: getPosts
-  })
+    queryKey: ["posts"],
+    queryFn: getPosts,
+  });
 
-  return <PostList posts={posts} />
+  return <PostList posts={posts} />;
 }
 ```
 
@@ -346,73 +326,69 @@ function PostsComponent() {
 
 ```tsx
 // 複数データソースの効率的な取得
-export const Route = createFileRoute('/dashboard')({
+export const Route = createFileRoute("/dashboard")({
   loader: async ({ context }) => {
     // 並列でデータを取得
     await Promise.all([
       context.queryClient.ensureQueryData({
-        queryKey: ['user-stats'],
-        queryFn: getUserStats
+        queryKey: ["user-stats"],
+        queryFn: getUserStats,
       }),
       context.queryClient.ensureQueryData({
-        queryKey: ['recent-activity'],
-        queryFn: getRecentActivity
+        queryKey: ["recent-activity"],
+        queryFn: getRecentActivity,
       }),
       context.queryClient.ensureQueryData({
-        queryKey: ['notifications'],
-        queryFn: getNotifications
-      })
-    ])
+        queryKey: ["notifications"],
+        queryFn: getNotifications,
+      }),
+    ]);
   },
-  component: DashboardComponent
-})
+  component: DashboardComponent,
+});
 ```
 
 ### 遅延データローディング（Deferred Loading）
 
 ```tsx
-export const Route = createFileRoute('/posts/$postId')({
+export const Route = createFileRoute("/posts/$postId")({
   loader: async ({ context, params }) => {
     // 重要なデータは即座に取得
     context.queryClient.ensureQueryData({
-      queryKey: ['post', params.postId],
-      queryFn: () => getPost(params.postId)
-    })
+      queryKey: ["post", params.postId],
+      queryFn: () => getPost(params.postId),
+    });
 
     // 重要でないデータはバックグラウンドで取得（await不要）
     context.queryClient.prefetchQuery({
-      queryKey: ['post-analytics', params.postId],
-      queryFn: () => getPostAnalytics(params.postId)
-    })
+      queryKey: ["post-analytics", params.postId],
+      queryFn: () => getPostAnalytics(params.postId),
+    });
   },
-  component: PostComponent
-})
+  component: PostComponent,
+});
 
 function PostComponent() {
-  const params = Route.useParams()
+  const params = Route.useParams();
 
   // 即座に利用可能
   const { data: post } = useSuspenseQuery({
-    queryKey: ['post', params.postId],
-    queryFn: () => getPost(params.postId)
-  })
+    queryKey: ["post", params.postId],
+    queryFn: () => getPost(params.postId),
+  });
 
   // 非同期で取得（エラーハンドリング付き）
   const { data: analytics, isLoading } = useQuery({
-    queryKey: ['post-analytics', params.postId],
-    queryFn: () => getPostAnalytics(params.postId)
-  })
+    queryKey: ["post-analytics", params.postId],
+    queryFn: () => getPostAnalytics(params.postId),
+  });
 
   return (
     <div>
       <h1>{post.title}</h1>
-      {isLoading ? (
-        <div>Loading analytics...</div>
-      ) : (
-        <div>Views: {analytics?.views}</div>
-      )}
+      {isLoading ? <div>Loading analytics...</div> : <div>Views: {analytics?.views}</div>}
     </div>
-  )
+  );
 }
 ```
 
@@ -432,23 +408,25 @@ const appropriateSearchParams = {
   priceRange: z.array(z.number()).optional(),
 
   // 検索・ソート
-  query: z.string().catch(''),
-  sort: z.enum(['newest', 'oldest', 'price']).catch('newest'),
+  query: z.string().catch(""),
+  sort: z.enum(["newest", "oldest", "price"]).catch("newest"),
 
   // 表示設定
-  view: z.enum(['grid', 'list']).catch('grid'),
+  view: z.enum(["grid", "list"]).catch("grid"),
   showFilters: z.boolean().catch(false),
 
   // 条件付きレンダリング
-  tab: z.enum(['all', 'active', 'completed']).catch('all'),
+  tab: z.enum(["all", "active", "completed"]).catch("all"),
   section: z.string().optional(),
-}
+};
 ```
 
 #### **❌ Search Paramsが不適切な状態とは**
 
 例えば以下の状態はSearch Paramsではなく、他の状態管理手法を使用
+
 - 一時的なUI状態 → useState
+
   - モーダル開閉状態
   - ドロップダウンメニュー開閉状態
 
@@ -477,37 +455,31 @@ Search Parametersを使用する前に、以下の条件をすべて満たすか
 // 型安全なSearch Parameters
 const productSearchSchema = z.object({
   page: z.number().catch(1),
-  filter: z.string().catch(''),
-  sort: z.enum(['newest', 'oldest', 'price']).catch('newest')
-})
+  filter: z.string().catch(""),
+  sort: z.enum(["newest", "oldest", "price"]).catch("newest"),
+});
 
-export const Route = createFileRoute('/shop/products')({
+export const Route = createFileRoute("/shop/products")({
   validateSearch: productSearchSchema,
-  component: ProductsComponent
-})
+  component: ProductsComponent,
+});
 
 function ProductsComponent() {
-  const search = Route.useSearch()
-  const navigate = useNavigate({ from: Route.fullPath })
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
 
   const updateSearch = (updates: Partial<typeof search>) => {
     navigate({
-      search: (prev) => ({ ...prev, ...updates })
-    })
-  }
+      search: (prev) => ({ ...prev, ...updates }),
+    });
+  };
 
   return (
     <div>
-      <button onClick={() => updateSearch({ sort: 'price' })}>
-        Sort by Price
-      </button>
-      <ProductList
-        page={search.page}
-        filter={search.filter}
-        sort={search.sort}
-      />
+      <button onClick={() => updateSearch({ sort: "price" })}>Sort by Price</button>
+      <ProductList page={search.page} filter={search.filter} sort={search.sort} />
     </div>
-  )
+  );
 }
 ```
 
@@ -515,15 +487,15 @@ function ProductsComponent() {
 
 ```tsx
 // 親ルートのSearch Parametersを継承
-export const Route = createFileRoute('/shop/products/$productId')({
+export const Route = createFileRoute("/shop/products/$productId")({
   beforeLoad: ({ search }) => {
     // 親の productSearchSchema が自動的に継承される
-    search.page // number
-    search.filter // string
-    search.sort // 'newest' | 'oldest' | 'price'
+    search.page; // number
+    search.filter; // string
+    search.sort; // 'newest' | 'oldest' | 'price'
   },
-  component: ProductDetailComponent
-})
+  component: ProductDetailComponent,
+});
 ```
 
 ### loaderDepsを使った依存関係管理
@@ -532,45 +504,45 @@ export const Route = createFileRoute('/shop/products/$productId')({
 const productSearchSchema = z.object({
   page: z.number().catch(1),
   category: z.string().optional(),
-  sort: z.enum(['price', 'name', 'date']).catch('name')
-})
+  sort: z.enum(["price", "name", "date"]).catch("name"),
+});
 
 // Search Parametersに依存するローダー
-export const Route = createFileRoute('/products')({
+export const Route = createFileRoute("/products")({
   validateSearch: productSearchSchema,
   // Search Parametersの変更時にローダーを再実行する依存関係を定義
   loaderDeps: ({ search }) => ({
     page: search.page,
     category: search.category,
-    sort: search.sort
+    sort: search.sort,
   }),
 
   loader: async ({ context, deps }) => {
     context.queryClient.ensureQueryData({
-      queryKey: ['products', deps], // 依存関係がキーに含まれる
-      queryFn: () => getProducts(deps)
-    })
+      queryKey: ["products", deps], // 依存関係がキーに含まれる
+      queryFn: () => getProducts(deps),
+    });
   },
 
-  component: ProductsComponent
-})
+  component: ProductsComponent,
+});
 
 function ProductsComponent() {
-  const search = Route.useSearch()
+  const search = Route.useSearch();
   const { data: products } = useSuspenseQuery({
-    queryKey: ['products', search],
-    queryFn: () => getProducts(search)
-  })
+    queryKey: ["products", search],
+    queryFn: () => getProducts(search),
+  });
 
-  return <ProductGrid products={products} currentPage={search.page} />
+  return <ProductGrid products={products} currentPage={search.page} />;
 }
 ```
 
 **loaderDepsの重要性**:
+
 - Search Parametersが変更されたときのみローダーを再実行
 - 効率的なキャッシング（deps値ごとに独立したキャッシュ）
 - 無駄なAPI呼び出しを防止
-
 
 ## ⚡ パフォーマンス最適化
 
@@ -578,31 +550,29 @@ function ProductsComponent() {
 
 ```tsx
 // 自動コード分割
-export const Route = createFileRoute('/heavy-page')({
-  component: lazyRouteComponent(() => import('./HeavyPageComponent'))
-})
+export const Route = createFileRoute("/heavy-page")({
+  component: lazyRouteComponent(() => import("./HeavyPageComponent")),
+});
 ```
 
 ### TypeScript パフォーマンス最適化
 
 ```tsx
 // ✅ TypeScript最適化: async/await使用
-export const Route = createFileRoute('/posts/$postId')({
+export const Route = createFileRoute("/posts/$postId")({
   loader: async ({ context, params }) => {
     // Promise<void>として推論され、型チェックが高速化
-    context.queryClient.ensureQueryData(
-      postQueryOptions(params.postId)
-    )
+    context.queryClient.ensureQueryData(postQueryOptions(params.postId));
   },
-  component: PostComponent
-})
+  component: PostComponent,
+});
 
 // ❌ 避けるべき: 複雑な型推論
-export const Route = createFileRoute('/posts/$postId')({
+export const Route = createFileRoute("/posts/$postId")({
   loader: ({ context, params }) =>
     // 複雑な戻り値型の推論で型チェックが遅くなる
-    context.queryClient.ensureQueryData(postQueryOptions(params.postId))
-})
+    context.queryClient.ensureQueryData(postQueryOptions(params.postId)),
+});
 ```
 
 ## 🛠️ エラーハンドリング
@@ -610,23 +580,23 @@ export const Route = createFileRoute('/posts/$postId')({
 ### Route レベルエラーバウンダリ
 
 ```tsx
-export const Route = createFileRoute('/posts/$postId')({
+export const Route = createFileRoute("/posts/$postId")({
   loader: async ({ context, params }) => {
     context.queryClient.ensureQueryData({
-      queryKey: ['post', params.postId],
-      queryFn: () => getPost(params.postId)
-    })
+      queryKey: ["post", params.postId],
+      queryFn: () => getPost(params.postId),
+    });
   },
 
   errorComponent: ({ error }) => {
     if (error instanceof NotFoundError) {
-      return <div>Post not found</div>
+      return <div>Post not found</div>;
     }
-    return <div>Something went wrong</div>
+    return <div>Something went wrong</div>;
   },
 
-  component: PostComponent
-})
+  component: PostComponent,
+});
 ```
 
 ## 📝 実装時の注意点
@@ -651,7 +621,6 @@ export const Route = createFileRoute('/posts/$postId')({
 2. **順序違反**: `loader` を `beforeLoad` より先に定義すると型推論が正しく動作しない
 3. **過度な複雑化**: Search Parametersの過度な使用は保守性を損なう
 
-
-1. **JSXベースの設定**: `<Router><Route /></Router>` パターンは型安全性が失われる
-2. **順序違反**: `loader` を `beforeLoad` より先に定義すると型推論が正しく動作しない
-3. **過度な複雑化**: Search Parametersの過度な使用は保守性を損なう
+4. **JSXベースの設定**: `<Router><Route /></Router>` パターンは型安全性が失われる
+5. **順序違反**: `loader` を `beforeLoad` より先に定義すると型推論が正しく動作しない
+6. **過度な複雑化**: Search Parametersの過度な使用は保守性を損なう

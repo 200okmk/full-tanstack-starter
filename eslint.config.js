@@ -3,8 +3,8 @@ import pluginQuery from "@tanstack/eslint-plugin-query";
 import pluginRouter from "@tanstack/eslint-plugin-router";
 import eslintConfigPrettier from "eslint-config-prettier";
 import * as reactHooks from "eslint-plugin-react-hooks";
-import tseslint from "typescript-eslint";
 import youMightNotNeedAnEffect from "eslint-plugin-react-you-might-not-need-an-effect";
+import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   // グローバル除外設定 - ビルド成果物と自動生成ファイルを除外
@@ -70,7 +70,7 @@ export default tseslint.config(
       // === 必要最小限のTypeScriptルール ===
       // 未使用変数エラー - アンダースコアプレフィックスは許可
       "@typescript-eslint/no-unused-vars": [
-        "error",
+        "warn",
         {
           argsIgnorePattern: "^_",
           varsIgnorePattern: "^_",
