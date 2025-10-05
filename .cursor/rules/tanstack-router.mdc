@@ -6,7 +6,9 @@ alwaysApply: false
 
 # TanStack Router Rule
 
-## 🗂️ ファイルベースルーティング基本指針
+## 🗂️ ファイルベースルーティング
+
+### 基本指針
 
 - **基本的にディレクトリベースで設計**: 基本的にディレクトリを使用してルーティング構造を構築する
 - **共通レイアウト**: 特定のパス配下に共通する処理やUIはLayout Routes（`route.tsx`）に切り出して繰り返しを避ける
@@ -19,14 +21,14 @@ alwaysApply: false
 // ├── __root.tsx          // アプリルートレイアウト
 // ├── index.tsx           // 認証保護されていないランディングホームページ
 // ├── auth/               // 認証関連ページ
-// │   ├── route.tsx       // 認証ページレイアウト
-// │   ├── login.tsx       // ログインページ
-// │   └── signup.tsx      // サインアップページ（ただしOAuth認証やマジックリンク認証のみの場合は無し）
+// │   ├── route.tsx         // 認証ページレイアウト
+// │   ├── login.tsx         // ログインページ
+// │   └── signup.tsx        // サインアップページ（ただしOAuth認証やマジックリンク認証のみの場合は無し）
 // ├── _authenticated/    // 認証保護される全てのページを配下に持ちつつ、URLパスに影響を出さないようににPathless Layoutとする
 // │   ├── route.tsx          // 認証保護処理を実行するレイアウト
 // │   ├── dashboard/         // 保護されたパスの一例
-// │   │   ├── route.tsx      // 共通レイアウト
-// │   │   └── index.tsx      // /dashboardルートページ
+// │   │   ├── route.tsx        // 共通レイアウト
+// │   │   └── index.tsx        // /dashboardルートページ
 // │   ...
 // │
 // └── api/                // API Routes
@@ -41,14 +43,13 @@ alwaysApply: false
 - **認証保護ルートディレクトリの明示**: 認証保護したいルートは `/src/routes/_authenticated`に追加していく
 - **beforeLoad での認証ガード実装**: beforeLoadにてRoot Routeのcontextに追加したsessionUser('session-user')を参照してログインセッションの検証を行う。またユーザーのロールなど追加した場合もここで適宜検証する。
 
-## 🎯 型安全性の確保
-
 ### **beforeLoad()の適切な使用場面**:
 
 - **認証ガード・権限チェック**: ユーザー状態や属性に基づくアクセス制御して適宜リダイレクト処理など
 - **事前計算**: paramsやcontextを使った派生データの計算。コンポーネントからはRoute.useRouteContext()で型安全にアクセス可能
 
 ### **beforeLoad()が不要な場面**:
+
 - 単純なデータフェッチングのみ
 - paramsの値をそのまま使用する場合
 
