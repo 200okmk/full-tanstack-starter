@@ -7,7 +7,7 @@ import { auth } from "~/lib/auth";
 // This is a sample middleware that you can use in your server functions.
 
 /**
- * Server Functionなどにて認証を行い、ユーザーをコンテキストに追加するミドルウェア
+ * Server Function実行時に認証を行い、セッションユーザーをコンテキストに追加するミドルウェア
  */
 export const authMiddleware = createMiddleware().server(async ({ next }) => {
   const request = getWebRequest()!;
@@ -21,9 +21,8 @@ export const authMiddleware = createMiddleware().server(async ({ next }) => {
   });
 
   if (!session) {
-    // エラーではなくログインページにリダイレクト
     throw redirect({
-      to: "/login",
+      to: "/auth/login",
       search: {
         redirect: request.url,
       },
