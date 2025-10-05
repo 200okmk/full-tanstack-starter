@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { GalleryVerticalEnd, LoaderCircle } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
@@ -16,10 +16,11 @@ export const Route = createFileRoute("/auth/login")({
 });
 
 function LoginForm() {
-  // redirectUrlは定数として事前に設定しておいたリダイレクト先(/dashboard)
+  // redirectUrlは定数として事前に設定しておいたリダイレクト先(デフォルトでは `/dashboard`)
   const { redirectUrl, queryClient } = Route.useRouteContext();
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/auth/login" });
+  const router = useRouter();
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -51,6 +52,8 @@ function LoginForm() {
         onSuccess: async () => {
           // Tanstack Queryのキャッシュを無効化
           await queryClient.invalidateQueries({ queryKey: ["session-user"] });
+          // RootのbeforeLoadを再実行してContextを更新
+          await router.invalidate();
           // 元のURLまたはデフォルト値にリダイレクト
           await navigate({ to: search.redirect ?? redirectUrl });
         },

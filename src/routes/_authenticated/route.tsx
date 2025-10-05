@@ -4,51 +4,27 @@ import {
   Outlet,
   redirect,
   useNavigate,
+  useRouter,
 } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
-import { getWebRequest } from "@tanstack/react-start/server";
 import { Button } from "~/components/ui/button";
-import { auth } from "~/lib/auth";
 import { signOut } from "~/lib/auth-client";
-
-export interface SessionUser {
-  id: string;
-  name: string;
-  email: string;
-  emailVerified: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-  image?: string | null | undefined;
-}
-
-const getSessionUser = createServerFn({ method: "GET" }).handler(async () => {
-  const { headers } = getWebRequest()!;
-  const session = await auth.api.getSession({ headers });
-
-  return session?.user ?? null;
-});
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
-  beforeLoad: async ({ context }) => {
-    const sessionUser = await context.queryClient.ensureQueryData<SessionUser | null>({
-      queryKey: ["session-user"],
-      queryFn: () => getSessionUser(),
-    });
-
-    if (!sessionUser) {
+  beforeLoad: ({ context }) => {
+    if (!context.sessionUser) {
       throw redirect({
         to: "/auth/login",
       });
     }
-
-    return { sessionUser };
+    return { sessionUser: context.sessionUser };
   },
 });
 
 function AuthenticatedLayout() {
   const { queryClient, sessionUser } = Route.useRouteContext();
   const navigate = useNavigate();
+  const router = useRouter();
 
   return (
     <div className="flex w-full flex-col items-center justify-center gap-4 rounded-md p-4 outline-2 outline-gray-200">
@@ -75,6 +51,7 @@ function AuthenticatedLayout() {
               await signOut();
               // Tanstack Queryのキャッシュを無効化
               await queryClient.invalidateQueries({ queryKey: ["session-user"] });
+              await router.invalidate();
               void navigate({ to: "/auth/login" });
             })();
           }}

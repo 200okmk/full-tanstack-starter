@@ -10,11 +10,22 @@ import {
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
+import { getSessionUser } from "~/lib/auth-client";
 import appCss from "~/styles/app.css?url";
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
+  sessionUser: Awaited<ReturnType<typeof getSessionUser>>;
 }>()({
+  beforeLoad: async ({ context }) => {
+    const sessionUser = await context.queryClient.ensureQueryData<Awaited<
+      ReturnType<typeof getSessionUser>
+    > | null>({
+      queryKey: ["session-user"],
+      queryFn: () => getSessionUser(),
+    });
+    return { sessionUser };
+  },
   head: () => ({
     meta: [
       {

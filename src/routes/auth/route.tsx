@@ -4,11 +4,13 @@ export const Route = createFileRoute("/auth")({
   component: RouteComponent,
   beforeLoad: ({ context }) => {
     const DEFAULT_REDIRECT_URL = "/dashboard";
+    // セッションユーザーが存在する場合はデフォルトのリダイレクト先へ
     if (context.sessionUser) {
-      throw redirect({
+      redirect({
         to: DEFAULT_REDIRECT_URL,
       });
     }
+    // `/auth`配下でDEFAULT_REDIRECT_URLを使い回すためにcontextに含める
     return {
       redirectUrl: DEFAULT_REDIRECT_URL,
     };
