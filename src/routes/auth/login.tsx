@@ -16,8 +16,8 @@ export const Route = createFileRoute("/auth/login")({
 });
 
 function LoginForm() {
-  // redirectUrlは定数として事前に設定しておいたリダイレクト先(デフォルトでは `/dashboard`)
-  const { redirectUrl, queryClient } = Route.useRouteContext();
+  // defaultRedirectUrlは定数として事前に設定しておいたリダイレクト先(デフォルトでは `/dashboard`)
+  const { defaultRedirectUrl, queryClient } = Route.useRouteContext();
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/auth/login" });
   const router = useRouter();
@@ -42,7 +42,7 @@ function LoginForm() {
         email,
         password,
         // 元のURLまたはデフォルト値を使用
-        callbackURL: search.redirect ?? redirectUrl,
+        callbackURL: search.redirect ?? defaultRedirectUrl,
       },
       {
         onError: (ctx) => {
@@ -55,7 +55,7 @@ function LoginForm() {
           // RootのbeforeLoadを再実行してContextを更新
           await router.invalidate();
           // 元のURLまたはデフォルト値にリダイレクト
-          await navigate({ to: search.redirect ?? redirectUrl });
+          await navigate({ to: search.redirect ?? defaultRedirectUrl });
         },
       },
     );
@@ -120,7 +120,7 @@ function LoginForm() {
                 void signIn.social(
                   {
                     provider: "github",
-                    callbackURL: search.redirect ?? redirectUrl,
+                    callbackURL: search.redirect ?? defaultRedirectUrl,
                   },
                   {
                     onRequest: () => {
@@ -152,7 +152,7 @@ function LoginForm() {
                 void signIn.social(
                   {
                     provider: "google",
-                    callbackURL: search.redirect ?? redirectUrl,
+                    callbackURL: search.redirect ?? defaultRedirectUrl,
                   },
                   {
                     onRequest: () => {

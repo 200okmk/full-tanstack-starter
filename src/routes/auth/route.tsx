@@ -12,7 +12,7 @@ export const Route = createFileRoute("/auth")({
     }
     // `/auth`配下でDEFAULT_REDIRECT_URLを使い回すためにcontextに含める
     return {
-      redirectUrl: DEFAULT_REDIRECT_URL,
+      defaultRedirectUrl: DEFAULT_REDIRECT_URL,
     };
   },
 });

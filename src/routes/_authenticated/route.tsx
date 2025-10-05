@@ -11,10 +11,13 @@ import { signOut } from "~/lib/auth-client";
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
-  beforeLoad: ({ context }) => {
+  beforeLoad: ({ context, location }) => {
     if (!context.sessionUser) {
       throw redirect({
         to: "/auth/login",
+        search: {
+          redirect: location.href,
+        },
       });
     }
     return { sessionUser: context.sessionUser };

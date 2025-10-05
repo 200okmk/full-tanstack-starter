@@ -36,187 +36,21 @@ alwaysApply: false
 //
 ```
 
-## 🔒 認証統合パターン
+## 🔒 認証パターン
 
-### beforeLoad での認証ガード実装
-
-```tsx
-// 基本的な認証ガードパターン
-export const Route = createFileRoute("/protected-route")({
-  beforeLoad: ({ context, location }) => {
-    // 1. 認証状態チェック
-    if (!context.sessionUser) {
-      throw redirect({
-        to: "/login",
-        search: {
-          // 認証後に元のページに戻るためのリダイレクトURL
-          redirect: location.href,
-        },
-      });
-    }
-
-    // 2. 必要に応じて権限チェックなどもする
-    if (!context.sessionUser.roles?.includes("admin")) {
-      throw redirect({ to: "/unauthorized" });
-    }
-
-    // 3. 追加のコンテキスト提供
-    return {
-      userPermissions: getUserPermissions(context.sessionUser),
-    };
-  },
-  component: ProtectedComponent,
-});
-```
+- **認証保護ルートディレクトリの明示**: 認証保護したいルートは `/src/routes/_authenticated`に追加していく
+- **beforeLoad での認証ガード実装**: beforeLoadにてRoot Routeのcontextに追加したsessionUser('session-user')を参照してログインセッションの検証を行う。またユーザーのロールなど追加した場合もここで適宜検証する。
 
 ## 🎯 型安全性の確保
 
-### createFileRoute の正しい使用法
+### **beforeLoad()の適切な使用場面**:
 
-```tsx
-// ✅ パターン1: 認証チェックのみ（シンプルなケース）
-export const Route = createFileRoute("/posts/$postId")({
-  beforeLoad: ({ context }) => {
-    if (!context.sessionUser) {
-      throw redirect({ to: "/login" });
-    }
-    // 認証チェックのみの場合は何も返さない
-  },
+- **認証ガード・権限チェック**: ユーザー状態や属性に基づくアクセス制御して適宜リダイレクト処理など
+- **事前計算**: paramsやcontextを使った派生データの計算。コンポーネントからはRoute.useRouteContext()で型安全にアクセス可能
 
-  loader: async ({ params }) => {
-    // paramsは直接使用可能
-    context.queryClient.ensureQueryData({
-      queryKey: ["post", params.postId],
-      queryFn: () => getPost(params.postId),
-    });
-  },
-
-  component: PostComponent,
-});
-
-// ✅ パターン2: 権限チェックと事前計算が必要なケース
-export const Route = createFileRoute("/posts/$postId/edit")({
-  beforeLoad: ({ params, context }) => {
-    if (!context.sessionUser) {
-      throw redirect({ to: "/login" });
-    }
-
-    // 実際に意味のある事前計算
-    const userRole = context.sessionUser.role;
-    const canEditPost = userRole === "admin" || userRole === "editor";
-
-    if (!canEditPost) {
-      throw redirect({ to: "/posts/$postId", params: { postId: params.postId } });
-    }
-
-    return {
-      canEditPost,
-      userRole,
-      editPermissions: getEditPermissions(userRole),
-    };
-  },
-
-  loader: async ({ params, context }) => {
-    // beforeLoadの結果とparamsの両方を使用
-    await Promise.all([
-      context.queryClient.ensureQueryData({
-        queryKey: ["post", params.postId],
-        queryFn: () => getPost(params.postId),
-      }),
-      // 編集権限がある場合のみ追加データを取得
-      context.canEditPost &&
-        context.queryClient.ensureQueryData({
-          queryKey: ["post-edit-data", params.postId],
-          queryFn: () => getPostEditData(params.postId),
-        }),
-    ]);
-  },
-
-  component: PostEditComponent,
-});
-
-function PostEditComponent() {
-  const params = Route.useParams(); // { postId: string }
-  const { canEditPost, editPermissions } = Route.useRouteContext();
-
-  return (
-    <div>
-      <h1>Edit Post: {params.postId}</h1>
-      {editPermissions.canChangeTitle && <input placeholder="Title" />}
-      {editPermissions.canPublish && <button>Publish</button>}
-    </div>
-  );
-}
-
-// ✅ パターン3: データフェッチングのみ（beforeLoad不要）
-export const Route = createFileRoute("/posts/$postId")({
-  loader: async ({ params }) => {
-    return getPost(params.postId);
-  },
-  component: PostComponent,
-});
-```
-
-**beforeLoad()を使うべき場面**:
-
-- **認証・権限チェック**: ユーザー状態に基づくアクセス制御
-- **事前計算**: paramsやcontextを使った派生データの計算
-- **条件付きリダイレクト**: 無効な状態での適切な画面遷移
-- **型安全なコンテキスト**: Route.useRouteContext()での型安全なアクセス
-
-**beforeLoad()が不要な場面**:
-
+### **beforeLoad()が不要な場面**:
 - 単純なデータフェッチングのみ
 - paramsの値をそのまま使用する場合
-
-### Route API の型安全活用
-
-```tsx
-// コンポーネント内での型安全なAPI使用
-function PostComponent() {
-  // Route固有のフック（型安全）
-  const params = Route.useParams();
-  const search = Route.useSearch();
-  const loaderData = Route.useLoaderData();
-
-  // Router全体のフック（fromオプションで型安全性確保）
-  const navigate = useNavigate({ from: Route.fullPath });
-  //useRouter メソッドは、コンテキストから現在の Router インスタンスを返すフックです。このフックは、コンポーネント内の Router インスタンスにアクセスするのに役立ちます。https://tanstack.com/router/latest/docs/framework/react/api/router/useRouterHook
-  const router = useRouter();
-
-  const handleEdit = () => {
-    navigate({
-      to: "/posts/$postId/edit",
-      params: { postId: params.postId },
-    });
-  };
-
-  return <button onClick={handleEdit}>Edit Post</button>;
-}
-```
-
-### Context型安全性の実装
-
-```tsx
-// src/routes/__root.tsx
-import { createRootRouteWithContext } from '@tanstack/react-router'
-import type { QueryClient } from '@tanstack/react-query'
-
-export const Route = createRootRouteWithContext<{
-  queryClient: QueryClient;
-  sessionUser: Awaited<ReturnType<typeof getSessionUser>>;
-}>()({
-  beforeLoad: async ({ context }) => {
-    const sessionUser = await context.queryClient.fetchQuery({
-      queryKey: ["session-user"],
-      queryFn: ({ signal }) => getSessionUser({ signal }),
-    }); // キャッシュにTanstack Queryを使用, router.tsxを参照
-    return { sessionUser };
-  },
-  head: () => ({...}),
-  component: RootComponent,
-})
-```
 
 ## 📊 データローディング戦略
 
