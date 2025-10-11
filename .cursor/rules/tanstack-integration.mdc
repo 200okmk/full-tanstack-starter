@@ -1,8 +1,7 @@
 ---
-description: TanStack Start・Router・Queryの3つのライブラリを統合した現代的なフルスタックReactアプリケーションの実装パターンを定義します。Render-as-you-fetchパターンの徹底、型安全性の確保、パフォーマンス最適化を重視した設計戦略を採用します。
-globs:
-alwaysApply: true
+alwaysApply: false
 ---
+
 # TanStack Integration Rule
 
 ## 🏗️ 基本統合設定
@@ -11,14 +10,14 @@ alwaysApply: true
 
 ```tsx
 // src/router.tsx
-import { createRouter as createTanStackRouter } from '@tanstack/react-router'
-import { QueryClient } from '@tanstack/react-query'
-import { routeTree } from './routeTree.gen'
+import { createRouter as createTanStackRouter } from "@tanstack/react-router";
+import { QueryClient } from "@tanstack/react-query";
+import { routeTree } from "./routeTree.gen";
 
 // 型安全なコンテキスト定義
 export interface RouterContext {
-  queryClient: QueryClient
-  user: User | null
+  queryClient: QueryClient;
+  user: User | null;
 }
 
 export function createRouter() {
@@ -30,7 +29,7 @@ export function createRouter() {
         experimental_prefetchInRender: true, // React 19対応
       },
     },
-  })
+  });
 
   return createTanStackRouter({
     routeTree,
@@ -38,9 +37,9 @@ export function createRouter() {
       queryClient,
       user: null, // 初期値、後でbeforeLoadで設定
     } satisfies RouterContext,
-    defaultPreload: 'intent',
+    defaultPreload: "intent",
     defaultPreloadStaleTime: 0,
-  })
+  });
 }
 ```
 
@@ -167,50 +166,46 @@ function RootDocument({ children }: { readonly children: React.ReactNode }) {
 
 ```tsx
 // 推奨：ensureQueryData + useSuspenseQuery
-export const Route = createFileRoute('/posts/$postId')({
+export const Route = createFileRoute("/posts/$postId")({
   loader: async ({ context, params }) => {
     // ★ 重要なデータは確実に取得してからレンダリング
     context.queryClient.ensureQueryData({
-      queryKey: ['post', params.postId],
+      queryKey: ["post", params.postId],
       queryFn: () => getPost(params.postId), // createServerFn
-    })
+    });
 
     // ★ 非重要なデータはバックグラウンドでプリフェッチ
     context.queryClient.prefetchQuery({
-      queryKey: ['post-comments', params.postId],
+      queryKey: ["post-comments", params.postId],
       queryFn: () => getPostComments(params.postId),
-    })
+    });
   },
   component: PostComponent,
-})
+});
 
 function PostComponent() {
-  const params = Route.useParams()
+  const params = Route.useParams();
 
   // loaderで取得済み - 即座に利用可能
   const { data: post } = useSuspenseQuery({
-    queryKey: ['post', params.postId],
+    queryKey: ["post", params.postId],
     queryFn: () => getPost(params.postId),
-  })
+  });
 
   // プリフェッチ済み、またはクライアントで取得
   const { data: comments, isLoading } = useQuery({
-    queryKey: ['post-comments', params.postId],
+    queryKey: ["post-comments", params.postId],
     queryFn: () => getPostComments(params.postId),
-  })
+  });
 
   return (
     <article>
       <h1>{post.title}</h1>
       <div>{post.content}</div>
 
-      {isLoading ? (
-        <CommentsSkeleton />
-      ) : (
-        <CommentsList comments={comments} />
-      )}
+      {isLoading ? <CommentsSkeleton /> : <CommentsList comments={comments} />}
     </article>
-  )
+  );
 }
 ```
 
@@ -218,32 +213,32 @@ function PostComponent() {
 
 ```tsx
 // 複数データソースの効率的な並列取得
-export const Route = createFileRoute('/dashboard')({
+export const Route = createFileRoute("/dashboard")({
   loader: async ({ context }) => {
     // ★ Promise.allで並列実行 - ウォーターフォール回避
     await Promise.all([
       context.queryClient.ensureQueryData({
-        queryKey: ['user-profile'],
+        queryKey: ["user-profile"],
         queryFn: getUserProfile,
       }),
       context.queryClient.ensureQueryData({
-        queryKey: ['user-stats'],
+        queryKey: ["user-stats"],
         queryFn: getUserStats,
       }),
       context.queryClient.ensureQueryData({
-        queryKey: ['recent-activity'],
+        queryKey: ["recent-activity"],
         queryFn: getRecentActivity,
       }),
-    ])
+    ]);
 
     // 非重要なデータは非同期でプリフェッチ
     context.queryClient.prefetchQuery({
-      queryKey: ['recommendations'],
+      queryKey: ["recommendations"],
       queryFn: getRecommendations,
-    })
+    });
   },
   component: DashboardComponent,
-})
+});
 ```
 
 ### Server Functions統合パターン
@@ -266,7 +261,7 @@ import {
 import { authMiddleware } from "~/lib/middlewares";
 
 export const getPostWithMetrics = createServerFn({
-  method: 'GET',
+  method: "GET",
 })
   .validator(postSelectSchema.pick({ id: true })) // ✅ schema.tsのスキーマ使用
   .handler(async ({ data: { id: postId } }) => {
@@ -276,40 +271,38 @@ export const getPostWithMetrics = createServerFn({
       db.select().from(postsTable).where(eq(postsTable.id, postId)),
 
       // メトリクスの集計
-      db.select({
-        commentCount: count(commentsTable.id),
-      })
+      db
+        .select({
+          commentCount: count(commentsTable.id),
+        })
         .from(commentsTable)
         .where(eq(commentsTable.postId, postId)),
 
       // 関連投稿
-      db.select()
-        .from(postsTable)
-        .where(ne(postsTable.id, postId))
-        .limit(3),
-    ])
+      db.select().from(postsTable).where(ne(postsTable.id, postId)).limit(3),
+    ]);
 
     return {
       post: post[0],
       metrics: metrics[0],
       relatedPosts,
-    }
-  })
+    };
+  });
 
 // ルートでの使用
-export const Route = createFileRoute('/posts/$postId')({
+export const Route = createFileRoute("/posts/$postId")({
   loader: async ({ context, params }) => {
     context.queryClient.ensureQueryData({
-      queryKey: ['post-with-metrics', params.postId],
+      queryKey: ["post-with-metrics", params.postId],
       queryFn: () => getPostWithMetrics({ id: parseInt(params.postId) }),
-    })
+    });
   },
   component: () => {
-    const params = Route.useParams()
+    const params = Route.useParams();
     const { data } = useSuspenseQuery({
-      queryKey: ['post-with-metrics', params.postId],
+      queryKey: ["post-with-metrics", params.postId],
       queryFn: () => getPostWithMetrics({ id: parseInt(params.postId) }),
-    })
+    });
 
     return (
       <PostDetail
@@ -317,9 +310,9 @@ export const Route = createFileRoute('/posts/$postId')({
         metrics={data.metrics}
         relatedPosts={data.relatedPosts}
       />
-    )
+    );
   },
-})
+});
 ```
 
 ## 📊 状態管理統合戦略
@@ -329,6 +322,7 @@ export const Route = createFileRoute('/posts/$postId')({
 TanStack Startプロジェクトでは、以下4つの状態管理手法で**95%以上のケースをカバー**し、複雑な専用状態管理ライブラリ（Zustand等）への依存を最小限に抑えます。
 
 #### **1. Search Params (TanStack Router)** - 共有可能・永続的な状態
+
 ```tsx
 // ✅ 適用場面
 - ページネーション（page, limit）
@@ -340,6 +334,7 @@ TanStack Startプロジェクトでは、以下4つの状態管理手法で**95%
 ```
 
 #### **2. TanStack Query** - サーバー状態・キャッシュ管理
+
 ```tsx
 // ✅ 適用場面
 - データベースから取得するすべてのデータ
@@ -349,6 +344,7 @@ TanStack Startプロジェクトでは、以下4つの状態管理手法で**95%
 ```
 
 #### **3. useState/useReducer** - ローカル状態・一時的UI状態
+
 ```tsx
 // ✅ 適用場面
 - 一時的なUI状態（modal open/close, dropdown状態）
@@ -358,6 +354,7 @@ TanStack Startプロジェクトでは、以下4つの状態管理手法で**95%
 ```
 
 #### **4. React Context** - 軽量なグローバル状態
+
 ```tsx
 // ✅ 適用場面
 - アプリケーション設定（theme, language）
@@ -394,39 +391,39 @@ interface ComplexClientState {
 
 ```tsx
 // 認証ミドルウェアと統合
-export const Route = createFileRoute('/dashboard')({
+export const Route = createFileRoute("/dashboard")({
   beforeLoad: ({ context, location }) => {
     // ルートレベルで認証済みユーザー情報を確認
     if (!context.sessionUser) {
       throw redirect({
-        to: '/login',
+        to: "/login",
         search: { redirect: location.href },
-      })
+      });
     }
 
     // 追加の認証情報を事前計算
     return {
       userPermissions: getUserPermissions(context.sessionUser),
-      canAccessAdmin: context.sessionUser.role === 'admin',
-    }
+      canAccessAdmin: context.sessionUser.role === "admin",
+    };
   },
 
   loader: async ({ context }) => {
     // 認証済み前提でデータを並列取得
     await Promise.all([
       context.queryClient.ensureQueryData({
-        queryKey: ['user-dashboard'],
+        queryKey: ["user-dashboard"],
         queryFn: () => getUserDashboard(context.sessionUser.id),
       }),
       context.queryClient.ensureQueryData({
-        queryKey: ['user-notifications'],
+        queryKey: ["user-notifications"],
         queryFn: () => getUserNotifications(context.sessionUser.id),
       }),
-    ])
+    ]);
   },
 
   component: DashboardComponent,
-})
+});
 ```
 
 ### データ変更時のクエリ管理
@@ -436,10 +433,10 @@ export const Route = createFileRoute('/dashboard')({
 import { userUpdateSchema, usersTable } from "~/db/schema"; // ✅ schema.tsからインポート
 
 export const updateUserProfile = createServerFn({
-  method: 'POST',
+  method: "POST",
 })
   .validator(userUpdateSchema.pick({ name: true, image: true })) // ✅ schema.tsのスキーマ使用
-  .middleware([authMiddleware])  // ✅ 認証ミドルウェア必須適用
+  .middleware([authMiddleware]) // ✅ 認証ミドルウェア必須適用
   .handler(async ({ data, context }) => {
     // context.sessionUserは認証済み保証（ミドルウェアで確認済み）
 
@@ -447,59 +444,58 @@ export const updateUserProfile = createServerFn({
       .update(usersTable) // ✅ 正しいテーブル名
       .set({ ...data, updatedAt: new Date() })
       .where(eq(usersTable.id, context.sessionUser.id))
-      .returning()
+      .returning();
 
-    return updatedUser
-  })
+    return updatedUser;
+  });
 
 // クライアントサイドでの使用
 function ProfileUpdateForm() {
-  const queryClient = useQueryClient()
-  const navigate = useNavigate()
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const updateProfileMutation = useMutation({
     mutationFn: updateUserProfile,
     onSuccess: (updatedUser) => {
       // ★ 関連するユーザーデータキャッシュを無効化
-      queryClient.invalidateQueries({ queryKey: ['user', updatedUser.id] })
-      queryClient.invalidateQueries({ queryKey: ['user-profile'] })
-      queryClient.invalidateQueries({ queryKey: ['session-user'] }) // セッション状態も更新
+      queryClient.invalidateQueries({ queryKey: ["user", updatedUser.id] });
+      queryClient.invalidateQueries({ queryKey: ["user-profile"] });
+      queryClient.invalidateQueries({ queryKey: ["session-user"] }); // セッション状態も更新
 
       // ★ 楽観的更新でユーザー情報をすぐに反映
-      queryClient.setQueryData(['session-user'], (oldSession: any) =>
-        oldSession ? { ...oldSession, user: updatedUser } : oldSession
-      )
+      queryClient.setQueryData(["session-user"], (oldSession: any) =>
+        oldSession ? { ...oldSession, user: updatedUser } : oldSession,
+      );
 
       // ★ Router全体の状態リフレッシュ（必須）
-      router.invalidate()
+      router.invalidate();
 
       // ★ プロフィールページにリダイレクト
-      navigate({ to: '/profile' })
+      navigate({ to: "/profile" });
     },
     onError: (error) => {
-      console.error('Profile update failed:', error)
+      console.error("Profile update failed:", error);
     },
-  })
+  });
 
   return (
-    <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
-      e.preventDefault()
-      const formData = new FormData(e.target)
-      updateProfileMutation.mutate({
-        name: formData.get('name') as string,
-        bio: formData.get('bio') as string,
-      })
-    }}>
+    <form
+      onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        updateProfileMutation.mutate({
+          name: formData.get("name") as string,
+          bio: formData.get("bio") as string,
+        });
+      }}
+    >
       <input name="name" placeholder="Name" required />
       <textarea name="bio" placeholder="Bio" />
-      <button
-        type="submit"
-        disabled={updateProfileMutation.isPending}
-      >
-        {updateProfileMutation.isPending ? 'Updating...' : 'Update Profile'}
+      <button type="submit" disabled={updateProfileMutation.isPending}>
+        {updateProfileMutation.isPending ? "Updating..." : "Update Profile"}
       </button>
     </form>
-  )
+  );
 }
 ```
 
@@ -507,10 +503,10 @@ function ProfileUpdateForm() {
 
 ```tsx
 // ユーザー権限に基づく条件付きデータ取得
-export const Route = createFileRoute('/admin')({
+export const Route = createFileRoute("/admin")({
   beforeLoad: ({ context }) => {
     if (!context.sessionUser?.isAdmin) {
-      throw redirect({ to: '/dashboard' })
+      throw redirect({ to: "/dashboard" });
     }
   },
 
@@ -518,18 +514,18 @@ export const Route = createFileRoute('/admin')({
     // 管理者のみがアクセス可能なデータ
     await Promise.all([
       context.queryClient.ensureQueryData({
-        queryKey: ['admin-stats'],
+        queryKey: ["admin-stats"],
         queryFn: getAdminStats,
       }),
       context.queryClient.ensureQueryData({
-        queryKey: ['user-management'],
+        queryKey: ["user-management"],
         queryFn: getUserManagement,
       }),
-    ])
+    ]);
   },
 
   component: AdminComponent,
-})
+});
 ```
 
 ## ⚡ パフォーマンス最適化
@@ -559,27 +555,27 @@ function DashboardPage() {
         <OptionalDashboardData />
       </Suspense>
     </div>
-  )
+  );
 }
 
 // 重要なデータコンポーネント
 function CriticalDashboardData() {
   const { data: profile } = useSuspenseQuery({
-    queryKey: ['user-profile'],
+    queryKey: ["user-profile"],
     queryFn: getUserProfile,
-  })
+  });
 
   const { data: stats } = useSuspenseQuery({
-    queryKey: ['user-stats'],
+    queryKey: ["user-stats"],
     queryFn: getUserStats,
-  })
+  });
 
   return (
     <div className="grid grid-cols-2">
       <UserProfileCard profile={profile} />
       <UserStatsCard stats={stats} />
     </div>
-  )
+  );
 }
 ```
 
@@ -590,38 +586,42 @@ function CriticalDashboardData() {
 import { postInsertSchema, postsTable } from "~/db/schema"; // ✅ schema.tsからインポート
 
 export const createPost = createServerFn({
-  method: 'POST',
+  method: "POST",
 })
   .validator(postInsertSchema.omit({ userId: true, id: true })) // ✅ schema.tsのスキーマ使用
-  .middleware([authMiddleware])  // ✅ 認証ミドルウェア必須適用
+  .middleware([authMiddleware]) // ✅ 認証ミドルウェア必須適用
   .handler(async ({ data, context }) => {
-    const [newPost] = await db.insert(postsTable).values({
-      ...data,
-      userId: context.sessionUser.id,
-    }).returning()
+    const [newPost] = await db
+      .insert(postsTable)
+      .values({
+        ...data,
+        userId: context.sessionUser.id,
+      })
+      .returning();
 
-    return newPost
-  })
+    return newPost;
+  });
 
 // クライアントサイドでの使用
 function CreatePostForm() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   const createPostMutation = useMutation({
     mutationFn: createPost,
     onSuccess: (newPost) => {
       // ★ 関連するクエリを効率的に無効化
-      queryClient.invalidateQueries({ queryKey: ['posts'] })
-      queryClient.invalidateQueries({ queryKey: ['user-posts'] })
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+      queryClient.invalidateQueries({ queryKey: ["user-posts"] });
 
       // ★ 新しい投稿を既存キャッシュに楽観的に追加
-      queryClient.setQueryData(['posts'], (oldPosts: Post[]) =>
-        [newPost, ...(oldPosts || [])]
-      )
+      queryClient.setQueryData(["posts"], (oldPosts: Post[]) => [
+        newPost,
+        ...(oldPosts || []),
+      ]);
     },
-  })
+  });
 
-  return <PostForm onSubmit={createPostMutation.mutate} />
+  return <PostForm onSubmit={createPostMutation.mutate} />;
 }
 ```
 
@@ -637,17 +637,20 @@ function CreatePostForm() {
 ```tsx
 // 実装例：ログイン処理
 const handleLogin = () => {
-  void signIn.email({ email, password }, {
-    onSuccess: async () => {
-      // ✅ 必須：セッション状態の無効化
-      await queryClient.invalidateQueries({ queryKey: ["session-user"] })
-      // ✅ 必須：ルータ状態の無効化
-      await router.invalidate()
-      // ナビゲーション
-      await navigate({ to: redirectUrl })
-    }
-  })
-}
+  void signIn.email(
+    { email, password },
+    {
+      onSuccess: async () => {
+        // ✅ 必須：セッション状態の無効化
+        await queryClient.invalidateQueries({ queryKey: ["session-user"] });
+        // ✅ 必須：ルータ状態の無効化
+        await router.invalidate();
+        // ナビゲーション
+        await navigate({ to: redirectUrl });
+      },
+    },
+  );
+};
 ```
 
 ### **データ変更Mutation（CRUD操作）**
@@ -655,28 +658,29 @@ const handleLogin = () => {
 ```tsx
 // データ変更後のキャッシュ無効化パターン
 function CreatePostForm() {
-  const queryClient = useQueryClient()
-  const router = useRouter()
+  const queryClient = useQueryClient();
+  const router = useRouter();
 
   const createPostMutation = useMutation({
     mutationFn: createPost,
     onSuccess: (newPost) => {
       // 関連するクエリキーを全て無効化
-      queryClient.invalidateQueries({ queryKey: ['posts'] })
-      queryClient.invalidateQueries({ queryKey: ['user-posts'] })
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+      queryClient.invalidateQueries({ queryKey: ["user-posts"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
 
       // 楽観的更新（任意）
-      queryClient.setQueryData(['posts'], (oldPosts: Post[]) =>
-        [newPost, ...(oldPosts || [])]
-      )
+      queryClient.setQueryData(["posts"], (oldPosts: Post[]) => [
+        newPost,
+        ...(oldPosts || []),
+      ]);
 
       // ルートデータに影響する場合はrouter.invalidate()も実行
-      router.invalidate()
-    }
-  })
+      router.invalidate();
+    },
+  });
 
-  return <PostForm onSubmit={createPostMutation.mutate} />
+  return <PostForm onSubmit={createPostMutation.mutate} />;
 }
 ```
 
@@ -685,16 +689,16 @@ function CreatePostForm() {
 ```tsx
 // ❌ 認証後にrouter.invalidate()なし - 認証状態がルートに反映されない
 onSuccess: async () => {
-  await queryClient.invalidateQueries({ queryKey: ["session-user"] })
+  await queryClient.invalidateQueries({ queryKey: ["session-user"] });
   // router.invalidate() が抜けている！
-  await navigate({ to: '/dashboard' })
-}
+  await navigate({ to: "/dashboard" });
+};
 
 // ❌ 楽観的更新のみでinvalidateしない - キャッシュが古くなる
 onSuccess: (newData) => {
-  queryClient.setQueryData(['data'], newData)
+  queryClient.setQueryData(["data"], newData);
   // invalidateQueries が抜けている！
-}
+};
 ```
 
 ## 🎯 エラーハンドリング統合
@@ -703,17 +707,17 @@ onSuccess: (newData) => {
 
 ```tsx
 // Route レベルエラーハンドリング
-export const Route = createFileRoute('/posts/$postId')({
+export const Route = createFileRoute("/posts/$postId")({
   loader: async ({ context, params }) => {
     context.queryClient.ensureQueryData({
-      queryKey: ['post', params.postId],
+      queryKey: ["post", params.postId],
       queryFn: () => getPost(params.postId),
-    })
+    });
   },
 
   errorComponent: ({ error, reset }) => {
     if (error.status === 404) {
-      return <PostNotFound />
+      return <PostNotFound />;
     }
 
     return (
@@ -722,49 +726,46 @@ export const Route = createFileRoute('/posts/$postId')({
         <p>{error.message}</p>
         <button onClick={reset}>Try again</button>
       </div>
-    )
+    );
   },
 
   component: PostComponent,
-})
+});
 ```
 
 ### Server Function エラーハンドリング
 
 ```tsx
 // ✅ エラーレスポンスの標準化（schema.ts完全準拠）
-import { setResponseStatus } from '@tanstack/react-start/server';
+import { setResponseStatus } from "@tanstack/react-start/server";
 import { postSelectSchema, postsTable } from "~/db/schema"; // ✅ schema.tsからインポート
 
 export const getPost = createServerFn({
-  method: 'GET',
+  method: "GET",
 })
   .validator(postSelectSchema.pick({ id: true })) // ✅ schema.tsのスキーマ使用
   .handler(async ({ data: { id: postId } }) => {
     try {
-      const [post] = await db
-        .select()
-        .from(postsTable)
-        .where(eq(postsTable.id, postId))
+      const [post] = await db.select().from(postsTable).where(eq(postsTable.id, postId));
 
       if (!post) {
-        setResponseStatus(404)
-        throw new Error('Post not found')
+        setResponseStatus(404);
+        throw new Error("Post not found");
       }
 
-      return post
+      return post;
     } catch (error) {
       // ログ記録
-      console.error('Failed to fetch post:', error)
+      console.error("Failed to fetch post:", error);
 
-      if (error.message === 'Post not found') {
-        throw error
+      if (error.message === "Post not found") {
+        throw error;
       }
 
-      setResponseStatus(500)
-      throw new Error('Failed to fetch post')
+      setResponseStatus(500);
+      throw new Error("Failed to fetch post");
     }
-  })
+  });
 ```
 
 ## 🔧 開発・デバッグ戦略

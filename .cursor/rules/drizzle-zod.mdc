@@ -1,8 +1,6 @@
 ---
-description: Drizzle ORM・drizzle-zod統合による現代的なデータベース操作パターンを定義します。Single Source of Truthの徹底実現、型安全性の確保、TanStack Start Server Functions統合を重視した設計戦略を採用します。
-alwaysApply: true
+alwaysApply: false
 ---
-
 # Drizzle Zod Rule
 
 ## 🛡️ drizzle-zod統合戦略（schema.ts を Single Source of Truth としてZodスキーマ定義とTS型生成も管理する。コードベース全体でそれらをimportして使用することで独自定義を避ける。）

@@ -35,7 +35,7 @@ src/
 │   ├── schema.ts            # Drizzleスキーマ
 │   ├── seed.ts              # DBシード
 │   └── index.ts             # DBインスタンス設定
-│── data-access/              # Drizzleスキーマで定義したEntityごとにCRUD操作ServerFunctionsをまとめる
+│── data-access/              # Drizzleスキーマで定義したEntity（テーブル）ごとにファイルを作成し、CRUD操作するServerFunctionsを定義する
 │   ├── users.ts              # ユーザー関連CRUD
 │   ├── comments.ts           # エンティティ関連CRUD
 │   └── posts.tsx             # エンティティ関連CRUD

@@ -11,8 +11,9 @@ export function createRouter() {
     defaultOptions: {
       queries: {
         refetchOnWindowFocus: false,
-        // TanStack Routerのデフォルト設定（下記 ”defaultPreloadStaleTime”）を上書き
+        // サーバー上でプリフェッチを行う場合は、各プリフェッチ呼び出しに特定の staleTime を渡す必要がないように、TanStack Routerのデフォルト設定（下記 ”defaultPreloadStaleTime”）を上書きして 0 より大きく設定する（https://tanstack.com/query/latest/docs/framework/react/guides/prefetching#prefetchquery--prefetchinfinitequery）。
         staleTime: 1000 * 60, // 1 minute
+        experimental_prefetchInRender: true, // React19のuse()APIに対応
       },
     },
   });

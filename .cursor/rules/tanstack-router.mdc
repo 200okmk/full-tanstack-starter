@@ -48,182 +48,212 @@ alwaysApply: false
 - **認証ガード・権限チェック**: ユーザー状態や属性に基づくアクセス制御して適宜リダイレクト処理など
 - **事前計算**: paramsやcontextを使った派生データの計算。コンポーネントからはRoute.useRouteContext()で型安全にアクセス可能
 
-### **beforeLoad()が不要な場面**:
+## 📊 データフェッチ戦略
 
-- 単純なデータフェッチングのみ
-- paramsの値をそのまま使用する場合
+### 基本方針
 
-## 📊 データローディング戦略
+- 親コンポーネント全体のUIレンダリングをブロックしないようなストリーミングUIの実現を原則とする（”Render-as-you-fetch”パターン）。すなわち、非同期処理が必要な部分のUIは必ず`Suspense`でラップしてフォールバックUIが表示されるようにし、それ以外のデータに依存しない静的な部分のUIは即座に表示する。
+- アプリ全体を通して、データキャッシュは TanStack Query で統一的に管理する。
+- アプリ全体を通して、非同期状態は原則としてReactの `Suspense` で管理する。
 
-### queryClientメソッドの使い分け
+### 遵守すべき重要な実装ポイント
 
-```tsx
-export const Route = createFileRoute("/posts/$postId")({
-  loader: async ({ context, params }) => {
-    // 🎯 ensureQueryData: 既存データがあれば使用、なければ取得
-    context.queryClient.ensureQueryData({
-      queryKey: ["post", params.postId],
-      queryFn: () => getPost(params.postId), // createServerFnを指定する
-    });
+- **loaderのプリフェッチにてasync/awaitを使用しない**: loader での非同期データフェッチによって静的な部分のUIまでも表示がブロックされることのないように、`ensureQueryData`プリフェッチは絶対に await せずに使用する。このRouteにインポートされる子コンポーネントが使用する付随情報のプリフェッチもコールする。Promise.allは使用しない。
+- **`pendingComponent`は使用せず`Suspense`を使用する**: Routeの`pendingComponent`は、非同期処理中にそのRoute全体の表示が保留された場合のフォールバックUIを指定するものであるが、根本的にそうならないよう実装することが基本方針なためこれは使用しない。代わりに非同期データフェッチが必要な部分のUIに対しては必ずReactの`Suspense`でラップする。
+- **子コンポーネント内で`useSuspenseQuery`を使用してフェッチしたデータにアクセスする**: 非同期データに依存する子コンポーネント（Routeの`component`に指定していないもの）は`Suspense`でラップされるためローディング状態は宣言的にReactが管理している。ちなみに `useSuspenseQuery` ではフェッチしたデータが定義されることが保証されているためOptional Chainingによるfalsyチェックは必要ない。
+- **`queryOptions()`を使用して再利用性を高める**: `queryKey`, `queryFn`を繰り返し記述しないために使用する。原則`queryFn`に指定されている非同期関数と同じファイル上にコロケーションする。
+- **関連する子コンポーネントはコロケーションする**: 親コンポーネントにインポートされた関連する子コンポーネントは、URLパスに表出しないコンポーネントフォルダ（`-components/`）内にコロケーションする。
+- **フォールバックUIを実装する**: Shadcn/uiの[`Skeleton`コンポーネント](https://ui.shadcn.com/docs/components/skeleton)などを使用して、`Suspense`でラップした子コンポーネント向けのフォールバックUIを実装する。非同期処理解決後に実際にストリーミングされるUIのデザインをおおまかに再現する。
 
-    // 🚀 prefetchQuery: バックグラウンドで非同期プリフェッチ
-    context.queryClient.prefetchQuery({
-      queryKey: ["related-posts", params.postId],
-      queryFn: () => getRelatedPosts(params.postId),
-    });
+### コード例
 
-    // 💾 条件付きでのデータ取得
-    if (needsFreshData) {
-      await context.queryClient.fetchQuery({
-        queryKey: ["fresh-stats"],
-        queryFn: () => getFreshStats(),
-      });
-    }
-  },
-  component: PostComponent,
-});
+```ts
+// ~/data-access/posts
+export const getPostById = createServerFn({
+  method: "GET",
+})
+.validator(postSelectSchema.pick({ id: true }))
+.handler(async ({ data: { id } }) => {
+    ...
+ })
+
+export const getRelatedPosts = createServerFn({
+  method: "GET",
+})
+.validator(postSelectSchema.pick({ id: true }))
+.handler(async ({ data: { id } }) => {
+    ...
+ })
+
+// queryOptions定義は、queryFnに指定されている非同期関数と同じファイル上にコロケーションする
+export const getPostByIdQuery = (postId: string) =>
+  queryOptions({
+    queryKey: ['post', postId],
+    queryFn: () => getPostById(postId),
+  })
+
+export const getRelatedPostsQuery = (postId: string) =>
+  queryOptions({
+    queryKey: ['post-related', postId],
+    queryFn: () => getRelatedPosts(postId),
+  })
+
+// ~/data-access/comments
+export const getPostComments = createServerFn({
+  method: "GET",
+})
+.validator(postSelectSchema.pick({ id: true }))
+.handler(async ({ data: { id } }) => {
+    ...
+ })
+
+export const getPostCommentsQuery = (postId: string) =>
+  queryOptions({
+    queryKey: ['post-comments', postId],
+    queryFn: () => getPostComments(postId),
+  })
 ```
 
-**メソッド選択指針**:
+```ts
+// ~/routes/posts/$postId.tsx
+import { Suspense } from 'react'
+import { createFileRoute } from '@tanstack/react-router'
+import { queryOptions, useSuspenseQuery } from '@tanstack/react-query'
+import { getPostById, getRelatedPosts, getPostByIdQuery, getRelatedPostsQuery } from '~/data-access/posts'
+import { getPostComments, getPostCommentsQuery } from '~/data-access/comments'
+// このRouteの親コンポーネントPostDetailPageにて使用する子コンポーネントは配下の`-components`フォルダ内にコロケーションする
+import { PostBody, PostBodySkeleton } from '~/routes/posts/-components/PostBody'
+import { PostComments, PostCommentsSkeleton } from '~/routes/posts/-components/PostComments'
+import { RelatedPosts, RelatedPostsSkeleton } from '~/routes/posts/-components/RelatedPosts'
 
-- **`ensureQueryData`**: Render-as-you-fetchパターンの基本（`useSuspenseQuery`と組み合わせ）
-- **`prefetchQuery`**: 重要でない追加データのバックグラウンド取得
-- **`fetchQuery`**: 常に最新データが必要な場合
-
-### Server Functions vs 通常のfetch
-
-```tsx
-// ✅ TanStack Start推奨: createServerFn
-const getPost = createServerFn({ method: "GET" })
-  .validator(postSelectSchema)
-  .handler(async ({ data: postId }) => {
-    return db.select().from(postsTable).where(eq(postsTable.id, postId));
-  });
-
-// ✅ 通常のfetch（外部API等）
-const fetchExternalData = async (id: string) => {
-  const res = await fetch(`https://api.example.com/posts/${id}`);
-  if (!res.ok) throw new Error("Failed to fetch");
-  return res.json();
-};
-
-// 混在使用例
-loader: async ({ context, params }) => {
-  await Promise.all([
-    // サーバー関数でDB取得
-    context.queryClient.ensureQueryData({
-      queryKey: ["post", params.postId],
-      queryFn: () => getPost(params.postId),
-    }),
-    // 外部APIでメタデータ取得
-    context.queryClient.ensureQueryData({
-      queryKey: ["external-meta", params.postId],
-      queryFn: () => fetchExternalData(params.postId),
-    }),
-  ]);
-};
-```
-
-**Server Functions使用が推奨される理由**:
-
-- **型安全性**: エンドツーエンドの型推論
-- **エラーハンドリング**: リダイレクトや`notFound`の自動処理
-- **バリデーション**: Zodでの入力検証
-- **パフォーマンス**: サーバーサイドでの最適化
-
-### loader でのデータプリフェッチ
-
-```tsx
-// 基本的なローダーパターン
-export const Route = createFileRoute("/posts")({
-  loader: async ({ context }) => {
-    // データを事前に取得してキャッシュ
-    context.queryClient.ensureQueryData({
-      queryKey: ["posts"],
-      queryFn: getPosts,
-    });
+// ==============================
+// Route定義
+// - loaderでawaitしないことにより、そのRoute全体のUIレンダリングをブロックしない。またプリフェッチメソッドは ensureQueryData に統一。このRouteにインポートされる子コンポーネントが使用する付随情報のプリフェッチも含めてコールする。
+// - componentに指定する親コンポーネントの構造は、静的UI + データ依存の非同期島（独立Suspense境界）。また、命名規則として名前の末尾は'Page'とする。
+// ==============================
+export const Route = createFileRoute('/posts/$postId')({
+  loader: ({ context: { queryClient }, params: { postId }}) => {
+    queryClient.ensureQueryData(getPostByIdQuery(postId))
+    queryClient.ensureQueryData(getPostCommentsQuery(postId))
+    queryClient.ensureQueryData(getRelatedPostsQuery(postId))
   },
-  component: PostsComponent,
-});
+  // このRouteにおける親コンポーネント
+  component: PostDetailPage,
+  errorComponent: PostDetailPageError
+})
 
-function PostsComponent() {
-  // ローダーで取得済みのデータを使用
-  const { data: posts } = useSuspenseQuery({
-    queryKey: ["posts"],
-    queryFn: getPosts,
-  });
+function PostDetailPage() {
+  const { postId }  = Route.useParams()
 
-  return <PostList posts={posts} />;
+  return (
+    <main>
+      <article >
+        <section>
+          // 非同期部分のため解決次第ストリーミング表示
+          <Suspense fallback={<PostBodySkeleton />}>
+            <PostBody postId={postId}>
+          </Suspense>
+        </section>
+
+        <section>
+          // 静的部分のため即座に表示
+          <h2>コメント</h2>
+          <Suspense fallback={<PostCommentsSkeleton />}>
+            <PostComments postId={postId} />
+          </Suspense>
+        </section>
+
+        <section>
+          <h2>関連ポスト</h2>
+          <Suspense fallback={<RelatedPostsSkeleton />}>
+            <RelatedPosts postId={postId} />
+          </Suspense>
+        </section>
+
+      </article>
+    </main>
+  )
+}
+
+function PostDetailPageError() {
+  return (
+    <div>
+      ...
+    </div>
+  )
 }
 ```
 
-### 並列データフェッチ
+```ts
+// ~/routes/posts/-components/PostBody.tsx
+import { type Post } from '~/db/schema.ts'
+import { Skeleton } from '~/components/ui/Skeleton'
 
-```tsx
-// 複数データソースの効率的な取得
-export const Route = createFileRoute("/dashboard")({
-  loader: async ({ context }) => {
-    // 並列でデータを取得
-    await Promise.all([
-      context.queryClient.ensureQueryData({
-        queryKey: ["user-stats"],
-        queryFn: getUserStats,
-      }),
-      context.queryClient.ensureQueryData({
-        queryKey: ["recent-activity"],
-        queryFn: getRecentActivity,
-      }),
-      context.queryClient.ensureQueryData({
-        queryKey: ["notifications"],
-        queryFn: getNotifications,
-      }),
-    ]);
-  },
-  component: DashboardComponent,
-});
-```
-
-### 遅延データローディング（Deferred Loading）
-
-```tsx
-export const Route = createFileRoute("/posts/$postId")({
-  loader: async ({ context, params }) => {
-    // 重要なデータは即座に取得
-    context.queryClient.ensureQueryData({
-      queryKey: ["post", params.postId],
-      queryFn: () => getPost(params.postId),
-    });
-
-    // 重要でないデータはバックグラウンドで取得（await不要）
-    context.queryClient.prefetchQuery({
-      queryKey: ["post-analytics", params.postId],
-      queryFn: () => getPostAnalytics(params.postId),
-    });
-  },
-  component: PostComponent,
-});
-
-function PostComponent() {
-  const params = Route.useParams();
-
-  // 即座に利用可能
-  const { data: post } = useSuspenseQuery({
-    queryKey: ["post", params.postId],
-    queryFn: () => getPost(params.postId),
-  });
-
-  // 非同期で取得（エラーハンドリング付き）
-  const { data: analytics, isLoading } = useQuery({
-    queryKey: ["post-analytics", params.postId],
-    queryFn: () => getPostAnalytics(params.postId),
-  });
+export function PostBody({ postId }: { postId: string }) {
+    const { data: post } = useSuspenseQuery(getPostByIdQuery(postId))
 
   return (
     <div>
-      <h1>{post.title}</h1>
-      {isLoading ? <div>Loading analytics...</div> : <div>Views: {analytics?.views}</div>}
+      <header>
+        <h1>{post.title}</h1>
+      </header>
+
+      <div>{post.content}</div>
     </div>
-  );
+  )
+}
+
+export function PostBodySkeleton() {
+  return (
+    <div className="...">
+      <Skeleton className="..." />
+      <Skeleton className="..." />
+      ...
+    </div>
+  )
+}
+```
+
+```ts
+// ~/routes/posts/-components/PostComments.tsx
+import { type Comment } from '~/db/schema.ts'
+
+export function PostComments({ postId }: { postId: string }) {
+  const { data: comments } = useSuspenseQuery(getPostCommentsQuery(postId))
+
+  if (comments.length === 0) {
+    return <div className="text-muted-foreground">コメントはありません</div>
+  }
+
+  return (
+    <div className="...">
+      <ul className="...">
+        {comments.map((c) => (
+          <li key={c.id}>
+            <PostCommentItem comment={c}>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function PostCommentItem ({ comment }: { comment: Comment}) {
+  return (
+    <div>
+    ...
+    </div>
+  )
+}
+
+function PostCommentsSkeleton() {
+  return (
+    <div className="...">
+      <Skeleton className="..." />
+      <Skeleton className="..." />
+      ...
+    </div>
+  )
 }
 ```
 
