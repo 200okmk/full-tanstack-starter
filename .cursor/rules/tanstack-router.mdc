@@ -63,16 +63,21 @@ alwaysApply: false
 - アプリ全体を通して、データキャッシュは TanStack Query で統一的に管理する。
 - アプリ全体を通して、非同期状態は原則としてReactの `Suspense` で管理する。
 
-### 遵守すべき重要な実装ポイント
+### 重要な実装ポイント
 
 - **loaderのプリフェッチにてasync/awaitを使用しない**: loader での非同期データフェッチによって静的な部分のUIまでも表示がブロックされることのないように、`ensureQueryData`プリフェッチは絶対に await せずに使用する。このRouteにインポートされる子コンポーネントが使用する付随情報のプリフェッチもコールする。Promise.allは使用しない。
+
 - **`pendingComponent`は使用せず`Suspense`を使用する**: Routeの`pendingComponent`は、loader での非同期処理によってそのRoute全体の表示が保留される時のフォールバックUIを指定するものであるが、根本的にそうならないよう実装することが Render-as-you-fetch パターンの基本方針なためこれは使用しない。代わりに非同期データフェッチが必要な部分のUIに対して、局所的にReactの`Suspense`でラップする。
+
 - **子コンポーネント内で`useSuspenseQuery`を使用してフェッチしたデータにアクセスする**: 非同期データに依存する子コンポーネント（Routeの`component`に指定していないもの）は`Suspense`でラップされるためローディング状態は宣言的にReactが管理している。ちなみに `useSuspenseQuery` ではフェッチしたデータが定義されることが保証されているためOptional Chainingによるfalsyチェックは必要ない。
+
 - **`queryOptions()`を使用して再利用性を高める**: `queryKey`, `queryFn`を繰り返し記述しないために使用する。原則`queryFn`に指定されている非同期関数と同じファイル上にコロケーションする。
+
 - **関連する子コンポーネントはコロケーションする**: 親コンポーネントにインポートされた関連する子コンポーネントは、URLパスに表出しないコンポーネントフォルダ（`-components/`）内にコロケーションする。
+
 - **フォールバックUIを実装する**: Shadcn/uiの[`Skeleton`コンポーネント](https://ui.shadcn.com/docs/components/skeleton)などを使用して、`Suspense`でラップした子コンポーネント向けのフォールバックUIを実装する。非同期処理解決後に実際にストリーミングされるUIのデザインをおおまかに再現する。
 
-### コード例
+### 具体的なコード例
 
 ```ts
 // ~/data-access/posts
@@ -101,7 +106,7 @@ export const getPostByIdQuery = (postId: string) =>
 
 export const getRelatedPostsQuery = (postId: string) =>
   queryOptions({
-    queryKey: ['post-related', postId],
+    queryKey: ['related-posts', postId],
     queryFn: () => getRelatedPosts(postId),
   })
 
@@ -265,11 +270,29 @@ function PostCommentsSkeleton() {
 }
 ```
 
-## 🔍 Search Parameters使用戦略
+## 🔍 Search Parameters 使用戦略
 
-### 基本指針
+### 基本指針と重要な実装ポイント
 
-- TanStack Routerの基本哲学の一つである”URLを第一級のデータストアとして扱う”に則り、Search Params を各Routeにおける状態管理の中核として積極的に活用する。
+- TanStack Routerの基本的な哲学の一つ”URLを第一級のデータストアとして扱う”に則り、Search Params を各Routeにおける状態管理の中核として積極的に活用する。
+
+- ページ番号やソートフラグなど一部のクエリパラメータが変更されてもすべてのコンポーネントが再レンダリングされないように、可能な限り細かい粒度のクエリパラメータをサブスクリプション（監視）する。具体的には、特定のコンポーネントが必要としている最小限のパラメータのみを `Route.useSearch()`内の`select`フィールドで指定して返り値をpropsで渡す。また、`structuralSharing: true`を設定する。（`useSearch()`内で使用できる構造的な等価性チェックフラグ。内容が同じオブジェクトなら前回の参照をそのまま返すことで再レンダリングを防ぐ機構。）
+
+- クエリパラメータを常に一貫性のある正規化された形式に保つために Search Middleware を活用する。具体的には、デフォルト値と同じ値を持つパラメータを自動的にURLから削除する`stripSearchParams`や、 ページ遷移時に特定のクエリパラメータを保持する`retainSearchParams`といった組み込みのものがある。また、必要であればカスタムの Search Middleware も作成する。
+
+- クエリパラメータのスキーマ定義には常に一貫してバリデーションライブラリ（Zod）を使用する。
+
+### Search Params を使用すべきでないパターン
+
+- **一時的なUI状態**: 具体的にはモーダルやドロップダウンメニューの開閉状態など。Reactの `useState()`を使用する。
+- **フォームの状態**: TanStack Formなどフォームライブラリを導入して体系的に管理する。
+- **認証状態**: Route Context（`beforeLoad`）で管理・検証する。
+- **アプリユーザーの個人的な設定**:
+
+### 具体的コード例
+```ts
+
+```
 
 #### **✅ Search Paramsで管理すべき状態とは**
 
@@ -295,24 +318,6 @@ const appropriateSearchParams = {
   section: z.string().optional(),
 };
 ```
-
-#### **❌ Search Paramsが不適切な状態とは**
-
-例えば以下の状態はSearch Paramsではなく、他の状態管理手法を使用
-
-- 一時的なUI状態 → useState
-
-  - モーダル開閉状態
-  - ドロップダウンメニュー開閉状態
-
-- フォーム入力中の状態 → フォームライブラリ（TanStack Formなど）
-
-- 認証・セッション状態 → RouterContext
-  currentUser: User | null,
-  isAuthenticated: boolean,
-
-- アプリ使用者の個人的な設定
-  - UIテーマ設定など
 
 #### **🎯 判断基準**
 
