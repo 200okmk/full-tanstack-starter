@@ -10,9 +10,9 @@ alwaysApply: false
 
 ### 基本指針
 
-- **基本的にディレクトリベースで設計**: 基本的にディレクトリを使用してルーティング構造を構築する
+- **ディレクトリでパスを設計する**: 基本的にディレクトリを使用してルーティングを構築していく。パスが深すぎる場合などは適宜 Flat Routes も使用する。
 - **共通レイアウト**: 特定のパス配下に共通する処理やUIはLayout Routes（`route.tsx`）に切り出して繰り返しを避ける
-- **パスレスグルーピング**: 実際のURLパスには影響を出さずに、意味的グループを表現するRoute Group Directory（`(admin)/`など）や共通処理を切り出せるPathless Layout（`_authenticated/`など）も使用して開発者が直感的に理解しやすい構造にする
+- **パスレスグルーピング**: 実際のURLパスには影響を出さずに意味的グループを表現するRoute Group Directory（`(admin)/`など）も使用して開発者が直感的に理解しやすい構造にする
 
 ### 基本的なディレクトリ構造パターン
 
@@ -59,7 +59,7 @@ alwaysApply: false
 ### 遵守すべき重要な実装ポイント
 
 - **loaderのプリフェッチにてasync/awaitを使用しない**: loader での非同期データフェッチによって静的な部分のUIまでも表示がブロックされることのないように、`ensureQueryData`プリフェッチは絶対に await せずに使用する。このRouteにインポートされる子コンポーネントが使用する付随情報のプリフェッチもコールする。Promise.allは使用しない。
-- **`pendingComponent`は使用せず`Suspense`を使用する**: Routeの`pendingComponent`は、非同期処理中にそのRoute全体の表示が保留された場合のフォールバックUIを指定するものであるが、根本的にそうならないよう実装することが基本方針なためこれは使用しない。代わりに非同期データフェッチが必要な部分のUIに対しては必ずReactの`Suspense`でラップする。
+- **`pendingComponent`は使用せず`Suspense`を使用する**: Routeの`pendingComponent`は、loader での非同期処理によってそのRoute全体の表示が保留される時のフォールバックUIを指定するものであるが、根本的にそうならないよう実装することが Render-as-you-fetch パターンの基本方針なためこれは使用しない。代わりに非同期データフェッチが必要な部分のUIに対して、局所的にReactの`Suspense`でラップする。
 - **子コンポーネント内で`useSuspenseQuery`を使用してフェッチしたデータにアクセスする**: 非同期データに依存する子コンポーネント（Routeの`component`に指定していないもの）は`Suspense`でラップされるためローディング状態は宣言的にReactが管理している。ちなみに `useSuspenseQuery` ではフェッチしたデータが定義されることが保証されているためOptional Chainingによるfalsyチェックは必要ない。
 - **`queryOptions()`を使用して再利用性を高める**: `queryKey`, `queryFn`を繰り返し記述しないために使用する。原則`queryFn`に指定されている非同期関数と同じファイル上にコロケーションする。
 - **関連する子コンポーネントはコロケーションする**: 親コンポーネントにインポートされた関連する子コンポーネントは、URLパスに表出しないコンポーネントフォルダ（`-components/`）内にコロケーションする。
@@ -99,6 +99,7 @@ export const getRelatedPostsQuery = (postId: string) =>
   })
 
 // ~/data-access/comments
+// Post本体情報の表示を優先させるためにコメントのような付随情報はストリームで時差表示させたい時は、上記の `getPostById` のクエリビルドでテーブルをJoinせずに、このように単体のServer Functionsと `getRelatedCommentsQuery` として分離する。
 export const getPostComments = createServerFn({
   method: "GET",
 })
@@ -129,7 +130,8 @@ import { RelatedPosts, RelatedPostsSkeleton } from '~/routes/posts/-components/R
 // ==============================
 // Route定義
 // - loaderでawaitしないことにより、そのRoute全体のUIレンダリングをブロックしない。またプリフェッチメソッドは ensureQueryData に統一。このRouteにインポートされる子コンポーネントが使用する付随情報のプリフェッチも含めてコールする。
-// - componentに指定する親コンポーネントの構造は、静的UI + データ依存の非同期島（独立Suspense境界）。また、命名規則として名前の末尾は'Page'とする。
+// - pendingComponentは原則使用しない。そもそもRoute全体のUIが保留されるような非同期データフェッチをloaderにて行わない基本方針なため。ただしSuspenseでラップした子コンポーネント用のフォールバックUIはそれぞれ作成する。
+// - componentに指定する親コンポーネントの構造は静的UI部分+ データ依存の非同期UI部分（独立Suspense境界）となる。また命名規則として名前の末尾は'Page'とする。
 // ==============================
 export const Route = createFileRoute('/posts/$postId')({
   loader: ({ context: { queryClient }, params: { postId }}) => {
@@ -249,7 +251,6 @@ function PostCommentItem ({ comment }: { comment: Comment}) {
 function PostCommentsSkeleton() {
   return (
     <div className="...">
-      <Skeleton className="..." />
       <Skeleton className="..." />
       ...
     </div>
