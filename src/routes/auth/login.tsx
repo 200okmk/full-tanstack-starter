@@ -19,7 +19,7 @@ function LoginForm() {
   // defaultRedirectUrlは定数として事前に設定しておいたリダイレクト先(デフォルトでは `/dashboard`)
   const { defaultRedirectUrl, queryClient } = Route.useRouteContext();
   const search = Route.useSearch();
-  const navigate = useNavigate({ from: "/auth/login" });
+  const navigate = useNavigate({ from: Route.fullPath });
   const router = useRouter();
 
   const [isLoading, setIsLoading] = useState(false);

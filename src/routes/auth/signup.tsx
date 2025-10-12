@@ -11,8 +11,8 @@ export const Route = createFileRoute("/auth/signup")({
 });
 
 function SignupForm() {
-  const { redirectUrl, queryClient } = Route.useRouteContext();
-  const navigate = useNavigate({ from: "/auth/signup" });
+  const { defaultRedirectUrl, queryClient } = Route.useRouteContext();
+  const navigate = useNavigate({ from: Route.fullPath });
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -42,7 +42,7 @@ function SignupForm() {
         name,
         email,
         password,
-        callbackURL: redirectUrl,
+        callbackURL: defaultRedirectUrl,
       },
       {
         onError: (ctx) => {
@@ -52,7 +52,7 @@ function SignupForm() {
         onSuccess: async () => {
           // Tanstack Queryのキャッシュを無効化
           await queryClient.invalidateQueries({ queryKey: ["session-user"] });
-          void navigate({ to: redirectUrl });
+          void navigate({ to: defaultRedirectUrl });
         },
       },
     );
@@ -139,7 +139,7 @@ function SignupForm() {
                 void signIn.social(
                   {
                     provider: "github",
-                    callbackURL: redirectUrl,
+                    callbackURL: defaultRedirectUrl,
                   },
                   {
                     onRequest: () => {
@@ -171,7 +171,7 @@ function SignupForm() {
                 void signIn.social(
                   {
                     provider: "google",
-                    callbackURL: redirectUrl,
+                    callbackURL: defaultRedirectUrl,
                   },
                   {
                     onRequest: () => {
