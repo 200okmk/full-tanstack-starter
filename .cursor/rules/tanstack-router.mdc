@@ -25,7 +25,7 @@ alwaysApply: false
 // │   ├── login.tsx         // ログインページ
 // │   └── signup.tsx        // サインアップページ（ただしOAuth認証やマジックリンク認証のみの場合は無し）
 // ├── posts/              // 認証保護されないパスの一例（`/products`なども同様）
-// │   ├── route.tsx         // `/posts`共通レイアウト
+// │   ├── route.tsx         // 共通UIや共通処理を切り出すためのレイアウト
 // │   ├── index.tsx         // ポスト一覧ページ
 // │   ├── $postId.tsx       // ポスト詳細ページ
 // │   └── -components/      // ポスト関連コンポーネントをここにコロケーションする
@@ -34,7 +34,7 @@ alwaysApply: false
 // ├── _authenticated/    // 認証保護されるべき全てのページが格納される Pathless Layout
 // │   ├── route.tsx          // 認証保護処理を実行するレイアウト
 // │   ├── dashboard/         // 保護されたパスの一例
-// │   │   ├── route.tsx        // `/dashboard`共通レイアウト
+// │   │   ├── route.tsx        // 共通UIや共通処理を切り出すためのレイアウト
 // │   │   └── index.tsx        // /dashboardルートページ
 // │   ...
 // │
@@ -309,14 +309,22 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { zodValidator, fallback } from '@tanstack/zod-adapter'
 import { z } from 'zod'
 import { stripSearchParams } from '@tanstack/react-router'
+import { LayoutGridIcon, LayoutListIcon } from 'lucide-react'
+
 import { Button } from '~/components/ui/button'
+import { ButtonGroup } from '~/components/ui/button-group'
+import {
+  Pagination,
+  PagenationContent,
+  ...
+} from '~/components/ui/pagination'
 import {
   Select,
   ...
 } from '~/components/ui/select'
 import { PostsList, PostsListSkeleton } from './-components/PostsList'
 import { PostsGrid, PostsGridSkeleton } from './-components/PostsGrid'
-
+import { getPostsQuery } from '~/data-access/posts'
 
 const defaultValues = {
   page: 1,
@@ -372,7 +380,7 @@ function PostsPage() {
     }),
   })
 
-  // Search Params更新ヘルパー
+  // 各Route専用のSearchParams更新ヘルパーを定義する
   const updateSearch = (updates: Partial<PostsSearch>) => {
     navigate({
       search: (prev) => ({ ...prev, ...updates }),
@@ -381,40 +389,49 @@ function PostsPage() {
 
   return (
     <main>
-      {/* 静的UI部分：即座に表示 */}
       <div>
         <h1>Posts</h1>
 
-        {/* フィルタ・ソートコントロール */}
+        {/* ソート選択 */}
         <div>
-          <Select value={sort} onValueChange={(value) => updateSearch({ sort: value, page: 1 })}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="newest">Newest</SelectItem>
-              <SelectItem value="oldest">Oldest</SelectItem>
-              <SelectItem value="popular">Popular</SelectItem>
-            </SelectContent>
-          </Select>
+          <ButtonGroup>
+            <Select
+              value={sort}
+              onValueChange={(value) => updateSearch({
+                sort: value as PostsSearch['sort'],
+                page: 1
+              })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">Newest</SelectItem>
+                <SelectItem value="oldest">Oldest</SelectItem>
+                <SelectItem value="popular">Popular</SelectItem>
+              </SelectContent>
+            </Select>
+          </ButtonGroup>
 
           {/* ビュー切り替え（UI専用、データ再取得しない） */}
-          <div>
-            <Button
-              variant={view === 'list' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => updateSearch({ view: 'list' })}
-            >
-              List
-            </Button>
+          <ButtonGroup>
             <Button
               variant={view === 'grid' ? 'default' : 'outline'}
-              size="sm"
+              size="icon"
               onClick={() => updateSearch({ view: 'grid' })}
+              aria-label="Grid view"
             >
-              Grid
+              <LayoutGridIcon />
             </Button>
-          </div>
+            <Button
+              variant={view === 'list' ? 'default' : 'outline'}
+              size="icon"
+              onClick={() => updateSearch({ view: 'list' })}
+              aria-label="List view"
+            >
+              <LayoutListIcon />
+            </Button>
+          </ButtonGroup>
         </div>
       </div>
 
@@ -423,28 +440,74 @@ function PostsPage() {
         {view === 'list' ? <PostsList /> : <PostsGrid />}
       </Suspense>
 
-      {/* ページネーション（静的UI） */}
-      <div>
-        <Button
-          variant="outline"
-          disabled={page === 1}
-          onClick={() => updateSearch({ page: page - 1 })}
-        >
-          Previous
-        </Button>
-        <span>Page {page}</span>
-        <Button
-          variant="outline"
-          onClick={() => updateSearch({ page: page + 1 })}
-        >
-          Next
-        </Button>
-      </div>
+      {/* ✅ Shadcn/ui Pagination使用 */}
+      <PostsPagination currentPage={page} onPageChange={(newPage) => updateSearch({ page: newPage })} />
     </main>
   )
 }
-```
 
+// ============================================
+// Pagination コンポーネント
+// ============================================
+interface PostsPaginationProps {
+  currentPage: number
+  onPageChange: (page: number) => void
+}
+
+function PostsPagination({ currentPage, onPageChange }: PostsPaginationProps) {
+  const getPageNumbers = () => {...}
+
+  return (
+    <Pagination>
+      <PaginationContent>
+        ...
+      </PaginationContent>
+    </Pagination>
+  )
+}
+```
+```ts
+// ~/routes/posts/-components/PostsList.tsx
+import { useSuspenseQuery } from '@tanstack/react-query'
+import { getRouteApi } from '@tanstack/react-router'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '~/components/ui/card'
+import { Skeleton } from '~/components/ui/skeleton'
+import { getPostsQuery } from '~/data-access/posts'
+
+const routeApi = getRouteApi('/posts')
+
+export function PostsList() {
+  const searchParams = routeApi.useSearch({
+    select: (search) => ({
+      page: search.page,
+      limit: search.limit,
+      sort: search.sort,
+      category: search.category,
+    }),
+    structuralSharing: true,
+  })
+
+  const { data: posts } = useSuspenseQuery(getPostsQuery(searchParams))
+}
+
+if (posts.length === 0) {
+  return (
+    <div>
+    ...
+    </div>
+  )
+}
+
+return (
+    <div>
+      {posts.map((post) => (
+        <Card key={post.id}>
+          ...
+        </Card>
+      ))}
+    </div>
+  )
+```
 ```ts
 // ~/data-access/posts.ts
 import { createServerFn } from '@tanstack/start'
@@ -474,6 +537,7 @@ export const getPosts = createServerFn({ method: 'GET' })
       posts: postsData,
       total: count,
       hasMore: offset + data.limit < count,
+      totalPages: Math.ceil(count / data.limit),
     }
   })
 ...
@@ -486,8 +550,8 @@ export const getPostsQuery = (input: GetPostsInput) =>
     queryFn: () => getPosts(input),
     staleTime: 5 * 60 * 1000, // 5分間はfreshと見なす
   })
-
 ```
+
 ## ⚡ パフォーマンス最適化
 
 ### Code Splitting
