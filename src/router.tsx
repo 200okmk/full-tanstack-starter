@@ -24,7 +24,7 @@ export function createRouter() {
       context: { queryClient, sessionUser: null },
       // ホバー時にプリロード
       defaultPreload: "intent",
-      // データの取得とキャッシュをTanstack Queryに管理させるため、すべてのローダーイベントを渡す設定（https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#passing-all-loader-events-to-an-external-cache）
+      // 大前提としてデータキャッシュは統一的にTanstack Query側で管理する。このようにRouter側でのStale設定を0にすることで、毎回loaderが起動されるためQuery側のキャッシュに集約できるようにする。（https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#passing-all-loader-events-to-an-external-cache）
       defaultPreloadStaleTime: 0,
       defaultErrorComponent: DefaultCatchBoundary,
       defaultNotFoundComponent: NotFound,
