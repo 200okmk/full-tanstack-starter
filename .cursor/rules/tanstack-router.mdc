@@ -282,7 +282,7 @@ function PostCommentsSkeleton() {
 
 - `loader`のプリフェッチが依存している特定の Search Params (フィルタやソートのフラグなど)が変更された場合、自動で再フェッチされるようにする。具体的には、queryOption（getProductsQueryなど）の引数になっている必要最小限の Search Param のみをRouteの `loaderDeps` に指定する。
 
-- クエリパラメータを常に一貫性のある正規化された形式に保つために Search Middleware を活用する。具体的には、デフォルト値と同じ値を持つパラメータを自動的にURLから削除する`stripSearchParams`や、 ページ遷移時に特定のクエリパラメータを保持する`retainSearchParams`といった組み込みのものがある。また、必要であればカスタムの Search Middleware も作成する。
+- クエリパラメータを常に一貫性のある正規化された形式に保つために Search Middleware を活用する。具体的には、デフォルト値と同じ値を持つパラメータを自動的にURLから削除する`stripSearchParams`や、 ページ遷移時に特定のクエリパラメータを保持する`retainSearchParams`といった組み込みのものがある。また、必要であればカスタムの Search Middleware も作成する。複数のSearch Middlewareを使用する場合、`retainSearchParams` → `stripSearchParams` → カスタムMiddleware の順で指定する。
 
 - クエリパラメータのスキーマ定義には常に一貫してバリデーションライブラリ（Zod）を使用する。
 
@@ -313,11 +313,6 @@ import { LayoutGridIcon, LayoutListIcon } from 'lucide-react'
 
 import { Button } from '~/components/ui/button'
 import { ButtonGroup } from '~/components/ui/button-group'
-import {
-  Pagination,
-  PagenationContent,
-  ...
-} from '~/components/ui/pagination'
 import {
   Select,
   ...
@@ -437,12 +432,93 @@ function PostsPage() {
 
       {/* 非同期UI部分：Suspenseでラップ */}
       <Suspense fallback={view === 'list' ? <PostsListSkeleton /> : <PostsGridSkeleton />}>
-        {view === 'list' ? <PostsList /> : <PostsGrid />}
+        {view === 'list'
+          ? <PostsList updateSearch={updateSearch} />
+          : <PostsGrid updateSearch={updateSearch} />
+        }
       </Suspense>
-
-      {/* ✅ Shadcn/ui Pagination使用 */}
-      <PostsPagination currentPage={page} onPageChange={(newPage) => updateSearch({ page: newPage })} />
     </main>
+  )
+}
+```
+
+```ts
+// ~/routes/posts/-components/PostsList.tsx
+import { useSuspenseQuery } from '@tanstack/react-query'
+import { getRouteApi } from '@tanstack/react-router'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '~/components/ui/card'
+import {
+  Pagination,
+  PagenationContent,
+  ...
+} from '~/components/ui/pagination'
+import { Skeleton } from '~/components/ui/skeleton'
+import { getPostsQuery } from '~/data-access/posts'
+
+const routeApi = getRouteApi('/posts')
+
+export function PostsList({
+  updateSearch
+}: {
+  updateSearch: (updates: Partial<PostsSearch>) => void
+}) {
+  const searchParams = routeApi.useSearch({
+    select: (search) => ({
+      page: search.page,
+      limit: search.limit,
+      sort: search.sort,
+      category: search.category,
+    }),
+    structuralSharing: true,
+  })
+
+  const { data } = useSuspenseQuery(getPostsQuery(searchParams))
+
+  if (data.posts.length === 0) {
+    return (
+      <section>
+      ...
+      </section>
+    )
+  }
+
+  return (
+    <section>
+      <div>
+        {data.posts.map((post) => (
+          <Card key={post.id}>
+            ...
+          </Card>
+        ))}
+      </div>
+      <div>
+        {/* データを持っているコンポーネント内でPaginationを表示 */}
+        <PostsPagination
+          currentPage={searchParams.page}
+          totalPages={data.totalPages}
+          onPageChange={(newPage) => updateSearch({ page: newPage })}
+        />
+      </div>
+    </section>
+  )
+}
+
+export function PostsListSkeleton() {
+  return (
+    <div>
+      {Array.from({ length: 5 }).map((_, i) => (
+        <Card key={i}>
+          <CardHeader>
+            <Skeleton className="..." />
+            ...
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="..." />
+            ...
+          </CardContent>
+        </Card>
+      ))}
+    </div>
   )
 }
 
@@ -451,10 +527,11 @@ function PostsPage() {
 // ============================================
 interface PostsPaginationProps {
   currentPage: number
+  totalPages: number
   onPageChange: (page: number) => void
 }
 
-function PostsPagination({ currentPage, onPageChange }: PostsPaginationProps) {
+function PostsPagination({ currentPage, onPageChange, totalPages }: PostsPaginationProps) {
   const getPageNumbers = () => {...}
 
   return (
@@ -466,48 +543,7 @@ function PostsPagination({ currentPage, onPageChange }: PostsPaginationProps) {
   )
 }
 ```
-```ts
-// ~/routes/posts/-components/PostsList.tsx
-import { useSuspenseQuery } from '@tanstack/react-query'
-import { getRouteApi } from '@tanstack/react-router'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '~/components/ui/card'
-import { Skeleton } from '~/components/ui/skeleton'
-import { getPostsQuery } from '~/data-access/posts'
 
-const routeApi = getRouteApi('/posts')
-
-export function PostsList() {
-  const searchParams = routeApi.useSearch({
-    select: (search) => ({
-      page: search.page,
-      limit: search.limit,
-      sort: search.sort,
-      category: search.category,
-    }),
-    structuralSharing: true,
-  })
-
-  const { data: posts } = useSuspenseQuery(getPostsQuery(searchParams))
-}
-
-if (posts.length === 0) {
-  return (
-    <div>
-    ...
-    </div>
-  )
-}
-
-return (
-    <div>
-      {posts.map((post) => (
-        <Card key={post.id}>
-          ...
-        </Card>
-      ))}
-    </div>
-  )
-```
 ```ts
 // ~/data-access/posts.ts
 import { createServerFn } from '@tanstack/start'
