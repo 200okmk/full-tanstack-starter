@@ -75,7 +75,7 @@ alwaysApply: false
 
 - **関連する子コンポーネントはコロケーションする**: 親コンポーネントにインポートされた関連する子コンポーネントは、URLパスに表出しないコンポーネントフォルダ（`-components/`）内にコロケーションする。
 
-- **フォールバックUIを実装する**: Shadcn/uiの[`Skeleton`コンポーネント](https://ui.shadcn.com/docs/components/skeleton)などを使用して、`Suspense`でラップした子コンポーネント向けのフォールバックUIを実装する。非同期処理解決後に実際にストリーミングされるUIのデザインをおおまかに再現する。
+- **フォールバックUIを実装する**: ペンディング状態時であれば、Shadcn/uiの[`Skeleton`コンポーネント](https://ui.shadcn.com/docs/components/skeleton)などを使用して`Suspense`でラップした子コンポーネント向けのスケルトンかスピナーフォールバックUIを実装する。非同期処理解決後に実際にストリーミングされるUIのデザインをおおまかに再現する。また、エラー時用ののフォールバックUIも実装する。
 
 ### 具体的なコード例
 
@@ -358,6 +358,7 @@ export const Route = createFileRoute('/posts/')({
     queryClient.ensureQueryData(getPostsQuery(deps))
   },
   component: PostsPage,
+  errorComponent: PostsPageError,
 })
 
 // ============================================
@@ -438,6 +439,16 @@ function PostsPage() {
         }
       </Suspense>
     </main>
+  )
+}
+
+function PostsPageError ({ error }) {
+  const router = useRouter()
+
+  return (
+    <div>
+    ...
+    </div>
   )
 }
 ```
