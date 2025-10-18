@@ -29,6 +29,7 @@ export function createRouter() {
       defaultErrorComponent: DefaultCatchBoundary,
       defaultNotFoundComponent: NotFound,
       scrollRestoration: true,
+      // Search Params の変化によるコンポーネントの再レンダリングを最小化するために統一的にStructural Sharingを有効にする。
       defaultStructuralSharing: true,
     }),
     queryClient,

@@ -191,9 +191,9 @@ function PostDetailPage() {
 
 function PostDetailPageError() {
   return (
-    <div>
+    <main>
       ...
-    </div>
+    </main>
   )
 }
 ```
@@ -278,7 +278,7 @@ function PostCommentsSkeleton() {
 
 - アプリ全体を通して、データキャッシュは TanStack Query で統一的に管理する。具体的には `~/router.tsx`のTanstack Router初期化設定にて `defaultPreloadStaleTime: 0` とする。
 
-- ページ番号やソートフラグなどの一部のクエリパラメータが変更されてもすべてのコンポーネントが再レンダリングされないように、可能な限り細かい粒度のクエリパラメータをサブスクリプション（監視）する。具体的には、特定のコンポーネントが必要としている最小限のパラメータのみを `Route.useSearch()`内の`select`フィールドで指定して返り値をpropsで渡す。
+- ページ番号やソートフラグなどの一部のクエリパラメータが変更されてもすべてのコンポーネントが再レンダリングされないように、可能な限り細かい粒度のクエリパラメータをサブスクリプション（監視）する。具体的には、特定のコンポーネントが必要としている最小限のパラメータのみを `Route.useSearch()`内の`select`フィールドで指定して返り値をpropsで渡す。また `~/router.tsx`での初期化設定にて統一的に `structuralSharing: true`を有効にしておく（設定済み）。
 
 - `loader`のプリフェッチが依存している特定の Search Params (フィルタやソートのフラグなど)が変更された場合、自動で再フェッチされるようにする。具体的には、queryOption（getProductsQueryなど）の引数になっている必要最小限の Search Param のみをRouteの `loaderDeps` に指定する。
 
@@ -303,9 +303,191 @@ function PostCommentsSkeleton() {
 ### 具体的コード例
 
 ```ts
+// ~/routes/posts/index.tsx
+import { Suspense } from 'react'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { zodValidator, fallback } from '@tanstack/zod-adapter'
+import { z } from 'zod'
+import { stripSearchParams } from '@tanstack/react-router'
+import { Button } from '~/components/ui/button'
+import {
+  Select,
+  ...
+} from '~/components/ui/select'
+import { PostsList, PostsListSkeleton } from './-components/PostsList'
+import { PostsGrid, PostsGridSkeleton } from './-components/PostsGrid'
 
+
+const defaultValues = {
+  page: 1,
+  limit: 20,
+  sort: 'newest' as const,
+}
+
+export const postsSearchSchema = z.object({
+  // データ依存パラメータ（loaderDepsに含める）
+  page: fallback(z.number().int().positive(), defaultValues.page).default(defaultValues.page),
+  limit: fallback(z.number().int().positive().max(100), defaultValues.limit).default(defaultValues.limit),
+  sort: fallback(z.enum(['newest', 'oldest', 'popular']), defaultValues.sort).default(defaultValues.sort),
+  category: z.string().optional(),
+
+  // UI専用パラメータなのでloaderDepsには含めない
+  view: fallback(z.enum(['grid', 'list']), 'grid').default('grid'),
+})
+
+export type PostsSearch = z.infer<typeof postsSearchSchema>
+
+export const Route = createFileRoute('/posts/')({
+  validateSearch: zodValidator(postsSearchSchema),
+  // デフォルト値と同じパラメータを自動削除
+  search: {
+    middlewares: [stripSearchParams(defaultValues)],
+  },
+  // データに影響するパラメータのみ依存に指定（viewは除外）
+  loaderDeps: ({ search: { page, limit, sort, category } }) => ({
+    page,
+    limit,
+    sort,
+    category,
+  }),
+  // awaitせずにプリフェッチを「起動」のみ。loaderDepsで指定した依存している Search Params を`deps`で参照し、queryの引数に渡す。
+  loader: ({ context: { queryClient }, deps }) => {
+    queryClient.ensureQueryData(getPostsQuery(deps))
+  },
+  component: PostsPage,
+})
+
+// ============================================
+// 親コンポーネント（静的UI + 非同期UIのSuspense境界）
+// ============================================
+function PostsPage() {
+  const navigate = useNavigate({ from: Route.fullPath })
+
+  // 最小限のパラメータのみ購読（select + structuralSharing）
+  const { page, sort, view } = Route.useSearch({
+    select: (search) => ({
+      page: search.page,
+      sort: search.sort,
+      view: search.view,
+    }),
+  })
+
+  // Search Params更新ヘルパー
+  const updateSearch = (updates: Partial<PostsSearch>) => {
+    navigate({
+      search: (prev) => ({ ...prev, ...updates }),
+    })
+  }
+
+  return (
+    <main>
+      {/* 静的UI部分：即座に表示 */}
+      <div>
+        <h1>Posts</h1>
+
+        {/* フィルタ・ソートコントロール */}
+        <div>
+          <Select value={sort} onValueChange={(value) => updateSearch({ sort: value, page: 1 })}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="newest">Newest</SelectItem>
+              <SelectItem value="oldest">Oldest</SelectItem>
+              <SelectItem value="popular">Popular</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* ビュー切り替え（UI専用、データ再取得しない） */}
+          <div>
+            <Button
+              variant={view === 'list' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => updateSearch({ view: 'list' })}
+            >
+              List
+            </Button>
+            <Button
+              variant={view === 'grid' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => updateSearch({ view: 'grid' })}
+            >
+              Grid
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* 非同期UI部分：Suspenseでラップ */}
+      <Suspense fallback={view === 'list' ? <PostsListSkeleton /> : <PostsGridSkeleton />}>
+        {view === 'list' ? <PostsList /> : <PostsGrid />}
+      </Suspense>
+
+      {/* ページネーション（静的UI） */}
+      <div>
+        <Button
+          variant="outline"
+          disabled={page === 1}
+          onClick={() => updateSearch({ page: page - 1 })}
+        >
+          Previous
+        </Button>
+        <span>Page {page}</span>
+        <Button
+          variant="outline"
+          onClick={() => updateSearch({ page: page + 1 })}
+        >
+          Next
+        </Button>
+      </div>
+    </main>
+  )
+}
 ```
 
+```ts
+// ~/data-access/posts.ts
+import { createServerFn } from '@tanstack/start'
+...
+// ✅ Routeで定義したスキーマをインポート（唯一の情報源）
+import { postsSearchSchema } from '~/routes/posts/index'
+
+// ==========================================
+// Server Functions
+// ==========================================
+...
+// ✅ UI専用の`view`を除外し、postsSearchSchemaからデータ取得に必要なフィールドのみを抽出。
+const getPostsInputSchema = postsSearchSchema.pick({
+  page: true,
+  limit: true,
+  sort: true,
+  category: true,
+})
+type GetPostsInput = z.infer<typeof getPostsInputSchema>
+
+export const getPosts = createServerFn({ method: 'GET' })
+  .validator(getPostsInputSchema)
+  .handler(async ({ data }) => {
+    const offset = (data.page - 1) * data.limit
+    ...
+    return {
+      posts: postsData,
+      total: count,
+      hasMore: offset + data.limit < count,
+    }
+  })
+...
+// ============================================
+// Query Options（コロケーション）
+// ============================================
+export const getPostsQuery = (input: GetPostsInput) =>
+  queryOptions({
+    queryKey: ['posts', input],
+    queryFn: () => getPosts(input),
+    staleTime: 5 * 60 * 1000, // 5分間はfreshと見なす
+  })
+
+```
 ## ⚡ パフォーマンス最適化
 
 ### Code Splitting
