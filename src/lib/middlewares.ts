@@ -15,7 +15,7 @@ export const authMiddleware = createMiddleware().server(async ({ next }) => {
   const session = await auth.api.getSession({
     headers: request.headers, // request.headersを直接渡す
     query: {
-      // https://www.better-auth.com/docs/concepts/session-management#session-caching
+      // Cookie キャッシュからではなくデータベースからセッションを取得し、Cookie キャッシュも更新するように強制する（https://www.better-auth.com/docs/concepts/session-management#session-caching）
       disableCookieCache: true,
     },
   });
