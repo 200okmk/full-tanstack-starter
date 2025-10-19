@@ -3,16 +3,6 @@ import { getWebRequest } from "@tanstack/react-start/server";
 import { createAuthClient } from "better-auth/react";
 import { auth } from "./auth";
 
-export interface SessionUser {
-  id: string;
-  name: string;
-  email: string;
-  emailVerified: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-  image?: string | null | undefined;
-}
-
 // セッションユーザーを取得するServer Function
 export const getSessionUser = createServerFn({ method: "GET" }).handler(async () => {
   const { headers } = getWebRequest()!;

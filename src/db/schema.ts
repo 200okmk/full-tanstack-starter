@@ -164,28 +164,28 @@ export const commentsRelations = relations(commentsTable, ({ one }) => ({
 // drizzle-zodの[ドキュメント](https://orm.drizzle.team/docs/zod)を参照。
 
 // users - カスタムバリデーション付きスキーマ
+export const userSelectSchema = createSelectSchema(usersTable);
 export const userInsertSchema = createInsertSchema(usersTable, {
   name: (schema) => schema.min(1, "名前は必須です").max(100, "名前は100文字以内"),
   email: z.email("有効なメールアドレスを入力してください"),
 });
-export const userSelectSchema = createSelectSchema(usersTable);
 export const userUpdateSchema = createUpdateSchema(usersTable);
 
 // posts - カスタムバリデーション付きスキーマ
+export const postSelectSchema = createSelectSchema(postsTable);
 export const postInsertSchema = createInsertSchema(postsTable, {
   title: (schema) => schema.min(1, "タイトルは必須").max(200, "タイトルは200文字以内"),
   content: (schema) =>
     schema.min(1, "コンテンツは必須").max(5000, "コンテンツは5000文字以内"),
 });
-export const postSelectSchema = createSelectSchema(postsTable);
 export const postUpdateSchema = createUpdateSchema(postsTable);
 
 // comments - カスタムバリデーション付きスキーマ
+export const commentSelectSchema = createSelectSchema(commentsTable);
 export const commentInsertSchema = createInsertSchema(commentsTable, {
   content: (schema) =>
     schema.min(1, "コメント内容は必須").max(1000, "コメントは1000文字以内"),
 });
-export const commentSelectSchema = createSelectSchema(commentsTable);
 export const commentUpdateSchema = createUpdateSchema(commentsTable);
 
 // =============================================================================
@@ -194,10 +194,8 @@ export const commentUpdateSchema = createUpdateSchema(commentsTable);
 // 命名規則：{Entity}, {Entity}{Operation}
 
 // users
-export type User = typeof usersTable.$inferSelect;
-export type NewUser = typeof usersTable.$inferInsert;
-export type UserInsert = z.infer<typeof userInsertSchema>;
-export type UserSelect = z.infer<typeof userSelectSchema>;
+export type User = z.infer<typeof userSelectSchema>;
+export type UserCreate = z.infer<typeof userInsertSchema>;
 export type UserUpdate = z.infer<typeof userUpdateSchema>;
 
 // sessions
@@ -213,15 +211,11 @@ export type VerificationToken = typeof verificationTokensTable.$inferSelect;
 export type NewVerificationToken = typeof verificationTokensTable.$inferInsert;
 
 // posts
-export type Post = typeof postsTable.$inferSelect;
-export type NewPost = typeof postsTable.$inferInsert;
-export type PostInsert = z.infer<typeof postInsertSchema>;
-export type PostSelect = z.infer<typeof postSelectSchema>;
+export type Post = z.infer<typeof postSelectSchema>;
+export type PostCreate = z.infer<typeof postInsertSchema>;
 export type PostUpdate = z.infer<typeof postUpdateSchema>;
 
 // comments
-export type Comment = typeof commentsTable.$inferSelect;
-export type NewComment = typeof commentsTable.$inferInsert;
-export type CommentInsert = z.infer<typeof commentInsertSchema>;
-export type CommentSelect = z.infer<typeof commentSelectSchema>;
+export type Comment = z.infer<typeof commentSelectSchema>;
+export type CommentCreate = z.infer<typeof commentInsertSchema>;
 export type CommentUpdate = z.infer<typeof commentUpdateSchema>;
