@@ -4,7 +4,7 @@ globs: src/routes/**/*.tsx,src/router.tsx
 alwaysApply: false
 ---
 
-# TanStack Router Rule
+# TanStack Router 運用戦略
 
 ## 🗂️ ファイルベースルーティング
 
@@ -14,7 +14,7 @@ alwaysApply: false
 - **共通レイアウト**: 特定のパス配下に共通する処理やUIはLayout Routes（`route.tsx`）に切り出して繰り返しを避ける。
 - **パスレスグルーピング**: 実際のURLパスには影響を出さずに意味的グループを表現するRoute Group Directory（`(admin)/`など）も使用して開発者が直感的に理解しやすい構造にする。
 
-### 基本的なディレクトリ構造パターン
+### ディレクトリ構造パターン例
 
 ```tsx
 // routes/
@@ -87,7 +87,7 @@ export const getPostById = createServerFn({
 .validator(postSelectSchema.pick({ id: true }))
 .handler(async ({ data: { id } }) => {
     ...
- })
+})
 
 export const getRelatedPosts = createServerFn({
   method: "GET",
@@ -95,7 +95,7 @@ export const getRelatedPosts = createServerFn({
 .validator(postSelectSchema.pick({ id: true }))
 .handler(async ({ data: { id } }) => {
     ...
- })
+})
 
 // queryOptions定義は、queryFnに指定されている非同期関数と同じファイル上にコロケーションする
 export const getPostByIdQuery = (postId: string) =>
@@ -118,7 +118,7 @@ export const getPostComments = createServerFn({
 .validator(postSelectSchema.pick({ id: true }))
 .handler(async ({ data: { id } }) => {
     ...
- })
+})
 
 export const getPostCommentsQuery = (postId: string) =>
   queryOptions({
@@ -300,7 +300,7 @@ function PostCommentsSkeleton() {
   3. モーダルやドロップダウンメニューの開閉状態など一時的なUI状態。Reactの `useState()`を使用する。
   4. フォームの状態。TanStack Formなどフォームライブラリを導入して体系的に管理する。
 
-### 具体的コード例
+### 具体的なコード例
 
 ```ts
 // ~/routes/posts/index.tsx

@@ -1,0 +1,179 @@
+---
+alwaysApply: false
+---
+
+# データモデル運用戦略
+
+## 💎 SSOT原則の徹底
+
+### 基本指針と実装方法
+
+- **Drizzleスキーマを常にSSOTとして参照し続ける**: Drizzleスキーマ`~/db/schema.ts`を常に Single Source of Truth （”信頼できる唯一の情報源”）として扱い可能な限り最終的な参照元とする。すなわち、そこで既に定義されたエンティティ情報に重複するようなZodスキーマ定義やTS型定義などを、新たに作成したりしてデータ定義を分散させない。
+  - 具体的には `drizzle-zod`ライブラリを使用して、DBテーブル定義を元にZodスキーマ定義とそこから推論したTS型の2つを生成する。コードベース各所ではそれらを常にインポートし、必要に応じて新たにフィールドを追加・削除したものを使用することでDBスキーマ定義と連動させる。
+  -
+-
+
+### Drizzleスキーマの構成と命名規則
+
+```ts
+// src/db/schema.ts - `schema.ts`ファイル内では上から順にテーブル定義（認証関連、アプリ本体Entity）、リレーション定義、Zodスキーマ生成、TS型生成の順番にコメントアウトでわかりやすくセクション化しながら記述していく。また各セクションの冒頭に定義した命名規則を徹底する。
+
+import { createSchemaFactory } from "drizzle-zod";
+import { z } from "zod";
+
+// =============================================================================
+// Schema Factory設定（プロジェクト全体で統一的なルールを適用。型強制coerceの自動適用など）
+// =============================================================================
+const { createInsertSchema, createSelectSchema, createUpdateSchema } =
+  createSchemaFactory({
+    // 以下の自動変換を有効化
+    coerce: {
+      date: true, // 日付型（文字列→Date）
+      number: true, //数値型（文字列→数値）
+      boolean: true, // ブール値の（"true"→true）
+    },
+    zodInstance: z, // 拡張インスタンスを使用
+  });
+
+// =============================================================================
+// テーブル定義
+// =============================================================================
+// 命名規則: 各テーブルのTSオブジェクト名は{entity}Table、各カラムのプロパティ名はやcreatedAtなどcamelCaseにする。一方、DB上の実テーブル名（pgTableの第1引数など）はusers, verification_tokensのようにsnake_caseにする。
+// 認証関連
+// ユーザー定義
+export const usersTable = pgTable("users", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  emailVerified: boolean("email_verified").notNull(),
+  image: text("image"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdateFn(() => new Date()),
+});
+
+export const sessionsTable = pgTable("sessions", {
+  /* ... */
+});
+
+export const accountsTable = pgTable("accounts", {
+  /* ... */
+});
+
+export const verificationTokensTable = pgTable("verification_tokens", {
+  /* ... */
+});
+
+// アプリ本体関連
+// 投稿テーブル
+export const postsTable = pgTable("posts", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => usersTable.id, { onDelete: "cascade" }),
+  published: boolean("published").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdateFn(() => new Date()),
+});
+
+// コメントテーブル
+export const commentsTable = pgTable("comments", {
+  id: serial("id").primaryKey(),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdateFn(() => new Date()),
+  postId: integer("post_id").references(() => postsTable.id, { onDelete: "cascade" }),
+});
+
+// =============================================================================
+// リレーション定義
+// =============================================================================
+// 命名規則：{entities}Relations
+// 認証関連
+export const usersRelations = relations(usersTable, ({ many }) => ({
+  sessions: many(sessionsTable),
+  accounts: many(accountsTable),
+  posts: many(postsTable),
+}));
+
+export const sessionsRelations = relations(sessionsTable, ({ one }) => ({
+  user: one(usersTable, {
+    fields: [sessionsTable.userId],
+    references: [usersTable.id],
+  }),
+}));
+
+// アプリ本体
+export const postsRelations = relations(postsTable, ({ one, many }) => ({
+  user: one(usersTable, {
+    fields: [postsTable.userId],
+    references: [usersTable.id],
+  }),
+  comments: many(commentsTable),
+}));
+
+// =============================================================================
+// Zodスキーマ定義（drizzle-zod統合によるSingle Source of Truth）
+// =============================================================================
+// 命名規則：{entity}{Operation}Schema
+
+// users - カスタムバリデーション付きスキーマ
+export const userInsertSchema = createInsertSchema(usersTable, {
+  name: (schema) => schema.min(1, "名前は必須です").max(100, "名前は100文字以内"),
+  email: (schema) => schema.email("有効なメールアドレスを入力してください"),
+});
+export const userSelectSchema = createSelectSchema(usersTable);
+export const userUpdateSchema = createUpdateSchema(usersTable);
+
+// posts - カスタムバリデーション付きスキーマ
+export const postInsertSchema = createInsertSchema(postsTable, {
+  title: (schema) => schema.min(1, "タイトルは必須").max(200, "タイトルは200文字以内"),
+  content: (schema) =>
+    schema.min(1, "コンテンツは必須").max(5000, "コンテンツは5000文字以内"),
+});
+export const postSelectSchema = createSelectSchema(postsTable);
+export const postUpdateSchema = createUpdateSchema(postsTable);
+
+// =============================================================================
+// TS型定義（drizzle-zod統合によるSingle Source of Truth）
+// =============================================================================
+// 命名規則：{Entity}, {Entity}{Operation}
+
+// users
+export type User = typeof usersTable.$inferSelect;
+export type NewUser = typeof usersTable.$inferInsert;
+export type UserInsert = z.infer<typeof userInsertSchema>;
+export type UserSelect = z.infer<typeof userSelectSchema>;
+export type UserUpdate = z.infer<typeof userUpdateSchema>;
+
+// posts
+export type Post = typeof postsTable.$inferSelect;
+export type NewPost = typeof postsTable.$inferInsert;
+export type PostInsert = z.infer<typeof postInsertSchema>;
+export type PostSelect = z.infer<typeof postSelectSchema>;
+export type PostUpdate = z.infer<typeof postUpdateSchema>;
+```
+
+## Server Functions運用ルール
+
+- **エンティティごとにCRUD操作とqueryOptionsを定義する**: DBスキーマで定義したデータモデル（テーブル定義）ごとにファイルを作成（ `~/data-access/{entities}.ts`）。関連するCRUD操作とそれらに対応するTanStack Query用の queryOption`（xxxQuery, xxxMutation）`を定義してコロケーションする。
+  - ディレクトリ例：
+    ```
+    src/
+    ├── data-access/
+    │   ├── users.ts          # ユーザー関連
+    │   ├── posts.ts          # 投稿関連
+    │   ├── comments.ts       # コメント関連
+    │   └── auth.ts           # 認証関連
+    ```
+- **認証が必要なServer Functionには必ず認証ミドルウェアを使用する**: 
