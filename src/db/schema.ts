@@ -20,7 +20,7 @@ const { createInsertSchema, createSelectSchema, createUpdateSchema } =
 // ===========================================================================
 // テーブル定義（認証関連のテーブルを切り出す複数スキーマ構成ができなかったため、1つのPublicスキーマ内にすべてのテーブルを定義している）
 // ===========================================================================
-// 命名規則: テーブルオブジェクト名はエンティティ複数形＋Table（`{entities}Table`）にし、各カラムのプロパティ名は`createdAt`のようにcamelCaseにする。一方、DB上の実テーブル名（pgTableの第1引数）は` verification_tokens`のように複数形snake_caseにし、各カラム名は単数系snake_caseにする。
+// 命名規則: テーブルオブジェクト名はエンティティ複数形＋Table（`{entities}Table`）にし、各カラムのプロパティ名は`createdAt`のようにcamelCaseにする。一方、DB上の実テーブル名（pgTableの第1引数）は` verification_tokens`のように複数形snake_caseにし、各カラム名は単数形snake_caseにする。
 
 // 認証関連
 // ユーザー定義
@@ -160,7 +160,7 @@ export const commentsRelations = relations(commentsTable, ({ one }) => ({
 // ===========================================================================
 // Zodスキーマ定義（`drizzle-zod`ライブラリから生成）
 // ===========================================================================
-// 命名規則：各スキーマ名は `userSelectSchema`のように`{entity}{Operation}Schema`にする。
+// 命名規則：各Zodスキーマ名は `userSelectSchema`のように`{entity}{Operation}Schema`にする。
 // 詳細は[drizzle-zodのドキュメント](https://orm.drizzle.team/docs/zod)を参照。
 
 // users

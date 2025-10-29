@@ -2,31 +2,43 @@
 alwaysApply: false
 ---
 
-# データエンティティ運用戦略
+# データモデル運用戦略
 
 ## 💎 SSOT原則の徹底
 
 - **DrizzleスキーマをSSOTとして位置付ける**: 一貫してDrizzleスキーマ（`~/db/schema.ts`）を Single Source of Truth （”信頼できる唯一の情報源”）として扱う。すなわち既にそこで定義されたエンティティ情報に重複するようなZodスキーマ定義やTS型定義などは、データ定義が分散してしまうため新たに作成しない。
-- **ZodスキーマとTS型はDrizzleスキーマからインポートして使用する**: `drizzle-zod`ライブラリを使用して、Drizzleスキーマで定義したエンティティ専用のZodスキーマ定義とそれに対応するTS型を生成する（以下詳細）。コード上では一貫してそれらをインポートし、必要に応じてフィールドを追加・削除したものを使用する。ただし、当然Drizzleスキーマに定義されたエンティティに関するものに限るため、フロントエンドでのみ使用するようなZodスキーマ（例えばSearch Paramsを定義するZodスキーマなど）はこの限りではない。
+- **ZodスキーマとTS型はDrizzleスキーマからインポートして使用する**: `drizzle-zod`ライブラリを使用して、Drizzleスキーマで定義したエンティティ専用のZodスキーマ定義とそれに対応するTS型を生成する（以下詳細）。コード上では一貫してそれらをインポートし、`pick(), omit()`などを用いて必要に応じてフィールドを追加・削除したものを使用する。ただし、当然Drizzleスキーマに定義されたエンティティに関するものに限るため、フロントエンドでのみ使用するようなZodスキーマ（例えばSearch Paramsを定義するZodスキーマなど）はこの限りではない。
   - **基本Zodスキーマ定義**: `drizzle-zod`ライブラリから提供されるメソッドを使用して、CREATE（INSERT）用、READ（SELECT）用、UPDATE（DELETE）用の3つの基本Zodスキーマを、すべてのアプリ本体エンティティごとに生成する。認証関連のテーブル定義などに対して生成しない。
-  - **TS型定義**: 上記の基本Zodスキーマ定義から、`z.infer<typeof ...>`などを使用してそれぞれTS型を生成する。
+  - **TS型定義**: 上記の基本Zodスキーマ定義から、`z.infer<typeof ...>`などを使用してそれぞれTS型を生成する。Zodスキーマが必要ない認証関連のエンティティは`typeof {entities}Table.$inferSelect`などを使用して、テーブル定義から直接TS型を生成する。
 
 ## Drizzleスキーマ実装指針
 
-- **Drizzleスキーマの全体的な構造**: 1つのDrizzleスキーマファイル（`~/db/schema.ts`）内にて、以下のセクションごとに記述していく。
-  - Schema Factory設定（`drizzle-zod`ライブラリによってDrizzleスキーマ全体に適用される統一的なルール。型強制coerceの自動適用など）
-  - テーブル定義（認証関連のテーブルを切り出す複数スキーマ構成ができなかったため、1つのPublicスキーマ内にすべてのテーブルを定義している）
-  - リレーション定義
-  - 生成したZodスキーマ
-  - 生成したTS型
-- **Drizzleスキーマ内の命名規則**: それぞれのセクション固有の命名規則を厳守する。
-  - **テーブル定義**: テーブルオブジェクト名はエンティティ複数形＋Table（`{entities}Table`）にし、各カラムのプロパティ名は`createdAt`のようにcamelCaseにする。一方、DB上の実テーブル名（pgTableの第1引数）は` verification_tokens`のように複数形snake_caseにし、各カラム名は単数系snake_caseにする。
-  - **リレーション定義**: リレーションオブジェクト名はエンティティ複数形＋Relations（`{entities}Relations`）にする。
-  - **Zodスキーマ定義**: 各スキーマ名は `userSelectSchema`のように`{entity}{Operation}Schema`にする。
-  - **TS型定義**: READ（SELECT）用のTS型名は `User`のように`{Entity}`にし, それ以外のTS型名は`{Entity}{Operation}`にする。
-- **日時カラムはTimestamptz型を使用する**:
+### Drizzleスキーマの全体的な構造
 
-### 具体的なDrizzleスキーマ例
+1つのDrizzleスキーマファイル（`~/db/schema.ts`）内にて、以下のセクションごとに記述していく。
+
+- Schema Factory設定
+  - Drizzleスキーマ全体に統一的に適用したいルールを記述するもの。日時を文字列からDate型に自動変換するなど、Zodの `coerce`を一括で適用できる。
+- テーブル定義
+  - 認証関連のテーブルを切り出す複数スキーマ構成ができなかったため、1つのPublicスキーマ内にすべてのテーブルを定義している
+- リレーション定義
+- 生成したZodスキーマ
+- 生成したTS型
+
+### Drizzleスキーマ内の命名規則
+
+それぞれのセクション固有の命名規則を厳守する。
+
+- **テーブル定義**: テーブルオブジェクト名はエンティティ複数形＋Table（`{entities}Table`）にし、各カラムのプロパティ名は`createdAt`のようにcamelCaseにする。一方、DB上の実テーブル名（pgTableの第1引数）は` verification_tokens`のように複数形snake_caseにし、各カラム名は単数形snake_caseにする。
+- **リレーション定義**: リレーションオブジェクト名はエンティティ複数形＋Relations（`{entities}Relations`）にする。
+- **Zodスキーマ定義**: 各Zodスキーマ名は `userSelectSchema`のように`{entity}{Operation}Schema`にする。
+- **TS型定義**: READ（SELECT）用のTS型名は `User`のように`{Entity}`にし, それ以外のTS型名は`{Entity}{Operation}`にする。
+
+### その他
+
+- **日時カラムはtimestamptz（Timestamp with Timezone）型を使用する**: DB上の日時情報がすべてUTC統一される。アプリ側は、DBから取得したDate型情報をユーザーのタイムゾーンに合わせて表示することだけに集中できる。
+
+## 具体的なDrizzleスキーマ例
 
 ```ts
 // src/db/schema.ts
@@ -52,7 +64,7 @@ const { createInsertSchema, createSelectSchema, createUpdateSchema } =
 // ===========================================================================
 // テーブル定義（認証関連のテーブルを切り出す複数スキーマ構成ができなかったため、1つのPublicスキーマ内に定義している）
 // ===========================================================================
-// 命名規則: テーブルオブジェクト名は `{entities}Table`のようにエンティティ複数形＋Tableとし、各カラムのプロパティ名は`createdAt`のようにcamelCaseにする。一方、DB上の実テーブル名（pgTableの第1引数）は` verification_tokens`のように複数形snake_caseとし、各カラム名は単数系snake_caseにする。
+// 命名規則: テーブルオブジェクト名は `{entities}Table`のようにエンティティ複数形＋Tableとし、各カラムのプロパティ名は`createdAt`のようにcamelCaseにする。一方、DB上の実テーブル名（pgTableの第1引数）は` verification_tokens`のように複数形snake_caseとし、各カラム名は単数形snake_caseにする。
 // 認証関連
 // ユーザー定義
 export const usersTable = pgTable("users", {
