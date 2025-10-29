@@ -3,9 +3,9 @@ import { boolean, integer, pgTable, serial, text, timestamp } from "drizzle-orm/
 import { createSchemaFactory } from "drizzle-zod";
 import { z } from "zod";
 
-// =============================================================================
-// Schema Factory設定（プロジェクト全体で統一的なルールを適用。型強制coerceの自動適用など）
-// =============================================================================
+// ===========================================================================
+// Schema Factory設定（`drizzle-zod`ライブラリによってDrizzleスキーマ全体に適用される統一的なルール。型強制coerceの自動適用など）
+// ===========================================================================
 const { createInsertSchema, createSelectSchema, createUpdateSchema } =
   createSchemaFactory({
     coerce: {
@@ -13,15 +13,14 @@ const { createInsertSchema, createSelectSchema, createUpdateSchema } =
       number: true, //数値型（文字列→数値）
       boolean: true, // ブール値の（"true"→true）
     },
-    // zodInstance: z, // インポートした拡張インスタンスを使用したい場合はここで指定する。
+    // インポートした拡張インスタンスを使用する場合
+    // zodInstance: z,
   });
 
-// =============================================================================
-// テーブル定義
-// =============================================================================
-// 命名規則: 各テーブルのTSオブジェクト名は{entity}Table、各カラムのプロパティ名はやcreatedAtなどcamelCaseにする。一方、DB上の実テーブル名（pgTableの第1引数など）はusers, verification_tokensのようにsnake_caseにする。
-
-// Drizzle ORMでは、PostgreSQLの”public”スキーマは特別扱いされており、pgSchema("public")は使えないため、pgTableを直接使用してテーブルを定義していく。
+// ===========================================================================
+// テーブル定義（認証関連のテーブルを切り出す複数スキーマ構成ができなかったため、1つのPublicスキーマ内にすべてのテーブルを定義している）
+// ===========================================================================
+// 命名規則: テーブルオブジェクト名はエンティティ複数形＋Table（`{entities}Table`）にし、各カラムのプロパティ名は`createdAt`のようにcamelCaseにする。一方、DB上の実テーブル名（pgTableの第1引数）は` verification_tokens`のように複数形snake_caseにし、各カラム名は単数系snake_caseにする。
 
 // 認証関連
 // ユーザー定義
@@ -108,19 +107,20 @@ export const postsTable = pgTable("posts", {
 export const commentsTable = pgTable("comments", {
   id: serial("id").primaryKey(),
   content: text("content").notNull(),
+  postId: integer("post_id").references(() => postsTable.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow()
     .$onUpdateFn(() => new Date()),
-  postId: integer("post_id").references(() => postsTable.id, { onDelete: "cascade" }),
 });
 
-// =============================================================================
+// ===========================================================================
 // リレーション定義
-// =============================================================================
-// 命名規則：{entities}Relations
+// ===========================================================================
+// 命名規則：リレーションオブジェクト名はエンティティ複数形＋Relations（`{entities}Relations`）にする。
 
+// 認証関連
 export const usersRelations = relations(usersTable, ({ many }) => ({
   sessions: many(sessionsTable),
   accounts: many(accountsTable),
@@ -157,13 +157,13 @@ export const commentsRelations = relations(commentsTable, ({ one }) => ({
   }),
 }));
 
-// =============================================================================
-// Zodスキーマ定義（Server FunctionsやAPIなど統一的にバリデーションに使用する）
-// =============================================================================
-// 命名規則：{entity}{Operation}Schema
-// drizzle-zodの[ドキュメント](https://orm.drizzle.team/docs/zod)を参照。
+// ===========================================================================
+// Zodスキーマ定義（`drizzle-zod`ライブラリから生成）
+// ===========================================================================
+// 命名規則：各スキーマ名は `userSelectSchema`のように`{entity}{Operation}Schema`にする。
+// 詳細は[drizzle-zodのドキュメント](https://orm.drizzle.team/docs/zod)を参照。
 
-// users - カスタムバリデーション付きスキーマ
+// users
 export const userSelectSchema = createSelectSchema(usersTable);
 export const userInsertSchema = createInsertSchema(usersTable, {
   name: (schema) => schema.min(1, "名前は必須です").max(100, "名前は100文字以内"),
@@ -171,7 +171,7 @@ export const userInsertSchema = createInsertSchema(usersTable, {
 });
 export const userUpdateSchema = createUpdateSchema(usersTable);
 
-// posts - カスタムバリデーション付きスキーマ
+// posts
 export const postSelectSchema = createSelectSchema(postsTable);
 export const postInsertSchema = createInsertSchema(postsTable, {
   title: (schema) => schema.min(1, "タイトルは必須").max(200, "タイトルは200文字以内"),
@@ -180,7 +180,7 @@ export const postInsertSchema = createInsertSchema(postsTable, {
 });
 export const postUpdateSchema = createUpdateSchema(postsTable);
 
-// comments - カスタムバリデーション付きスキーマ
+// comments
 export const commentSelectSchema = createSelectSchema(commentsTable);
 export const commentInsertSchema = createInsertSchema(commentsTable, {
   content: (schema) =>
@@ -188,10 +188,10 @@ export const commentInsertSchema = createInsertSchema(commentsTable, {
 });
 export const commentUpdateSchema = createUpdateSchema(commentsTable);
 
-// =============================================================================
-// TS型定義（drizzle-zod統合によるSingle Source of Truth）
-// =============================================================================
-// 命名規則：{Entity}, {Entity}{Operation}
+// ===========================================================================
+// TS型定義（上記のZodスキーマ定義から生成）
+// ===========================================================================
+// 命名規則：READ（SELECT）用のTS型名は `User`のように`{Entity}`にし, それ以外のTS型名は`{Entity}{Operation}`にする。
 
 // users
 export type User = z.infer<typeof userSelectSchema>;
