@@ -6,67 +6,6 @@ alwaysApply: false
 
 ## 🔧 Server Functions設計パターン
 
-### 基本的なServer Function定義
-
-```tsx
-// lib/api/example.ts
-import { createServerFn } from '@tanstack/react-start'
-import { eq } from 'drizzle-orm'
-import { db } from '~/db'
-import { usersTable, postsTable, userSelectSchema } from '~/db/schema' // ✅ schema.tsからインポート
-import { authMiddleware } from '~/lib/middlewares'
-
-// 基本的なGET Server Function（認証なし）
-export const getUser = createServerFn({
-  method: 'GET',
-})
-  .validator(userSelectSchema.pick({ id: true })) // ✅ schema.tsのスキーマ使用
-  .handler(async ({ data }) => {
-    const { id } = data
-
-    try {
-      // Drizzle ORM SQL-like方式でのクエリ
-      const [user] = await db
-        .select()
-        .from(usersTable)
-        .where(eq(usersTable.id, id))
-
-      if (!user) {
-        throw new Error('User not found')
-      }
-
-      return user
-    } catch (error) {
-      console.error('Failed to fetch user:', error)
-      throw new Error('Failed to fetch user')
-    }
-  })
-```
-
-### 設定オプションの活用
-
-```tsx
-// レスポンス形式の制御
-export const getRawResponse = createServerFn({
-  method: 'GET',
-  response: 'raw', // Response オブジェクトを直接返す
-}).handler(async () => {
-  return new Response('Hello, World!', {
-    headers: { 'Content-Type': 'text/plain' }
-  })
-})
-
-// 静的Server Function（ビルド時実行）
-export const getStaticData = createServerFn({
-  type: 'static'
-}).handler(async () => {
-  return {
-    buildTime: new Date().toISOString(),
-    version: process.env.npm_package_version
-  }
-})
-```
-
 ### 標準的なPOST Server Function（認証あり）
 
 ```tsx
@@ -128,24 +67,6 @@ export const createPostFromForm = createServerFn({
       .returning()
 
     return newPost
-  })
-```
-
-### 例外：認証不要のServer Function（明示的コメント必須）
-
-```tsx
-// ✅ 例外パターン：パブリックなお問い合わせフォーム
-export const submitContactForm = createServerFn({ method: 'POST' })
-  .validator(z.object({
-    name: z.string().min(1),
-    email: z.string().email(),
-    message: z.string().min(10)
-    // 注：一時的なフォームデータ（DBに保存されない）
-  }))
-  // 認証ミドルウェア適用なし（パブリックフォームのため）
-  .handler(async ({ data }) => {
-    await sendEmail(data)
-    return { success: true }
   })
 ```
 
@@ -588,22 +509,7 @@ export const getDashboardData = createServerFn({
 
 ## 🏗️ 実装時の注意点
 
-### 必須要件
-
-1. **認証ミドルウェアの徹底適用**
-   - 全てのPOSTメソッドに基本的に`authMiddleware`適用
-   - 例外は明示的にコメントで理由を記載
-
-2. **schema.tsのSingle Source of Truth徹底**
-   - 独自Zodスキーマ作成を避け、必ずschema.tsからインポート
-   - 例外は限定的なケース（認証機能、一時的データなど）のみ
-
-3. **型安全性の確保**
-   - Drizzle ORMの型推論を活用（`$inferSelect`, `$inferInsert`）
-   - Zodスキーマからの型推論（`z.infer<typeof schema>`）
-
 ### パフォーマンス最適化
-- Server Functionsは必要最小限のデータのみ返す
 - Drizzle ORMのSQL-like方式で効率的なクエリを構築
 - ストリーミングを活用して初期表示を高速化
 - キャッシュ戦略を適切に設定

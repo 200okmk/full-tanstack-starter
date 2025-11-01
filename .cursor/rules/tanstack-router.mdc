@@ -75,7 +75,9 @@ alwaysApply: false
 
 - **関連する子コンポーネントはコロケーションする**: 親コンポーネントにインポートされた関連する子コンポーネントは、URLパスに表出しないコンポーネントフォルダ（`-components/`）内にコロケーションする。
 
-- **フォールバックUIを実装する**: ペンディング状態時であれば、Shadcn/uiの[`Skeleton`コンポーネント](https://ui.shadcn.com/docs/components/skeleton)などを使用して`Suspense`でラップした子コンポーネント向けのスケルトンかスピナーフォールバックUIを実装する。非同期処理解決後に実際にストリーミングされるUIのデザインをおおまかに再現する。また、エラー時用ののフォールバックUIも実装する。
+- **Suspense境界単位でフォールバックUIを実装する**: Shadcn/uiの[`Skeleton`コンポーネント](https://ui.shadcn.com/docs/components/skeleton)などを使用して、`Suspense`でラップした子コンポーネント向けのスケルトンかスピナーフォールバックUIを実装する。非同期処理解決後に実際にストリーミングされるUIのデザインをおおまかに再現する。また、エラー時用ののフォールバックUIも実装する。
+
+- **Route単位でエラーコンポーネントを実装する**: Route単位で細かくエラーハンドリングするため、可能な限り`errorComponent: `に専用エラーコンポーネントを指定する。
 
 ### 具体的なコード例
 
@@ -84,47 +86,47 @@ alwaysApply: false
 export const getPostById = createServerFn({
   method: "GET",
 })
-.validator(postSelectSchema.pick({ id: true }))
-.handler(async ({ data: { id } }) => {
-    ...
-})
+  .validator(postSelectSchema.pick({ id: true }))
+  .handler(async ({ data: { id } }) => {
+    /* ... */
+  });
 
 export const getRelatedPosts = createServerFn({
   method: "GET",
 })
-.validator(postSelectSchema.pick({ id: true }))
-.handler(async ({ data: { id } }) => {
-    ...
-})
+  .validator(postSelectSchema.pick({ id: true }))
+  .handler(async ({ data: { id } }) => {
+    /* ... */
+  });
 
 // queryOptions定義は、queryFnに指定されている非同期関数と同じファイル上にコロケーションする
 export const getPostByIdQuery = (postId: string) =>
   queryOptions({
-    queryKey: ['post', postId],
+    queryKey: ["post", postId],
     queryFn: () => getPostById(postId),
-  })
+  });
 
 export const getRelatedPostsQuery = (postId: string) =>
   queryOptions({
-    queryKey: ['related-posts', postId],
+    queryKey: ["related-posts", postId],
     queryFn: () => getRelatedPosts(postId),
-  })
+  });
 
 // ~/data-access/comments
 // Post本体情報の表示を優先させるためにコメントのような付随情報はストリームで時差表示させたい時は、上記の `getPostById` のクエリビルドでテーブルをJoinせずに、このように単体のServer Functionsと `getRelatedCommentsQuery` として分離する。
 export const getPostComments = createServerFn({
   method: "GET",
 })
-.validator(postSelectSchema.pick({ id: true }))
-.handler(async ({ data: { id } }) => {
-    ...
-})
+  .validator(postSelectSchema.pick({ id: true }))
+  .handler(async ({ data: { id } }) => {
+    /* ... */
+  });
 
 export const getPostCommentsQuery = (postId: string) =>
   queryOptions({
-    queryKey: ['post-comments', postId],
+    queryKey: ["post-comments", postId],
     queryFn: () => getPostComments(postId),
-  })
+  });
 ```
 
 ```ts
