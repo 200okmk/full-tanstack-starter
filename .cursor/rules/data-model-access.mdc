@@ -201,7 +201,7 @@ export type CommentUpdate = z.infer<typeof commentUpdateSchema>;
 
 ## Server Functions運用ルール
 
-- **エンティティごとにCRUD操作とqueryOptionsを定義する**: DBスキーマで定義したデータモデル（テーブル定義）ごとにファイルを作成（ `~/data-access/{entities}.ts`）。関連するCRUD操作とそれらに対応するTanStack Query用の queryOption`（xxxQuery, xxxMutation）`を定義してコロケーションする。
+- **エンティティごとにCRUD操作とqueryOptionを定義する**: Drizzleスキーマで定義したエンティティ（テーブル定義）ごとにファイルを作成する（`~/data-access/{entities}.ts`）。主にCRUD操作をするServer Functionとそれに対応するTanStack Query用のqueryOption `（xxxQuery, xxxMutation）`をそのファイル内に定義してコロケーションする。
   - ディレクトリ例：
     ```
     src/
@@ -210,5 +210,11 @@ export type CommentUpdate = z.infer<typeof commentUpdateSchema>;
     │   ├── posts.ts          # 投稿関連
     │   ├── comments.ts       # コメント関連
     │   └── auth.ts           # 認証関連
+    ...
     ```
-- **認証が必要なServer Functionには必ず認証ミドルウェアを使用する**:
+- **validator()内での検証には、既にどこかで定義されているはずのZodスキーマをインポートして使用する（SSOT原則）**:
+  - 大前提として、サーバーサイドでも基本的に入力値に対してバリデーションを行う。
+  - テーブルとして定義したエンティティに関するCRUであれば、Drizzleスキーマから該当のZodスキーマをインポートする。
+  - あるいは、そのServer Functionが依存している要素のバリデーションに使用すべきZodスキーマ（例えばSearch Paramsを定義するZodスキーマ）は、該当のRouteなどからインポートする。
+- **認証が必要なServer Functionには必ず認証ミドルウェアを適用する**: 主にCREATE, UPDATE, DELETE操作を想定。ミドルウェア定義は `~/lib/middlewares.ts`などにて行う。
+- **SQLライク方式でクエリビルドを記述する**: 特に理由なし。SQL自体の学習も兼ねることができるため。
