@@ -47,8 +47,8 @@ alwaysApply: false
 
 ## 🔒 認証パターン
 
-- **認証保護ルートディレクトリの明示**: 認証保護したいルートは `/src/routes/_authenticated/` ディrクトリ配下に追加していく。
-- **beforeLoad での認証ガード実装**: RootのRoute（`~/routes/__root.tsx`） のcontextに追加したsessionUser('session-user')をbeforeLoad にて参照し、ログインセッションの検証を行う。またユーザーのロールなど追加した場合もここで適宜検証する。
+- **認証保護ルートディレクトリの明示**: 認証保護したいルートは `/src/routes/_authenticated/` ディレクトリ配下に追加していく。
+- **beforeLoad での認証ガード実装**: Root route（`~/routes/__root.tsx`） のcontextに追加したsessionUser('session-user')をbeforeLoad にて参照し、ログインセッションの検証を行う。またユーザーのロールなど追加した場合もここで適宜検証する。
 
 ### **beforeLoad()の適切な使用場面**:
 
@@ -363,9 +363,9 @@ export const Route = createFileRoute('/posts/')({
   errorComponent: PostsPageError,
 })
 
-// ============================================
+// =============================================
 // 親コンポーネント（静的UI + 非同期UIのSuspense境界）
-// ============================================
+// =============================================
 function PostsPage() {
   const navigate = useNavigate({ from: Route.fullPath })
 
@@ -378,7 +378,7 @@ function PostsPage() {
     }),
   })
 
-  // 各Route専用のSearchParams更新ヘルパーを定義する
+  // 各Routeごとに専用のSearchParams更新ヘルパーを定義する
   const updateSearch = (updates: Partial<PostsSearch>) => {
     navigate({
       search: (prev) => ({ ...prev, ...updates }),
@@ -560,14 +560,11 @@ function PostsPagination({ currentPage, onPageChange, totalPages }: PostsPaginat
 ```ts
 // ~/data-access/posts.ts
 import { createServerFn } from '@tanstack/start'
-...
+/* ... */
 // ✅ Routeで定義したスキーマをインポート（唯一の情報源）
 import { postsSearchSchema } from '~/routes/posts/index'
 
-// ==========================================
-// Server Functions
-// ==========================================
-...
+
 // ✅ UI専用の`view`を除外し、postsSearchSchemaからデータ取得に必要なフィールドのみを抽出。
 const getPostsInputSchema = postsSearchSchema.pick({
   page: true,
@@ -590,9 +587,7 @@ export const getPosts = createServerFn({ method: 'GET' })
     }
   })
 ...
-// ============================================
 // Query Options（コロケーション）
-// ============================================
 export const getPostsQuery = (input: GetPostsInput) =>
   queryOptions({
     queryKey: ['posts', input],
