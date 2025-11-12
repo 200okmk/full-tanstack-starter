@@ -21,7 +21,7 @@ alwaysApply: false
 - Schema Factory設定（`drizzle-zod`ライブラリのもの）
   - Drizzleスキーマ全体に統一的に適用したいルールを記述するもの。日時を文字列からDate型に自動変換するなど、Zodの `coerce`を一括で適用できる。
 - テーブル定義
-  - 認証関連のテーブルを切り出して複数スキーマ構成にできなかったため、実質1つのPublicスキーマ内にすべてのテーブルを定義している
+  - 認証関連のテーブルを切り出して複数スキーマ構成にできなかったため、実質1つのPublicスキーマ内にすべてのテーブルを定義している。
 - リレーション定義
 - 生成したZodスキーマ
 - 生成したTS型
@@ -199,9 +199,9 @@ export type CommentUpdate = z.infer<typeof commentUpdateSchema>;
 ...
 ```
 
-## Server Functions運用ルール
+## Server Functions運用方法
 
-- **エンティティごとにCRUD操作とqueryOptionを定義する**: Drizzleスキーマで定義したエンティティ（テーブル定義）ごとにファイルを作成する（`~/data-access/{entities}.ts`）。主にCRUD操作をするServer Functionとそれに対応するTanStack Query用のqueryOption `（xxxQuery, xxxMutation）`をそのファイル内に定義してコロケーションする。
+- **エンティティごとにCRUD操作とqueryOptionを定義する**: Drizzleスキーマで定義したエンティティ（テーブル定義）ごとにファイルを作成する（`~/data-access/{entities}.ts`）。そのファイル内で、主にCRUD操作をするServer Functionとそれに対応するTanStack Query用のqueryOption `（xxxQuery, xxxMutation）`を定義してコロケーションする。
   - ディレクトリ例：
     ```
     src/
@@ -214,7 +214,7 @@ export type CommentUpdate = z.infer<typeof commentUpdateSchema>;
     ```
 - **validator()内での検証には、既にどこかで定義されているはずのZodスキーマをインポートして使用する（SSOT原則）**:
   - 大前提として、サーバーサイドでも基本的に入力値に対してバリデーションを行う。
-  - テーブルとして定義したエンティティに関するCRUであれば、Drizzleスキーマから該当のZodスキーマをインポートする。
-  - あるいは、そのServer Functionが依存している要素のバリデーションに使用すべきZodスキーマ（例えばSearch Paramsを定義するZodスキーマ）は、該当のRouteなどからインポートする。
+  - テーブルとして定義したエンティティに関するCRUDメソッド（`getPostById()`など）では、Drizzleスキーマから該当のZodスキーマをインポートする。
+  - あるいは、そのServer Functionが依存している要素のバリデーションのために定義したZodスキーマ（例えば `getPosts()`のloaderDepsとなる Search Paramsを定義しているZodスキーマ）があれば、該当のRouteパスなどからインポートする。
 - **認証が必要なServer Functionには必ず認証ミドルウェアを適用する**: 主にCREATE, UPDATE, DELETE操作を想定。ミドルウェア定義は `~/lib/middlewares.ts`などにて行う。
 - **SQLライク方式でクエリビルドを記述する**: 特に理由なし。SQL自体の学習も兼ねることができるため。

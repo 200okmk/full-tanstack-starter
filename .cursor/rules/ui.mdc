@@ -6,7 +6,7 @@ alwaysApply: false
 
 # UI構築・運用戦略
 
-## Shadcn/uiエコシステム
+## Shadcn/ui中心
 
 - **Shadcn/uiを中心にUIを構築していく**: `~/components/ui`内に配置されていくShadcn/uiの[基礎UIコンポーネント群](https://ui.shadcn.com/docs/components)を組み合わせてアプリのUIを構築していく。
 <!-- - **Shadcn/uiと互換を持つレジストリも活用する**:  -->

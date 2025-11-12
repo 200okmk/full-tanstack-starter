@@ -1,6 +1,6 @@
 # [Tanstack Start テンプレート🏝️]()
 
-フルスタックTypeScript/ReactフレームワークのTanstack Startを下記の技術スタックで立ち上げ、Netlifyにデプロイするためのテンプレート
+フルスタックReactフレームワークのTanstack Startを下記の技術スタックで立ち上げ、Netlifyにデプロイするためのテンプレート
 
 ## 使用技術
 
