@@ -860,19 +860,26 @@ function UserListContent() {
 
 ## Shadcn/uiエコシステム
 
-- **Shadcn/uiの上にUIを構築する**: Shadcn/uiが`~/components/ui`内に配置する[基礎UIコンポーネント群](https://ui.shadcn.com/docs/components)を優先的に組み合わせてアプリのUIを構築していく。Shadcn/uiの拡張ライブラリやフォロワーライブラリなども活用していく（[KiboUI](https://www.kibo-ui.com/), [MagicUI](https://magicui.design/docs)）。
+- **Shadcn/uiの上にUIを構築する**: Shadcn/uiが`~/components/ui`内に配置する[基礎UIコンポーネント群](https://ui.shadcn.com/docs/components)を組み合わせてアプリのUIを構築していく。
+<!-- - **Shadcn/uiと互換を持つレジストリも活用する**:  -->
 - **基礎UIコンポーネントに対するスタイリング**: アプリ内で常に統一的に適用されるべきデザインである場合のみ、 `~/components/ui`内に配置された基礎UIコンポーネントのデフォルトTailwindユーティリティを直接編集して良い。それ以外の一時的なスタイル変更は className属性に対して `cn()`便利関数(`~/lib/utils.ts`)などを使用して上書きする。
 - **アイコンライブラリ**: プロジェクト内で使用するアイコンライブラリは基本的に `lucide-react`を使用する。
 - **フォールバックUI**: ペンディング状態中のコンポーネントのフォールバックUIの作成には、基本的に[Shadcn/uiの`Skeleton`コンポーネント](https://ui.shadcn.com/docs/components/skeleton)を使用する（`./tanstack-router.mdc`で詳述）。
 
-## デザインシステム運用戦略
+## デザインシステム
 
 ### デザイントークン
+
+- **Shadcn/uiのCSS変数定義を拡張する**: Shadcn/ui初期化時にデフォルトで提供される`~/styles/app.css`のCSS変数をベースとして、随時変更・拡張していく。
 
 ### レスポンシブ対応
 
 - **モバイル、タブレット、PCの3つのレイアウトを作成する**: 標準で実装する3つのレイアウトの基本ブレークポイントをそれぞれ、モバイル向けはprefixなし、タブレット向けは`md:`（48rem, 768px）、PC向けは`xl:`（80rem, 1280px）とする。ただし絶対的な基準ではないため、不自然にレイアウトが崩れる場合は最適なブレークポイントをその都度柔軟に選択する（https://tailwindcss.com/docs/responsive-design#overview）。
-- **子コンポーネント内部ではコンテナクエリを使用する**: ページのマクロレイアウトはメディアクエリで行い、子コンポーネント内部では[コンテナクエリ](https://tailwindcss.com/docs/responsive-design#container-queries)を使用してデザインの自己完結性を向上させる。
+- **子コンポーネント内部ではコンテナクエリを使用する**: ページの全体的なレイアウトはメディアクエリで行い、子コンポーネント内部では[コンテナクエリ](https://tailwindcss.com/docs/responsive-design#container-queries)を使用してデザインの自己完結性を向上させる。
+
+### ダークモード
+
+- **ダークモードの実装も標準とする**: ダークモード用のデザイントークンを`~/styles/app.css`の `.dark {}`にも同時に定義していく。具体的には、必ず `:root {}`内で定義している変数名と全く同じ変数名（例えば`--background`, `--secondary`など）で定義する。これによりライトモード/ダークモード共通のユーティリティクラス（`bg-background`など）を記述でき、className属性上で毎回`dark:`variantを使用してユーティリティクラスを書き分ける必要がなくなるため。
 
 ## アクセシビリティ配慮
 
