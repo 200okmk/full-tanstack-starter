@@ -212,7 +212,7 @@ export type CommentUpdate = z.infer<typeof commentUpdateSchema>;
     │   └── auth.ts           # 認証関連
     ...
     ```
-- **validator()内での検証には、既にどこかで定義されているはずのZodスキーマをインポートして使用する（SSOT原則）**:
+- **inputValidator()内での検証には、既にどこかで定義されているはずのZodスキーマをインポートして使用する（SSOT原則）**:
   - 大前提として、サーバーサイドでも基本的に入力値に対してバリデーションを行う。
   - テーブルとして定義したエンティティに関するCRUDメソッド（`getPostById()`など）では、Drizzleスキーマから該当のZodスキーマをインポートする。
   - あるいは、そのServer Functionが依存している要素のバリデーションのために定義したZodスキーマ（例えば `getPosts()`のloaderDepsとなる Search Paramsを定義しているZodスキーマ）があれば、該当のRouteパスなどからインポートする。

@@ -86,7 +86,7 @@ alwaysApply: false
 export const getPostById = createServerFn({
   method: "GET",
 })
-  .validator(postSelectSchema.pick({ id: true }))
+  .inputValidator(postSelectSchema.pick({ id: true }))
   .handler(async ({ data: { id } }) => {
     /* ... */
   });
@@ -94,7 +94,7 @@ export const getPostById = createServerFn({
 export const getRelatedPosts = createServerFn({
   method: "GET",
 })
-  .validator(postSelectSchema.pick({ id: true }))
+  .inputValidator(postSelectSchema.pick({ id: true }))
   .handler(async ({ data: { id } }) => {
     /* ... */
   });
@@ -117,7 +117,7 @@ export const getRelatedPostsQuery = (postId: string) =>
 export const getPostComments = createServerFn({
   method: "GET",
 })
-  .validator(postSelectSchema.pick({ id: true }))
+  .inputValidator(postSelectSchema.pick({ id: true }))
   .handler(async ({ data: { id } }) => {
     /* ... */
   });
@@ -575,7 +575,7 @@ const getPostsInputSchema = postsSearchSchema.pick({
 type GetPostsInput = z.infer<typeof getPostsInputSchema>
 
 export const getPosts = createServerFn({ method: 'GET' })
-  .validator(getPostsInputSchema)
+  .inputValidator(getPostsInputSchema)
   .handler(async ({ data }) => {
     const offset = (data.page - 1) * data.limit
     ...
