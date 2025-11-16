@@ -1,0 +1,31 @@
+---
+alwaysApply: false
+---
+
+# Gitflowブランチ運用とそれに連動させたNetlify, NeonDBのCD戦略
+
+## CDのトリガーとなるGitflowブランチ運用
+
+### 一般的なGitflowでブランチ運用する
+
+主に下記3つのブランチで構成される一般的なGitflowをブランチ戦略として採用。
+
+- 本番環境である永続的な`main`ブランチ（マージのみ。直接コミット禁止）
+- 開発統合ステージング環境である永続的な`develop`ブランチ
+- 個別の機能開発を行う一時的な`feature`や`fix`などのブランチ（`develop`から分岐して`develop`へマージ）
+
+### それぞれのブランチでのプッシュをアプリ本体の自動ビルドのトリガーにする
+
+プロジェクト開始時にホスト先プラットフォーム（Netlify）にてGithubリポジトリを接続してデプロイする。これにより上記3つの各ブランチ上でプッシュするたびに、それぞれ自動ビルドが実行される。また本番環境以外の`develop`や個別の`feature`ブランチに対しても専用のプレビュー環境URLが発行されるように設定する（`## Netlify（アプリ本体のホスト先）`にて詳述）。
+
+### 親ブランチへのマージを自動DBマイグレーションのトリガーにする
+
+大前提としてアプリ本体と同様に、上記3つの各ブランチ（環境）に対応して以下の通りDBもそれぞれ個別に存在する。そして親ブランチへのマージプッシュ時にDBマイグレーションが行われるようにGithub Actionsワークフローを作成する（`## NeonDB（Postgresのホスト先）`にて詳述）。
+
+- **`main`ブランチ用リモートDB**: NeonDBの`production`ブランチ上に本番環境用DBインスタンスを作成。`develop`から`main`へのマージプッシュ時に、`/.github/workflows/migrate-production-db.yml`によってDBマイグレーションを実行。
+- **`develop`ブランチ用リモートDB**: NeonDBの`development`ブランチ上に開発統合ステージング環境用DBインスタンスを作成。`feature`など各機能ブランチから`develop`へのマージプッシュ時に、`/.github/workflows/migrate-preview-db.yml`によってDBマイグレーションを実行。
+- **`feature`など開発ブランチ用ローカルDB**: ローカル開発時のDBには、`/docker-compose.yml`で定義したPostgresのDockerコンテナをローカルPC上で立ち上げて使用する。また`drizzle-kit studio`コマンドでDrizzle Studioも立ち上げることで、GUI上でDB操作の結果などを簡単に確認できる。
+
+## Netlify（アプリ本体のホスト先）
+
+## NeonDB（Postgresのホスト先）

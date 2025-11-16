@@ -28,14 +28,14 @@ routes/
   │   ├── route.tsx                    // 共通UIや共通処理を切り出すためのレイアウト
   │   ├── index.tsx                    // ポスト一覧ページ
   │   ├── $postId.tsx                  // ポスト詳細ページ
-  │   └── -components/                 // ポスト関連コンポーネントをここにコロケーションする
+  │   └── -components/                 // ポスト関連コンポーネントをコロケーション
   │       ├── PostBody.tsx                // ポスト本体コンポーネント
   │       └── PostComments.tsx            // ポストのコメント群コンポーネント
-  ├── _authenticated/               // 認証保護されるべき全てのページが格納される Pathless Layout
+  ├── _authenticated/               // 認証保護されるべき全てのパスを持つ Pathless Layout
   │   ├── route.tsx                    // 認証保護処理を実行するレイアウト
   │   ├── dashboard/                   // 保護されたパスの一例
   │   │   ├── route.tsx                   // 共通UIや共通処理を切り出すためのレイアウト
-  │   │   └── index.tsx                   // dashboardルートページ
+  │   │   └── index.tsx                   // `dashboard`ルートページ
   │   ...
   │
   └── api/                          // API Routes
