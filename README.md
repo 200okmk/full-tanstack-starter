@@ -149,14 +149,6 @@ feature/fix/* (機能開発・修正ブランチ)
 
 #### **環境変数によるデータベース接続の自動切り替え**
 
-```typescript
-// src/db/index.ts
-export const db: Database =
-  process.env.NODE_ENV === "development"
-    ? createLocalDb() // Docker Compose
-    : createNeonDb(); // Neon (preview/production)
-```
-
 #### **開発時のDBワークフロー**
 
 ```zsh
