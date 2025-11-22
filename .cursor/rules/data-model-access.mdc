@@ -37,7 +37,7 @@ alwaysApply: false
 
 ### その他
 
-- **日時カラムはtimestamptz（Timestamp with Timezone）型を使用する**: DB上の日時情報がすべてUTC統一される。アプリ側は、DBから取得したDate型情報をユーザーのタイムゾーンに合わせて表示することだけに集中できる。
+- **日時カラムはtimestamptz（Timestamp with Timezone）型を使用する**: DB上の日時情報がすべてUTCに統一される。アプリ側は、DBから取得したDate型情報をユーザーのタイムゾーンに合わせて表示することだけに集中できる。
 
 ### 具体的なDrizzleスキーマ例
 

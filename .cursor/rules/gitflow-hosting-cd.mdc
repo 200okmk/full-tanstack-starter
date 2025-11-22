@@ -48,10 +48,10 @@ export const db: Database =
 
 ### 親ブランチへのマージを自動DBマイグレーションのトリガーにする
 
-親ブランチへのマージプ時に、自動でDBマイグレーションが行われるようにGithub Actionsワークフローを策定する。
+親ブランチへのマージ時に、自動でDBマイグレーションが行われるようにGithub Actionsワークフローを策定する。
 
+- `feature`など各作業ブランチから`develop`へのマージプッシュ時に、`/.github/workflows/migrate-preview-db.yml`によってDBマイグレーションを実行。
 - `develop`から`main`へのマージプッシュ時に、`/.github/workflows/migrate-production-db.yml`によってDBマイグレーションを実行。
-- `feature`など各機能ブランチから`develop`へのマージプッシュ時に、`/.github/workflows/migrate-preview-db.yml`によってDBマイグレーションを実行。
 
 ## 環境変数
 
