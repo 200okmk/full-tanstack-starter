@@ -1,12 +1,12 @@
 ---
-description:
-globs: src/**/*.tsx
+description: Reactコンポーネント実装・運用指針を定義したもの。具体的にはShadcn/uiの基礎UIコンポーネント群やエコシステムを中心にコンポーネントを構築していくこと、Tailwindのデザインシステム運用指針、アクセシビリティのためのセマンティックHTMLやキーボード操作などに関する指針などを定義している。
+globs: src/styles/**/*.css,components.json,src/routes/**/*.tsx,src/components/**/*.tsx
 alwaysApply: false
 ---
 
 # UI構築・運用戦略
 
-## Shadcn/ui中心
+## Shadcn/uiを基礎にしたUI構築
 
 - **Shadcn/uiを中心にUIを構築していく**: `~/components/ui`内に配置されていくShadcn/uiの[基礎UIコンポーネント群](https://ui.shadcn.com/docs/components)を組み合わせてアプリのUIを構築していく。
 <!-- - **Shadcn/uiと互換を持つレジストリも活用する**:  -->
