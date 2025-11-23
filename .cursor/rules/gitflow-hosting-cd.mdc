@@ -63,6 +63,6 @@ export const db: Database =
 - **DATABASE_URL**:
   - NeonDBダッシュボードから本番環境用、プレビュー環境用それぞれのDBインスタンスの接続URLを取得する。ダッシュボードのサイドバーでBranchを選択 -> Overview -> Computesタブ -> Connect -> モーダル内の"Connection string"から取得可能。
   - Deploy contextに応じて接続URLを設定し分ける必要がある。`Production`には本番環境用の接続URLを設定する。一方 `Deploy Previews`（PRごとに一時的に生成される環境）、`Branch Deploys`（本番ブランチ以外の作業ブランチごとに生成される環境）、固定の`develop`ブランチにはプレビュー環境用の接続URLを設定する。
-- **BETTER_AUTH_URL**: `openssl rand -base64 32`コマンドを実行などして[自前でシークレットを用意する](https://www.better-auth.com/docs/reference/options#secret)。当然ローカル開発時に使用しているものとは別の値を設定する。
+- **BETTER_AUTH_SECRET**: `openssl rand -base64 32`コマンドを実行するなどして[自前でシークレットを用意する](https://www.better-auth.com/docs/reference/options#secret)。当然ローカル開発時に使用しているものとは別の値を設定する。
 - **Google OAuth関連**: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRETの値を取得して設定する。詳細はBetterAuth[公式ドキュメント](https://www.better-auth.com/docs/authentication/google)を参照。
 - **Github OAuth関連**: GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRETの値を取得して設定する。詳細はBetterAuth[公式ドキュメント](https://www.better-auth.com/docs/authentication/github)を参照。
