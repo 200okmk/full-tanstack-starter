@@ -1,6 +1,5 @@
 ---
-description: TanStack Routerのファイルベースルーティング指針、Routeコンテキスト、TanStack Queryとの統合、認証ガード、型安全ナビゲーションの実装パターンを定義します。
-globs: src/routes/**/*.tsx,src/router.tsx
+description: TanStack Routerの様々な運用指針と実装方法を定義したもの。プロジェクト全体の様々なキャッシュを管理しているTanStack Queryとの統合方法も具体例を交えながら定義している。具体的にはファイルベースルーティング、認証保護配下のパスと検証方法、ストリーミングUI戦略、そのためのSuspenseを使ったコンポーネント構造、データフェッチ方法やフォールバック用のコンポーネントなどを定義するRouteの規則、Search Paramsの使用戦略などを定義しています。
 alwaysApply: false
 ---
 
@@ -44,7 +43,7 @@ routes/
       ...
 ```
 
-## 🔒 認証パターン
+## 🔒 認証保護と検証方法
 
 - **認証保護ルートディレクトリの明示**: 認証保護したいルートは `/src/routes/_authenticated/` ディレクトリ配下に追加していく。
 - **beforeLoad での認証ガード実装**: Root route（`~/routes/__root.tsx`） のcontextに追加したsessionUser('session-user')をbeforeLoad にて参照し、ログインセッションの検証を行う。またユーザーのロールなど追加した場合もここで適宜検証する。
@@ -54,7 +53,7 @@ routes/
 - **認証ガード・権限チェック**: ユーザーのセッション状態などにアクセスして、適宜リダイレクト処理などを行う。
 - **事前計算**: paramsやcontextを使った派生データの計算。コンポーネントからは `Route.useRouteContext()` で型安全にアクセス可能。
 
-## 📊 データフェッチとストリーミングUI戦略
+## 📊 ストリーミングUIのためのデータフェッチ戦略
 
 ### 基本指針
 
