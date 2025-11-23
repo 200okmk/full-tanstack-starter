@@ -1,8 +1,9 @@
 ---
+description: データの参照・追加・更新などにおいては、常にDrizzleスキーマと生成されるZodスキーマ定義をSSOTとして扱い、一貫してそれらを参照元として運用することを定義したもの。具体的には SSOT原則、Drizzleスキーマのセクションや命名規則などの具体的な実装指針、Server Functionsの運用指針、データアクセス層、などを定義している。
 alwaysApply: false
 ---
 
-# データモデル運用戦略
+# Drizzleスキーマを中心とするデータモデル運用戦略
 
 ## 💎 SSOT原則の徹底
 
@@ -199,9 +200,9 @@ export type CommentUpdate = z.infer<typeof commentUpdateSchema>;
 ...
 ```
 
-## Server Functions運用方法
+## Server Functions運用指針
 
-- **エンティティごとにCRUD操作とqueryOptionを定義する**: Drizzleスキーマで定義したエンティティ（テーブル定義）ごとにファイルを作成する（`~/data-access/{entities}.ts`）。そのファイル内で、主にCRUD操作をするServer Functionとそれに対応するTanStack Query用のqueryOption `（xxxQuery, xxxMutation）`を定義してコロケーションする。
+- **DALにてエンティティごとにCRUD操作とqueryOptionを定義する**: Drizzleスキーマで定義したエンティティ（テーブル定義）ごとに、DALにてファイルを作成する（`~/data-access/{entities}.ts`）。そのファイル内で、主にCRUD操作をするServer Functionとそれに対応するTanStack Query用のqueryOption `（xxxQuery, xxxMutation）`を定義してコロケーションする。
   - ディレクトリ例：
     ```
     src/
