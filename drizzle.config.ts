@@ -2,10 +2,10 @@ import type { Config } from "drizzle-kit";
 
 export default {
   // マイグレーションファイルの出力ディレクトリ
-  out: "./src/lib/db/migrations",
+  out: "./migrations",
 
   // スキーマ定義ファイルのパス（テーブル定義を含むファイル）
-  schema: "./src/lib/db/schemas/index.ts",
+  schema: "./src/db/schema.ts",
 
   // drizzle-kit push コマンドを実行するときに、出力された SQL ステートメントを実行するかどうかを確認するプロンプトが表示される
   strict: true,

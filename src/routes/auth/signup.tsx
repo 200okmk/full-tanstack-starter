@@ -4,15 +4,15 @@ import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { signIn } from "~/lib/auth-client";
+import { signIn, signUp } from "~/lib/auth-client";
 
-export const Route = createFileRoute("/(auth)/login")({
-  component: LoginForm,
+export const Route = createFileRoute("/auth/signup")({
+  component: SignupForm,
 });
 
-function LoginForm() {
-  const { redirectUrl, queryClient } = Route.useRouteContext();
-  const navigate = useNavigate();
+function SignupForm() {
+  const { defaultRedirectUrl, queryClient } = Route.useRouteContext();
+  const navigate = useNavigate({ from: Route.fullPath });
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -22,18 +22,27 @@ function LoginForm() {
     if (isLoading) return;
 
     const formData = new FormData(e.currentTarget);
+    const name = formData.get("name") as string;
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
-    if (!email || !password) return;
+    const confirmPassword = formData.get("confirm_password") as string;
+
+    if (!name || !email || !password || !confirmPassword) return;
+
+    if (password !== confirmPassword) {
+      setErrorMessage("Passwords do not match");
+      return;
+    }
 
     setIsLoading(true);
     setErrorMessage("");
 
-    void signIn.email(
+    void signUp.email(
       {
+        name,
         email,
         password,
-        callbackURL: redirectUrl,
+        callbackURL: defaultRedirectUrl,
       },
       {
         onError: (ctx) => {
@@ -41,8 +50,9 @@ function LoginForm() {
           setIsLoading(false);
         },
         onSuccess: async () => {
-          await queryClient.invalidateQueries({ queryKey: ["user"] });
-          await navigate({ to: redirectUrl });
+          // Tanstack Queryのキャッシュを無効化
+          await queryClient.invalidateQueries({ queryKey: ["session-user"] });
+          void navigate({ to: defaultRedirectUrl });
         },
       },
     );
@@ -59,9 +69,20 @@ function LoginForm() {
               </div>
               <span className="sr-only">Acme Inc.</span>
             </a>
-            <h1 className="text-xl font-bold">Welcome back to Acme Inc.</h1>
+            <h1 className="text-xl font-bold">Sign up for Acme Inc.</h1>
           </div>
           <div className="flex flex-col gap-5">
+            <div className="grid gap-2">
+              <Label htmlFor="name">Name</Label>
+              <Input
+                id="name"
+                name="name"
+                type="text"
+                placeholder="John Doe"
+                readOnly={isLoading}
+                required
+              />
+            </div>
             <div className="grid gap-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -79,14 +100,25 @@ function LoginForm() {
                 id="password"
                 name="password"
                 type="password"
-                placeholder="Enter password here"
+                placeholder="Password"
+                readOnly={isLoading}
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="confirm_password">Confirm Password</Label>
+              <Input
+                id="confirm_password"
+                name="confirm_password"
+                type="password"
+                placeholder="Confirm Password"
                 readOnly={isLoading}
                 required
               />
             </div>
             <Button type="submit" className="mt-2 w-full" size="lg" disabled={isLoading}>
               {isLoading && <LoaderCircle className="animate-spin" />}
-              {isLoading ? "Logging in..." : "Login"}
+              {isLoading ? "Signing up..." : "Sign up"}
             </Button>
           </div>
           {errorMessage && (
@@ -103,11 +135,11 @@ function LoginForm() {
               className="w-full"
               type="button"
               disabled={isLoading}
-              onClick={() => {
+              onClick={() =>
                 void signIn.social(
                   {
                     provider: "github",
-                    callbackURL: redirectUrl,
+                    callbackURL: defaultRedirectUrl,
                   },
                   {
                     onRequest: () => {
@@ -119,8 +151,8 @@ function LoginForm() {
                       setErrorMessage(ctx.error.message);
                     },
                   },
-                );
-              }}
+                )
+              }
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                 <path
@@ -128,18 +160,18 @@ function LoginForm() {
                   fill="currentColor"
                 />
               </svg>
-              Login with GitHub
+              Sign up with GitHub
             </Button>
             <Button
               variant="outline"
               className="w-full"
               type="button"
               disabled={isLoading}
-              onClick={() => {
+              onClick={() =>
                 void signIn.social(
                   {
                     provider: "google",
-                    callbackURL: redirectUrl,
+                    callbackURL: defaultRedirectUrl,
                   },
                   {
                     onRequest: () => {
@@ -151,8 +183,8 @@ function LoginForm() {
                       setErrorMessage(ctx.error.message);
                     },
                   },
-                );
-              }}
+                )
+              }
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                 <path
@@ -160,16 +192,16 @@ function LoginForm() {
                   fill="currentColor"
                 />
               </svg>
-              Login with Google
+              Sign up with Google
             </Button>
           </div>
         </div>
       </form>
 
       <div className="text-center text-sm">
-        Don&apos;t have an account?{" "}
-        <Link to="/signup" className="underline underline-offset-4">
-          Sign up
+        Already have an account?{" "}
+        <Link to="/auth/login" className="underline underline-offset-4">
+          Login
         </Link>
       </div>
     </div>

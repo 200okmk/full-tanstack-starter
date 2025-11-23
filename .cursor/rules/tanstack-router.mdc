@@ -1,0 +1,595 @@
+---
+description: 主にTanStack Routerの様々な運用指針と実装方法を定義したもの。またプロジェクト全体を通して様々なキャッシュを管理しているTanStack Queryとの密接な統合方法も具体的なコード例を交えながら例示している。具体的にはファイルベースルーティング、認証保護配下のパスと検証方法、ストリーミングUI戦略、そのためのSuspenseを使ったコンポーネント構造、データフェッチ方法やフォールバック用のコンポーネントなどを定義するRouteの規則、Search Paramsの使用戦略などを定義しています。
+alwaysApply: false
+---
+
+# TanStack Router 運用戦略
+
+## 🗂️ ファイルベースルーティング
+
+### 基本指針
+
+- **ディレクトリでパスを設計する**: 基本的にディレクトリを使用してルーティングを構築していく。パスが深すぎる場合などは適宜 Flat Routes も使用する。
+- **共通レイアウト**: 特定のパス配下に共通する処理やUIはLayout Routes（`route.tsx`）に切り出して繰り返しを避ける。
+- **パスレスグルーピング**: 実際のURLパスには影響を出さずに意味的グループを表現するRoute Group Directory（`(admin)/`など）も使用して開発者が直感的に理解しやすい構造にする。
+
+### ディレクトリ構造パターン例
+
+```
+routes/
+  ├── __root.tsx                    //アプリルートレイアウト
+  ├── index.tsx                     // 認証保護されていないランディングホームページ
+  ├── auth/                         // 認証関連専用パス
+  │   ├── route.tsx                    // 認証ページレイアウト
+  │   ├── login.tsx                    // ログインページ
+  │   └── signup.tsx                   // サインアップページ（ただしOAuth認証やマジックリンク認証のみの場合は無し）
+  ├── posts/                        // 認証保護されないパスの一例（`/products`なども同様）
+  │   ├── route.tsx                    // 共通UIや共通処理を切り出すためのレイアウト
+  │   ├── index.tsx                    // ポスト一覧ページ
+  │   ├── $postId.tsx                  // ポスト詳細ページ
+  │   └── -components/                 // ポスト関連コンポーネントをコロケーション
+  │       ├── PostBody.tsx                // ポスト本体コンポーネント
+  │       └── PostComments.tsx            // ポストのコメント群コンポーネント
+  ├── _authenticated/               // 認証保護されるべき全てのパスを持つ Pathless Layout
+  │   ├── route.tsx                    // 認証保護処理を実行するレイアウト
+  │   ├── dashboard/                   // 保護されたパスの一例
+  │   │   ├── route.tsx                   // 共通UIや共通処理を切り出すためのレイアウト
+  │   │   └── index.tsx                   // `dashboard`ルートページ
+  │   ...
+  │
+  └── api/                          // API Routes
+      ├── auth/                        // 認証関連APIパス
+      │   └── $.ts                        // 各種認証エンドポイント（BetterAuth準拠）
+      ...
+```
+
+## 🔒 認証保護と検証方法
+
+- **認証保護ルートディレクトリの明示**: 認証保護したいルートは `/src/routes/_authenticated/` ディレクトリ配下に追加していく。
+- **beforeLoad での認証ガード実装**: Root route（`~/routes/__root.tsx`） のcontextに追加したsessionUser('session-user')をbeforeLoad にて参照し、ログインセッションの検証を行う。またユーザーのロールなど追加した場合もここで適宜検証する。
+
+### **beforeLoad()の適切な使用場面**:
+
+- **認証ガード・権限チェック**: ユーザーのセッション状態などにアクセスして、適宜リダイレクト処理などを行う。
+- **事前計算**: paramsやcontextを使った派生データの計算。コンポーネントからは `Route.useRouteContext()` で型安全にアクセス可能。
+
+## 📊 ストリーミングUIのためのデータフェッチ戦略
+
+### 基本指針
+
+- 親コンポーネント全体のUIレンダリングをブロックしないようなストリーミングUIの実現を原則とする（”Render-as-you-fetch”パターン）。すなわち、非同期処理が必要な部分のUIは必ず`Suspense`でラップしてフォールバックUIが表示されるようにし、それ以外のデータに依存しない静的な部分のUIは即座に表示する。
+- アプリ全体を通して、データキャッシュは TanStack Query で統一的に管理する。具体的には `~/router.tsx`のTanstack Router初期化設定にて `defaultPreloadStaleTime: 0` とする。
+- アプリ全体を通して、非同期状態は原則としてReactの `Suspense` で管理する。
+
+### 重要な実装ポイント
+
+- **loaderのプリフェッチにてasync/awaitを使用しない**: loader での非同期データフェッチによって静的な部分のUIまでも表示がブロックされることのないように、`ensureQueryData`プリフェッチは絶対に await せずに使用する。このRouteにインポートされる子コンポーネントが使用する付随情報のプリフェッチもコールする。Promise.allは使用しない。
+
+- **`pendingComponent`は使用せず`Suspense`を使用する**: Routeの`pendingComponent`は、loader での非同期処理によってそのRoute全体の表示が保留される時のフォールバックUIを指定するものであるが、根本的にそうならないよう実装することが Render-as-you-fetch パターンの基本方針なためこれは使用しない。代わりに非同期データフェッチが必要な部分のUIに対して、局所的にReactの`Suspense`でラップする。
+
+- **子コンポーネント内で`useSuspenseQuery`を使用してフェッチしたデータにアクセスする**: 非同期データに依存する子コンポーネント（Routeの`component`に指定していないもの）は`Suspense`でラップされるためローディング状態は宣言的にReactが管理している。ちなみに `useSuspenseQuery` ではフェッチしたデータが定義されることが保証されているためOptional Chainingによるfalsyチェックは必要ない。
+
+- **`queryOptions()`を使用して再利用性を高める**: `queryKey`, `queryFn`を繰り返し記述しないために使用する。原則`queryFn`に指定されている非同期関数と同じファイル上にコロケーションする。
+
+- **関連する子コンポーネントはコロケーションする**: 親コンポーネントにインポートされた関連する子コンポーネントは、URLパスに表出しないコンポーネントフォルダ（`-components/`）内にコロケーションする。
+
+- **Suspense境界単位でフォールバックUIを実装する**: Shadcn/uiの[`Skeleton`コンポーネント](https://ui.shadcn.com/docs/components/skeleton)などを使用して、`Suspense`でラップした子コンポーネント向けのスケルトンかスピナーフォールバックUIを実装する。非同期処理解決後に実際にストリーミングされるUIのデザインをおおまかに再現する。また、エラー時用ののフォールバックUIも実装する。
+
+- **Route単位でエラーコンポーネントを実装する**: Route単位で細かくエラーハンドリングするため、可能な限り`errorComponent: `に専用エラーコンポーネントを指定する。
+
+### 具体的なコード例
+
+```ts
+// ~/data-access/posts
+export const getPostById = createServerFn({
+  method: "GET",
+})
+  .inputValidator(postSelectSchema.pick({ id: true }))
+  .handler(async ({ data: { id } }) => {
+    /* ... */
+  });
+
+export const getRelatedPosts = createServerFn({
+  method: "GET",
+})
+  .inputValidator(postSelectSchema.pick({ id: true }))
+  .handler(async ({ data: { id } }) => {
+    /* ... */
+  });
+
+// queryOptions定義は、queryFnに指定されている非同期関数と同じファイル上にコロケーションする
+export const getPostByIdQuery = (postId: string) =>
+  queryOptions({
+    queryKey: ["post", postId],
+    queryFn: () => getPostById(postId),
+  });
+
+export const getRelatedPostsQuery = (postId: string) =>
+  queryOptions({
+    queryKey: ["related-posts", postId],
+    queryFn: () => getRelatedPosts(postId),
+  });
+
+// ~/data-access/comments
+// Post本体情報の表示を優先させるためにコメントのような付随情報はストリームで時差表示させたい時は、上記の `getPostById` のクエリビルドでテーブルをJoinせずに、このように単体のServer Functionsと `getRelatedCommentsQuery` として分離する。
+export const getPostComments = createServerFn({
+  method: "GET",
+})
+  .inputValidator(postSelectSchema.pick({ id: true }))
+  .handler(async ({ data: { id } }) => {
+    /* ... */
+  });
+
+export const getPostCommentsQuery = (postId: string) =>
+  queryOptions({
+    queryKey: ["post-comments", postId],
+    queryFn: () => getPostComments(postId),
+  });
+```
+
+```ts
+// ~/routes/posts/$postId.tsx
+import { Suspense } from 'react'
+import { createFileRoute } from '@tanstack/react-router'
+import { queryOptions, useSuspenseQuery } from '@tanstack/react-query'
+import { getPostById, getRelatedPosts, getPostByIdQuery, getRelatedPostsQuery } from '~/data-access/posts'
+import { getPostComments, getPostCommentsQuery } from '~/data-access/comments'
+// このRouteの親コンポーネントPostDetailPageにて使用する子コンポーネントは配下の`-components`フォルダ内にコロケーションする
+import { PostBody, PostBodySkeleton } from '~/routes/posts/-components/PostBody'
+import { PostComments, PostCommentsSkeleton } from '~/routes/posts/-components/PostComments'
+import { RelatedPosts, RelatedPostsSkeleton } from '~/routes/posts/-components/RelatedPosts'
+
+// ==============================
+// Route定義
+// - loaderでawaitしないことにより、そのRoute全体のUIレンダリングをブロックしない。またプリフェッチメソッドは ensureQueryData に統一。このRouteにインポートされる子コンポーネントが使用する付随情報のプリフェッチも含めてコールする。
+// - pendingComponentは原則使用しない。そもそもRoute全体のUIが保留されるような非同期データフェッチをloaderにて行わない基本方針なため。ただしSuspenseでラップした子コンポーネント用のフォールバックUIはそれぞれ作成する。
+// - componentに指定する親コンポーネントの構造は静的UI部分+ データ依存の非同期UI部分（独立Suspense境界）となる。また命名規則として名前の末尾は'Page'とする。
+// ==============================
+export const Route = createFileRoute('/posts/$postId')({
+  loader: ({ context: { queryClient }, params: { postId }}) => {
+    queryClient.ensureQueryData(getPostByIdQuery(postId))
+    queryClient.ensureQueryData(getPostCommentsQuery(postId))
+    queryClient.ensureQueryData(getRelatedPostsQuery(postId))
+  },
+  // このRouteにおける親コンポーネント
+  component: PostDetailPage,
+  errorComponent: PostDetailPageError
+})
+
+function PostDetailPage() {
+  const { postId }  = Route.useParams()
+
+  return (
+    <main>
+      <article >
+        <section>
+          // 非同期部分のため解決次第ストリーミング表示
+          <Suspense fallback={<PostBodySkeleton />}>
+            <PostBody postId={postId}>
+          </Suspense>
+        </section>
+
+        <section>
+          // 静的部分のため即座に表示
+          <h2>コメント</h2>
+          <Suspense fallback={<PostCommentsSkeleton />}>
+            <PostComments postId={postId} />
+          </Suspense>
+        </section>
+
+        <section>
+          <h2>関連ポスト</h2>
+          <Suspense fallback={<RelatedPostsSkeleton />}>
+            <RelatedPosts postId={postId} />
+          </Suspense>
+        </section>
+
+      </article>
+    </main>
+  )
+}
+
+function PostDetailPageError() {
+  return (
+    <main>
+      ...
+    </main>
+  )
+}
+```
+
+```ts
+// ~/routes/posts/-components/PostBody.tsx
+import { type Post } from '~/db/schema.ts'
+import { Skeleton } from '~/components/ui/Skeleton'
+
+export function PostBody({ postId }: { postId: string }) {
+    const { data: post } = useSuspenseQuery(getPostByIdQuery(postId))
+
+  return (
+    <div>
+      <header>
+        <h1>{post.title}</h1>
+      </header>
+
+      <div>{post.content}</div>
+    </div>
+  )
+}
+
+export function PostBodySkeleton() {
+  return (
+    <div className="...">
+      <Skeleton className="..." />
+      <Skeleton className="..." />
+      ...
+    </div>
+  )
+}
+```
+
+```ts
+// ~/routes/posts/-components/PostComments.tsx
+import { type Comment } from '~/db/schema.ts'
+
+export function PostComments({ postId }: { postId: string }) {
+  const { data: comments } = useSuspenseQuery(getPostCommentsQuery(postId))
+
+  if (comments.length === 0) {
+    return <div className="text-muted-foreground">コメントはありません</div>
+  }
+
+  return (
+    <div className="...">
+      <ul className="...">
+        {comments.map((c) => (
+          <li key={c.id}>
+            <PostCommentItem comment={c}>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function PostCommentItem ({ comment }: { comment: Comment}) {
+  return (
+    <div>
+    ...
+    </div>
+  )
+}
+
+function PostCommentsSkeleton() {
+  return (
+    <div className="...">
+      <Skeleton className="..." />
+      ...
+    </div>
+  )
+}
+```
+
+## ❓ Search Params 使用戦略
+
+### 基本指針と重要な実装ポイント
+
+- TanStack Router の基本的な哲学の一つ”URLを第一級のデータストアとして扱う”に則り、Search Params を各Routeにおける状態管理の中核として積極的に活用する。
+
+- アプリ全体を通して、データキャッシュは TanStack Query で統一的に管理する。具体的には `~/router.tsx`のTanstack Router初期化設定にて `defaultPreloadStaleTime: 0` とする。
+
+- ページ番号やソートフラグなどの一部のクエリパラメータが変更されてもすべてのコンポーネントが再レンダリングされないように、可能な限り細かい粒度のクエリパラメータをサブスクリプション（監視）する。具体的には、特定のコンポーネントが必要としている最小限のパラメータのみを `Route.useSearch()`内の`select`フィールドで指定して返り値をpropsで渡す。また `~/router.tsx`での初期化設定にて統一的に `structuralSharing: true`を有効にしておく（設定済み）。
+
+- `loader`のプリフェッチが依存している特定の Search Params (フィルタやソートのフラグなど)が変更された場合、自動で再フェッチされるようにする。具体的には、queryOption（getProductsQueryなど）の引数になっている必要最小限の Search Param のみをRouteの `loaderDeps` に指定する。
+
+- クエリパラメータを常に一貫性のある正規化された形式に保つために Search Middleware を活用する。具体的には、デフォルト値と同じ値を持つパラメータを自動的にURLから削除する`stripSearchParams`や、 ページ遷移時に特定のクエリパラメータを保持する`retainSearchParams`といった組み込みのものがある。また、必要であればカスタムの Search Middleware も作成する。複数のSearch Middlewareを使用する場合、`retainSearchParams` → `stripSearchParams` → カスタムMiddleware の順で指定する。
+
+- クエリパラメータのスキーマ定義には常に一貫してバリデーションライブラリ（Zod）を使用する。
+
+### Search Params 使用・不使用例
+
+- **使用すべき状態パターン**: URLで共有して再現可能であるべきもの、永続させない一時的な条件やフラグなどが一般的に該当する。
+
+  1. フィルタ、ソート、ページネーション、検索クエリ、表示件数などの条件フラグ。
+  2. タブ選択、ビューモード切り替えなどの表示設定フラグ。
+
+- **使用すべきでない状態パターン**: 共有されるべきでないセキュリティ関連、個人設定などの永続させるべきもの、UI開閉状態など再現しなくても良いものなどが該当する。
+
+  1. 認証状態。Route Context（`beforeLoad`）で管理・検証する。
+  2. アプリユーザーの個人的な設定。DBかブラウザ上のストレージに保存する。
+  3. モーダルやドロップダウンメニューの開閉状態など一時的なUI状態。Reactの `useState()`を使用する。
+  4. フォームの状態。TanStack Formなどフォームライブラリを導入して体系的に管理する。
+
+### 具体的なコード例
+
+```ts
+// ~/routes/posts/index.tsx
+import { Suspense } from 'react'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { zodValidator, fallback } from '@tanstack/zod-adapter'
+import { z } from 'zod'
+import { stripSearchParams } from '@tanstack/react-router'
+import { LayoutGridIcon, LayoutListIcon } from 'lucide-react'
+
+import { Button } from '~/components/ui/button'
+import { ButtonGroup } from '~/components/ui/button-group'
+import {
+  Select,
+  ...
+} from '~/components/ui/select'
+import { PostsList, PostsListSkeleton } from './-components/PostsList'
+import { PostsGrid, PostsGridSkeleton } from './-components/PostsGrid'
+import { getPostsQuery } from '~/data-access/posts'
+
+const defaultValues = {
+  page: 1,
+  limit: 20,
+  sort: 'newest' as const,
+}
+
+export const postsSearchSchema = z.object({
+  // データ依存パラメータ（loaderDepsに含める）
+  page: fallback(z.number().int().positive(), defaultValues.page).default(defaultValues.page),
+  limit: fallback(z.number().int().positive().max(100), defaultValues.limit).default(defaultValues.limit),
+  sort: fallback(z.enum(['newest', 'oldest', 'popular']), defaultValues.sort).default(defaultValues.sort),
+  category: z.string().optional(),
+
+  // UI専用パラメータなのでloaderDepsには含めない
+  view: fallback(z.enum(['grid', 'list']), 'grid').default('grid'),
+})
+
+export type PostsSearch = z.infer<typeof postsSearchSchema>
+
+export const Route = createFileRoute('/posts/')({
+  validateSearch: zodValidator(postsSearchSchema),
+  // デフォルト値と同じパラメータを自動削除
+  search: {
+    middlewares: [stripSearchParams(defaultValues)],
+  },
+  // データに影響するパラメータのみ依存に指定（viewは除外）
+  loaderDeps: ({ search: { page, limit, sort, category } }) => ({
+    page,
+    limit,
+    sort,
+    category,
+  }),
+  // awaitせずにプリフェッチを「起動」のみ。loaderDepsで指定した依存している Search Params を`deps`で参照し、queryの引数に渡す。
+  loader: ({ context: { queryClient }, deps }) => {
+    queryClient.ensureQueryData(getPostsQuery(deps))
+  },
+  component: PostsPage,
+  errorComponent: PostsPageError,
+})
+
+// =============================================
+// 親コンポーネント（静的UI + 非同期UIのSuspense境界）
+// =============================================
+function PostsPage() {
+  const navigate = useNavigate({ from: Route.fullPath })
+
+  // 最小限のパラメータのみ購読（select + structuralSharing）
+  const { page, sort, view } = Route.useSearch({
+    select: (search) => ({
+      page: search.page,
+      sort: search.sort,
+      view: search.view,
+    }),
+  })
+
+  // 各Routeごとに専用のSearchParams更新ヘルパーを定義する
+  const updateSearch = (updates: Partial<PostsSearch>) => {
+    navigate({
+      search: (prev) => ({ ...prev, ...updates }),
+    })
+  }
+
+  return (
+    <main>
+      <div>
+        <h1>Posts</h1>
+
+        {/* ソート選択 */}
+        <div>
+          <ButtonGroup>
+            <Select
+              value={sort}
+              onValueChange={(value) => updateSearch({
+                sort: value as PostsSearch['sort'],
+                page: 1
+              })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">Newest</SelectItem>
+                <SelectItem value="oldest">Oldest</SelectItem>
+                <SelectItem value="popular">Popular</SelectItem>
+              </SelectContent>
+            </Select>
+          </ButtonGroup>
+
+          {/* ビュー切り替え（UI専用、データ再取得しない） */}
+          <ButtonGroup>
+            <Button
+              variant={view === 'grid' ? 'default' : 'outline'}
+              size="icon"
+              onClick={() => updateSearch({ view: 'grid' })}
+              aria-label="Grid view"
+            >
+              <LayoutGridIcon />
+            </Button>
+            <Button
+              variant={view === 'list' ? 'default' : 'outline'}
+              size="icon"
+              onClick={() => updateSearch({ view: 'list' })}
+              aria-label="List view"
+            >
+              <LayoutListIcon />
+            </Button>
+          </ButtonGroup>
+        </div>
+      </div>
+
+      {/* 非同期UI部分：Suspenseでラップ */}
+      <Suspense fallback={view === 'list' ? <PostsListSkeleton /> : <PostsGridSkeleton />}>
+        {view === 'list'
+          ? <PostsList updateSearch={updateSearch} />
+          : <PostsGrid updateSearch={updateSearch} />
+        }
+      </Suspense>
+    </main>
+  )
+}
+
+function PostsPageError ({ error }) {
+  const router = useRouter()
+
+  return (
+    <div>
+    ...
+    </div>
+  )
+}
+```
+
+```ts
+// ~/routes/posts/-components/PostsList.tsx
+import { useSuspenseQuery } from '@tanstack/react-query'
+import { getRouteApi } from '@tanstack/react-router'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '~/components/ui/card'
+import {
+  Pagination,
+  PagenationContent,
+  ...
+} from '~/components/ui/pagination'
+import { Skeleton } from '~/components/ui/skeleton'
+import { getPostsQuery } from '~/data-access/posts'
+
+const routeApi = getRouteApi('/posts')
+
+export function PostsList({
+  updateSearch
+}: {
+  updateSearch: (updates: Partial<PostsSearch>) => void
+}) {
+  const searchParams = routeApi.useSearch({
+    select: (search) => ({
+      page: search.page,
+      limit: search.limit,
+      sort: search.sort,
+      category: search.category,
+    }),
+    structuralSharing: true,
+  })
+
+  const { data } = useSuspenseQuery(getPostsQuery(searchParams))
+
+  if (data.posts.length === 0) {
+    return (
+      <section>
+      ...
+      </section>
+    )
+  }
+
+  return (
+    <section>
+      <div>
+        {data.posts.map((post) => (
+          <Card key={post.id}>
+            ...
+          </Card>
+        ))}
+      </div>
+      <div>
+        {/* データを持っているコンポーネント内でPaginationを表示 */}
+        <PostsPagination
+          currentPage={searchParams.page}
+          totalPages={data.totalPages}
+          onPageChange={(newPage) => updateSearch({ page: newPage })}
+        />
+      </div>
+    </section>
+  )
+}
+
+export function PostsListSkeleton() {
+  return (
+    <div>
+      {Array.from({ length: 5 }).map((_, i) => (
+        <Card key={i}>
+          <CardHeader>
+            <Skeleton className="..." />
+            ...
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="..." />
+            ...
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  )
+}
+
+// ============================================
+// Pagination コンポーネント
+// ============================================
+interface PostsPaginationProps {
+  currentPage: number
+  totalPages: number
+  onPageChange: (page: number) => void
+}
+
+function PostsPagination({ currentPage, onPageChange, totalPages }: PostsPaginationProps) {
+  const getPageNumbers = () => {...}
+
+  return (
+    <Pagination>
+      <PaginationContent>
+        ...
+      </PaginationContent>
+    </Pagination>
+  )
+}
+```
+
+```ts
+// ~/data-access/posts.ts
+import { createServerFn } from '@tanstack/start'
+/* ... */
+// ✅ Routeで定義したスキーマをインポート（唯一の情報源）
+import { postsSearchSchema } from '~/routes/posts/index'
+
+
+// ✅ UI専用の`view`を除外し、postsSearchSchemaからデータ取得に必要なフィールドのみを抽出。
+const getPostsInputSchema = postsSearchSchema.pick({
+  page: true,
+  limit: true,
+  sort: true,
+  category: true,
+})
+type GetPostsInput = z.infer<typeof getPostsInputSchema>
+
+export const getPosts = createServerFn({ method: 'GET' })
+  .inputValidator(getPostsInputSchema)
+  .handler(async ({ data }) => {
+    const offset = (data.page - 1) * data.limit
+    ...
+    return {
+      posts: postsData,
+      total: count,
+      hasMore: offset + data.limit < count,
+      totalPages: Math.ceil(count / data.limit),
+    }
+  })
+...
+// Query Options（コロケーション）
+export const getPostsQuery = (input: GetPostsInput) =>
+  queryOptions({
+    queryKey: ['posts', input],
+    queryFn: () => getPosts(input),
+    staleTime: 5 * 60 * 1000, // 5分間はfreshと見なす
+  })
+```

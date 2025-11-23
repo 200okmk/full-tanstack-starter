@@ -28,14 +28,11 @@
   // use LF line endings
   "files.eol": "\n",
 
-  // set prettier as default formatter for json, ts, tsx, js, jsx, html, css
-  "[json][jsonc][typescript][typescriptreact][javascript][javascriptreact][html][css]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
-  },
+  // set prettier as default formatter
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
 
   // format on save
   "editor.formatOnSave": true,
-
-  // format on save mode
-  "editor.formatOnSaveMode": "modifications"
+  "editor.colorDecoratorsActivatedOn": "hover",
+  "editor.formatOnPaste": true
 }

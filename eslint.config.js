@@ -3,6 +3,7 @@ import pluginQuery from "@tanstack/eslint-plugin-query";
 import pluginRouter from "@tanstack/eslint-plugin-router";
 import eslintConfigPrettier from "eslint-config-prettier";
 import * as reactHooks from "eslint-plugin-react-hooks";
+import youMightNotNeedAnEffect from "eslint-plugin-react-you-might-not-need-an-effect";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
@@ -34,7 +35,9 @@ export default tseslint.config(
       ...pluginQuery.configs["flat/recommended"],
       // TanStack Router設定 - 型安全なルーティング
       ...pluginRouter.configs["flat/recommended"],
-      // Prettier統合 - フォーマットルールとの競合を回避
+      // React useEffect最適化 - 不要なuseEffectを検出。(https://github.com/mizdra/eslint-plugin-react-you-might-not-need-an-effect)
+      youMightNotNeedAnEffect.configs.recommended,
+      // Prettier統合 - フォーマットルールとの競合を回避。
       eslintConfigPrettier,
     ],
     languageOptions: {
@@ -67,7 +70,7 @@ export default tseslint.config(
       // === 必要最小限のTypeScriptルール ===
       // 未使用変数エラー - アンダースコアプレフィックスは許可
       "@typescript-eslint/no-unused-vars": [
-        "error",
+        "warn",
         {
           argsIgnorePattern: "^_",
           varsIgnorePattern: "^_",

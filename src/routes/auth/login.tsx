@@ -1,18 +1,26 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { GalleryVerticalEnd, LoaderCircle } from "lucide-react";
 import { useState } from "react";
+import { z } from "zod";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { signIn, signUp } from "~/lib/auth-client";
+import { signIn } from "~/lib/auth-client";
 
-export const Route = createFileRoute("/(auth)/signup")({
-  component: SignupForm,
+export const Route = createFileRoute("/auth/login")({
+  validateSearch: z.object({
+    // ログイン成功後、直前にいたURLへユーザーを戻してあげるためのSearch Param
+    redirect: z.string().optional(),
+  }),
+  component: LoginForm,
 });
 
-function SignupForm() {
-  const { redirectUrl, queryClient } = Route.useRouteContext();
-  const navigate = useNavigate();
+function LoginForm() {
+  // defaultRedirectUrlは定数として事前に設定しておいたリダイレクト先(デフォルトでは `/dashboard`)
+  const { defaultRedirectUrl, queryClient } = Route.useRouteContext();
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
+  const router = useRouter();
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -22,27 +30,19 @@ function SignupForm() {
     if (isLoading) return;
 
     const formData = new FormData(e.currentTarget);
-    const name = formData.get("name") as string;
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
-    const confirmPassword = formData.get("confirm_password") as string;
-
-    if (!name || !email || !password || !confirmPassword) return;
-
-    if (password !== confirmPassword) {
-      setErrorMessage("Passwords do not match");
-      return;
-    }
+    if (!email || !password) return;
 
     setIsLoading(true);
     setErrorMessage("");
 
-    void signUp.email(
+    void signIn.email(
       {
-        name,
         email,
         password,
-        callbackURL: redirectUrl,
+        // 元のURLまたはデフォルト値を使用
+        callbackURL: search.redirect ?? defaultRedirectUrl,
       },
       {
         onError: (ctx) => {
@@ -50,8 +50,12 @@ function SignupForm() {
           setIsLoading(false);
         },
         onSuccess: async () => {
-          await queryClient.invalidateQueries({ queryKey: ["user"] });
-          void navigate({ to: redirectUrl });
+          // Tanstack Queryのキャッシュを無効化
+          await queryClient.invalidateQueries({ queryKey: ["session-user"] });
+          // RootのbeforeLoadを再実行してContextを更新
+          await router.invalidate();
+          // 元のURLまたはデフォルト値にリダイレクト
+          await navigate({ to: search.redirect ?? defaultRedirectUrl });
         },
       },
     );
@@ -68,20 +72,9 @@ function SignupForm() {
               </div>
               <span className="sr-only">Acme Inc.</span>
             </a>
-            <h1 className="text-xl font-bold">Sign up for Acme Inc.</h1>
+            <h1 className="text-xl font-bold">Welcome back to Acme Inc.</h1>
           </div>
           <div className="flex flex-col gap-5">
-            <div className="grid gap-2">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                name="name"
-                type="text"
-                placeholder="John Doe"
-                readOnly={isLoading}
-                required
-              />
-            </div>
             <div className="grid gap-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -99,25 +92,14 @@ function SignupForm() {
                 id="password"
                 name="password"
                 type="password"
-                placeholder="Password"
-                readOnly={isLoading}
-                required
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="confirm_password">Confirm Password</Label>
-              <Input
-                id="confirm_password"
-                name="confirm_password"
-                type="password"
-                placeholder="Confirm Password"
+                placeholder="Enter password here"
                 readOnly={isLoading}
                 required
               />
             </div>
             <Button type="submit" className="mt-2 w-full" size="lg" disabled={isLoading}>
               {isLoading && <LoaderCircle className="animate-spin" />}
-              {isLoading ? "Signing up..." : "Sign up"}
+              {isLoading ? "Logging in..." : "Login"}
             </Button>
           </div>
           {errorMessage && (
@@ -134,11 +116,11 @@ function SignupForm() {
               className="w-full"
               type="button"
               disabled={isLoading}
-              onClick={() =>
+              onClick={() => {
                 void signIn.social(
                   {
                     provider: "github",
-                    callbackURL: redirectUrl,
+                    callbackURL: search.redirect ?? defaultRedirectUrl,
                   },
                   {
                     onRequest: () => {
@@ -150,8 +132,8 @@ function SignupForm() {
                       setErrorMessage(ctx.error.message);
                     },
                   },
-                )
-              }
+                );
+              }}
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                 <path
@@ -159,18 +141,18 @@ function SignupForm() {
                   fill="currentColor"
                 />
               </svg>
-              Sign up with GitHub
+              Login with GitHub
             </Button>
             <Button
               variant="outline"
               className="w-full"
               type="button"
               disabled={isLoading}
-              onClick={() =>
+              onClick={() => {
                 void signIn.social(
                   {
                     provider: "google",
-                    callbackURL: redirectUrl,
+                    callbackURL: search.redirect ?? defaultRedirectUrl,
                   },
                   {
                     onRequest: () => {
@@ -182,8 +164,8 @@ function SignupForm() {
                       setErrorMessage(ctx.error.message);
                     },
                   },
-                )
-              }
+                );
+              }}
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                 <path
@@ -191,16 +173,16 @@ function SignupForm() {
                   fill="currentColor"
                 />
               </svg>
-              Sign up with Google
+              Login with Google
             </Button>
           </div>
         </div>
       </form>
 
       <div className="text-center text-sm">
-        Already have an account?{" "}
-        <Link to="/login" className="underline underline-offset-4">
-          Login
+        Don&apos;t have an account?{" "}
+        <Link to="/auth/signup" className="underline underline-offset-4">
+          Sign up
         </Link>
       </div>
     </div>

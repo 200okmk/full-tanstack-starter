@@ -1,79 +1,42 @@
-import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
+import { Link, createFileRoute } from "@tanstack/react-router";
 import ThemeToggle from "~/components/ThemeToggle";
-import { Button } from "~/components/ui/button";
-import { signOut } from "~/lib/auth-client";
 
 export const Route = createFileRoute("/")({
   component: Home,
-  loader: ({ context }) => {
-    return { user: context.user };
-  },
 });
 
 function Home() {
-  const { queryClient } = Route.useRouteContext();
-  const { user } = Route.useLoaderData();
-  const router = useRouter();
-
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-10 p-2">
-      <div className="flex flex-col items-center gap-4">
-        <h1 className="text-3xl font-bold sm:text-4xl">React TanStarter</h1>
-        <div className="flex items-center gap-2 max-sm:flex-col">
-          This is an unprotected page:
+      <div className="flex flex-col items-center gap-8">
+        <h1 className="text-3xl font-bold md:text-4xl">Full-TanStack Template</h1>
+        <div className="flex items-center gap-2 max-md:flex-col">
+          <p className="text-center">
+            ここは認証保護されていないランディングホームページです
+          </p>
           <pre className="bg-card text-card-foreground rounded-md border p-1">
-            routes/index.tsx
+            ~/routes/index.tsx
+          </pre>
+        </div>
+        <div className="flex items-center gap-2 max-md:flex-col">
+          <Link to="/dashboard" className="text-center underline">
+            認証保護されたページへ遷移
+          </Link>
+          <pre className="bg-card text-card-foreground un rounded-md border p-1">
+            ~/routes/_authenticated/dashboard/index.tsx
           </pre>
         </div>
       </div>
-
-      {user ? (
-        <div className="flex flex-col items-center gap-2">
-          <p>Welcome back, {user.name}!</p>
-          <Button type="button" asChild className="mb-2 w-fit" size="lg">
-            <Link to="/dashboard">Go to Dashboard</Link>
-          </Button>
-          <div className="text-center text-xs sm:text-sm">
-            Session user:
-            <pre className="max-w-screen overflow-x-auto px-2 text-start">
-              {JSON.stringify(user, null, 2)}
-            </pre>
-          </div>
-
-          <Button
-            onClick={() => {
-              void (async () => {
-                await signOut();
-                await queryClient.invalidateQueries({ queryKey: ["user"] });
-                await router.invalidate();
-              })();
-            }}
-            type="button"
-            className="w-fit"
-            variant="destructive"
-            size="lg"
-          >
-            Sign out
-          </Button>
-        </div>
-      ) : (
-        <div className="flex flex-col items-center gap-2">
-          <p>You are not signed in.</p>
-          <Button type="button" asChild className="w-fit" size="lg">
-            <Link to="/login">Log in</Link>
-          </Button>
-        </div>
-      )}
 
       <div className="flex flex-col items-center gap-2">
         <ThemeToggle />
         <a
           className="text-muted-foreground hover:text-foreground underline"
-          href="https://github.com/dotnize/react-tanstarter"
+          href="https://github.com/maakintosh/tsstart-betterauth-drizzle-neon-netlify"
           target="_blank"
           rel="noreferrer noopener"
         >
-          dotnize/react-tanstarter
+          maakintosh/full-tanstack-template
         </a>
       </div>
     </div>

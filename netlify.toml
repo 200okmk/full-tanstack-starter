@@ -5,9 +5,9 @@
 # Netlifyダッシュボードで以下の環境変数を設定してください：
 #
 # DATABASE_URL:
-#   Production: [Neon Production URL]
-#   Deploy Previews: [Neon Preview URL]
-#   Branch deploys: [Neon Preview URL]
+#   Production: [Neon Production_DB URL]
+#   Deploy Previews: [Neon Preview_DB URL]
+#   Branch deploys: [Neon Preview_DB URL]
 #   Scopes: All Scope
 #
 # BETTER_AUTH_SECRET:
