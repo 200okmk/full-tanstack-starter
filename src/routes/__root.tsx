@@ -6,32 +6,23 @@ import {
   ScriptOnce,
   Scripts,
 } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
-import { getWebRequest } from "@tanstack/react-start/server";
 
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
-import { auth } from "~/lib/auth";
+import { User } from "~/db/schema";
+import { getSessionUser } from "~/lib/auth-client";
 import appCss from "~/styles/app.css?url";
-
-const getSessionUser = createServerFn({ method: "GET" }).handler(async () => {
-  const { headers } = getWebRequest()!;
-
-  const session = await auth.api.getSession({ headers });
-
-  return session?.user ?? null;
-});
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
-  sessionUser: Awaited<ReturnType<typeof getSessionUser>>;
+  sessionUser: User | null;
 }>()({
   beforeLoad: async ({ context }) => {
-    const sessionUser = await context.queryClient.fetchQuery({
+    const sessionUser = await context.queryClient.ensureQueryData<User | null>({
       queryKey: ["session-user"],
-      queryFn: ({ signal }) => getSessionUser({ signal }),
-    }); // キャッシュにTanstack Queryを使用, router.tsxを参照
+      queryFn: () => getSessionUser() as Promise<User | null>,
+    });
     return { sessionUser };
   },
   head: () => ({
@@ -66,12 +57,12 @@ function RootComponent() {
 
 function RootDocument({ children }: { readonly children: React.ReactNode }) {
   return (
-    // suppress since we're updating the "dark" class in a custom script below
-    <html suppressHydrationWarning>
+    // 下記の`ScriptOnce`カスタムスクリプトで"dark"クラスを更新しているので、`suppressHydrationWarning`を使用してクライアント側のHydration警告を抑制
+    <html lang="ja" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
-      <body>
+      <body className="bg-background mx-auto p-4">
         <ScriptOnce>
           {`document.documentElement.classList.toggle(
             'dark',

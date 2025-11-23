@@ -7,23 +7,22 @@ import { auth } from "~/lib/auth";
 // This is a sample middleware that you can use in your server functions.
 
 /**
- * Server Functionなどにて認証を行い、ユーザーをコンテキストに追加するミドルウェア
+ * 認証状態であることが必要なServer Functionに対して認証チェックを行い、セッション情報をコンテキストに追加するミドルウェア。認証状態でない場合はリダイレクトしてログイン画面に遷移する。
  */
 export const authMiddleware = createMiddleware().server(async ({ next }) => {
   const request = getWebRequest()!;
 
   const session = await auth.api.getSession({
-    headers: request.headers, // ✅ 正しい：request.headersを直接渡す
+    headers: request.headers, // request.headersを直接渡す
     query: {
-      // https://www.better-auth.com/docs/concepts/session-management#session-caching
+      // ミドルウェアとして厳格に認証状態を保証するため、Cookieキャッシュからではなくデータベースから直接セッションを取得する。Cookieキャッシュも更新される（https://www.better-auth.com/docs/concepts/session-management#session-caching）。
       disableCookieCache: true,
     },
   });
 
   if (!session) {
-    // ✅ エラーではなくログインページにリダイレクト
     throw redirect({
-      to: "/login",
+      to: "/auth/login",
       search: {
         redirect: request.url,
       },

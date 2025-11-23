@@ -28,9 +28,15 @@ export const auth = betterAuth({
   // process.env.URLを使用（Netlifyランタイムで安定して利用可能）
   baseURL: process.env.URL ?? "http://localhost:3000",
   secret: process.env.BETTER_AUTH_SECRET!,
+  session: {
+    // セッションが使用され、updateAge に達すると、セッションの有効期限は現在時刻に expiresIn 値を加えた値に延長される（https://www.better-auth.com/docs/concepts/session-management#session-expiration）。
+    expiresIn: 60 * 60 * 24 * 30, // デフォルトは7日間
+    updateAge: 60 * 60 * 24, // セッションを更新する頻度。
+  },
   emailAndPassword: {
     enabled: true,
   },
+  // OAuth認証プロバイダーの設定
   socialProviders: {
     github: {
       clientId: process.env.GITHUB_CLIENT_ID!,

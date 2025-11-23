@@ -1,0 +1,221 @@
+---
+description: データの参照・追加・更新などにおいては、常にDrizzleスキーマと生成されるZodスキーマ定義をSSOTとして扱い、一貫してそれらを参照元として運用することを定義したもの。具体的には SSOT原則、Drizzleスキーマのセクションや命名規則などの具体的な実装指針、Server Functionsの運用指針、データアクセス層、などを定義している。
+alwaysApply: false
+---
+
+# Drizzleスキーマを中心とするデータモデル運用戦略
+
+## 💎 SSOT原則の徹底
+
+- **DrizzleスキーマをSSOTとして位置付ける**: 一貫してDrizzleスキーマ（`~/db/schema.ts`）を Single Source of Truth （”信頼できる唯一の情報源”）として扱う。すなわち既にそこで定義されたエンティティ情報に重複するようなZodスキーマ定義やTS型定義などは、データ定義が分散してしまうため新たに作成しない。
+- **ZodスキーマとTS型はDrizzleスキーマからインポートして使用する**: `drizzle-zod`ライブラリを使用して、Drizzleスキーマで定義したエンティティ専用のZodスキーマ定義とそれに対応するTS型を生成する（以下詳細）。コード上では一貫してそれらをインポートし、`pick(), omit()`などを用いて必要に応じてフィールドを追加・削除したものを使用する。ただし、当然Drizzleスキーマに定義されたエンティティに関するものに限るため、フロントエンドでのみ使用するようなZodスキーマ（例えばSearch Paramsを定義するZodスキーマなど）は必要な箇所にその都度定義して良い。
+
+  - **Zodスキーマ定義**: `drizzle-zod`ライブラリから提供されるメソッドを使用して、CREATE（INSERT）用、READ（SELECT）用、UPDATE（DELETE）用の3つの基本Zodスキーマを、すべてのアプリ本体エンティティごとに生成する。認証関連のテーブル定義などに対してはおそらく必要なさそう。
+  - **TS型定義**: 上記の基本Zodスキーマ定義から、`z.infer<typeof ...>`などを使用してそれぞれTS型を生成する。Zodスキーマが必要ない認証関連のエンティティは`typeof {entities}Table.$inferSelect`などを使用して、テーブル定義から直接TS型を生成する。
+
+## Drizzleスキーマ実装指針
+
+### Drizzleスキーマの全体的な構造
+
+1つのDrizzleスキーマファイル（`~/db/schema.ts`）内にて、以下のセクションごとに記述していく。
+
+- Schema Factory設定（`drizzle-zod`ライブラリのもの）
+  - Drizzleスキーマ全体に統一的に適用したいルールを記述するもの。日時を文字列からDate型に自動変換するなど、Zodの `coerce`を一括で適用できる。
+- テーブル定義
+  - 認証関連のテーブルを切り出して複数スキーマ構成にできなかったため、実質1つのPublicスキーマ内にすべてのテーブルを定義している。
+- リレーション定義
+- 生成したZodスキーマ
+- 生成したTS型
+
+### Drizzleスキーマ内の命名規則
+
+それぞれのセクション固有の命名規則を厳守する。
+
+- **テーブル定義**: テーブルオブジェクト名はエンティティ小文字複数形＋Table（`{entities}Table`）にし、各カラムのプロパティ名は`createdAt`のようにcamelCaseにする。一方、DB上の実テーブル名（pgTableの第1引数）は` verification_tokens`のように複数形のsnake_caseにし、各カラム名は単数形のsnake_caseにする。
+- **リレーション定義**: リレーションオブジェクト名はエンティティ小文字複数形＋Relations（`{entities}Relations`）のcamelCaseにする。
+- **Zodスキーマ定義**: 各Zodスキーマ名は `userSelectSchema`のように`{entity}{Operation}Schema`にする。
+- **TS型定義**: READ（SELECT）用のTS型名は `User`のように`{Entity}`にし, それ以外のTS型名は`{Entity}{Operation}`にする（いずれもPascalCase）。
+
+### その他
+
+- **日時カラムはtimestamptz（Timestamp with Timezone）型を使用する**: DB上の日時情報がすべてUTCに統一される。アプリ側は、DBから取得したDate型情報をユーザーのタイムゾーンに合わせて表示することだけに集中できる。
+
+### 具体的なDrizzleスキーマ例
+
+```ts
+// src/db/schema.ts
+import { relations } from "drizzle-orm";
+import { boolean, integer, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { createSchemaFactory } from "drizzle-zod";
+import { z } from "zod";
+
+// ===========================================================================
+// Schema Factory設定（`drizzle-zod`ライブラリによってDrizzleスキーマ全体に適用される統一的なルール。型強制coerceの自動適用など）
+// ===========================================================================
+const { createInsertSchema, createSelectSchema, createUpdateSchema } =
+  createSchemaFactory({
+    // 以下の自動変換を有効化
+    coerce: {
+      date: true, // 日付型（文字列→Date）
+      number: true, //数値型（文字列→数値）
+      boolean: true, // ブール値の（"true"→true）
+    },
+    zodInstance: z, // 拡張インスタンスを使用
+  });
+
+// ===========================================================================
+// テーブル定義（認証関連のテーブルを切り出す複数スキーマ構成ができなかったため、1つのPublicスキーマ内に定義している）
+// ===========================================================================
+// 命名規則: テーブルオブジェクト名は `{entities}Table`のようにエンティティ複数形＋Tableとし、各カラムのプロパティ名は`createdAt`のようにcamelCaseにする。一方、DB上の実テーブル名（pgTableの第1引数）は` verification_tokens`のように複数形snake_caseとし、各カラム名は単数形snake_caseにする。
+// 認証関連
+// ユーザー定義
+export const usersTable = pgTable("users", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  emailVerified: boolean("email_verified").notNull(),
+  image: text("image"),
+  /* ... */
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdateFn(() => new Date()),
+});
+
+export const sessionsTable = pgTable("sessions", {
+  /* ... */
+});
+
+export const accountsTable = pgTable("accounts", {
+  /* ... */
+});
+
+export const verificationTokensTable = pgTable("verification_tokens", {
+  /* ... */
+});
+
+// アプリ本体関連
+// 投稿テーブル
+export const postsTable = pgTable("posts", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => usersTable.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  published: boolean("published").notNull().default(false),
+  /* ... */
+});
+
+// コメントテーブル
+export const commentsTable = pgTable("comments", {
+  id: serial("id").primaryKey(),
+  content: text("content").notNull(),
+  postId: integer("post_id").references(() => postsTable.id, { onDelete: "cascade" }),
+  /* ... */
+});
+
+// ===========================================================================
+// リレーション定義
+// ===========================================================================
+// 命名規則：リレーションオブジェクト名はエンティティ複数形＋Relations（`{entities}Relations`）にする。
+// 認証関連
+export const usersRelations = relations(usersTable, ({ many }) => ({
+  sessions: many(sessionsTable),
+  accounts: many(accountsTable),
+  posts: many(postsTable),
+}));
+
+export const sessionsRelations = relations(sessionsTable, ({ one }) => ({
+  user: one(usersTable, {
+    fields: [sessionsTable.userId],
+    references: [usersTable.id],
+  }),
+}));
+...
+
+// アプリ本体関連
+export const postsRelations = relations(postsTable, ({ one, many }) => ({
+  user: one(usersTable, {
+    fields: [postsTable.userId],
+    references: [usersTable.id],
+  }),
+  comments: many(commentsTable),
+}));
+...
+
+// ===========================================================================
+// 基本Zodスキーマ定義（drizzle-zodから生成。アプリ本体エンティティのみ）
+// ===========================================================================
+// 命名規則：各スキーマ名は `userSelectSchema`のように`{entity}{Operation}Schema`にする。
+
+// users
+export const userSelectSchema = createSelectSchema(usersTable);
+export const userInsertSchema = createInsertSchema(usersTable, {
+  name: (schema) => schema.min(1, "名前は必須です").max(100, "名前は100文字以内"),
+  email: (schema) => schema.email("有効なメールアドレスを入力してください"),
+  ...
+});
+export const userUpdateSchema = createUpdateSchema(usersTable, {
+  /* ... */
+});
+
+// posts
+export const postSelectSchema = createSelectSchema(postsTable);
+export const postInsertSchema = createInsertSchema(postsTable, {
+  title: (schema) => schema.min(1, "タイトルは必須").max(200, "タイトルは200文字以内"),
+  content: (schema) =>
+    schema.min(1, "コンテンツは必須").max(500, "コンテンツは500文字以内"),
+  ...
+});
+export const postUpdateSchema = createUpdateSchema(postsTable, {
+  /* ... */
+});
+
+// ===========================================================================
+// TS型定義（上記のZodスキーマ定義から生成）
+// ===========================================================================
+// 命名規則：READ（SELECT）用のTS型名は`User`のように`{Entity}`にし, それ以外のTS型名は`{Entity}{Operation}`にする。
+
+// users
+export type User = z.infer<typeof userSelectSchema>;
+export type UserCreate = z.infer<typeof userInsertSchema>;
+export type UserUpdate = z.infer<typeof userUpdateSchema>;
+
+// sessions
+export type Session = typeof sessionsTable.$inferSelect;
+export type NewSession = typeof sessionsTable.$inferInsert;
+
+// posts
+export type Post = z.infer<typeof postSelectSchema>;
+export type PostCreate = z.infer<typeof postInsertSchema>;
+export type PostUpdate = z.infer<typeof postUpdateSchema>;
+
+// comments
+export type Comment = z.infer<typeof commentSelectSchema>;
+export type CommentCreate = z.infer<typeof commentInsertSchema>;
+export type CommentUpdate = z.infer<typeof commentUpdateSchema>;
+
+...
+```
+
+## Server Functions運用指針
+
+- **DALにてエンティティごとにCRUD操作とqueryOptionを定義する**: Drizzleスキーマで定義したエンティティ（テーブル定義）ごとに、DALにてファイルを作成する（`~/data-access/{entities}.ts`）。そのファイル内で、主にCRUD操作をするServer Functionとそれに対応するTanStack Query用のqueryOption `（xxxQuery, xxxMutation）`を定義してコロケーションする。
+  - ディレクトリ例：
+    ```
+    src/
+    ├── data-access/
+    │   ├── users.ts          # ユーザー関連
+    │   ├── posts.ts          # 投稿関連
+    │   ├── comments.ts       # コメント関連
+    │   └── auth.ts           # 認証関連
+    ...
+    ```
+- **inputValidator()内での検証には、既にどこかで定義されているはずのZodスキーマをインポートして使用する（SSOT原則）**:
+  - 大前提として、サーバーサイドでも基本的に入力値に対してバリデーションを行う。
+  - テーブルとして定義したエンティティに関するCRUDメソッド（`getPostById()`など）では、Drizzleスキーマから該当のZodスキーマをインポートする。
+  - あるいは、そのServer Functionが依存している要素のバリデーションのために定義したZodスキーマ（例えば `getPosts()`のloaderDepsとなる Search Paramsを定義しているZodスキーマ）があれば、該当のRouteパスなどからインポートする。
+- **認証が必要なServer Functionには必ず認証ミドルウェアを適用する**: 主にCREATE, UPDATE, DELETE操作を想定。ミドルウェア定義は `~/lib/middlewares.ts`などにて行う。
+- **SQLライク方式でクエリビルドを記述する**: 特に理由なし。SQL自体の学習も兼ねることができるため。

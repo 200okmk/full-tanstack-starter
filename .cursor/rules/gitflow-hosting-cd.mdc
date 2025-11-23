@@ -1,0 +1,68 @@
+---
+description: Gitflowによるブランチ運用と、それをトリガーとしてホストしたアプリ本体の自動ビルドやDBの自動マイグレーションが実行されるように設定したCD戦略を解説するもの。具体的にはGitflowブランチ単位に分離された実行環境、それに対応する個別のDB作成と切り替え手法、Github Actionによる自動マイグレーション、ホスティングサイト（Netlify）上の環境変数設定ガイドなどを定義している。
+alwaysApply: false
+---
+
+# Gitflowブランチ運用とそれに連動させたCD戦略
+
+## ブランチ単位の分離環境とCDトリガー
+
+### 一般的なGitflowでブランチ運用する
+
+主に下記3つのブランチ階層で構成される一般的なGitflowをブランチ戦略として採用。
+
+- 本番環境である永続的な`main`ブランチ（マージのみ。直接コミット禁止）
+- 開発統合ステージング環境である永続的な`develop`ブランチ
+- 機能開発や修正などを行う`feature`や`fix`などの一時的な各作業ブランチ（`develop`から分岐して`develop`へマージ）
+
+### 各ブランチでのプッシュをアプリ本体の自動ビルドのトリガーにする
+
+- プロジェクト開始時にホスティングサイト（Netlify）上からGithubリポジトリを接続してデプロイする。これによりプッシュ/マージするたびに、`main`ブランチなら本番環境として、`develop`ブランチや`feature`などの各作業ブランチならプレビュー環境として自動ビルドが実行され専用URLが発行されるようになる。
+
+### アプリの実行環境別にそれぞれ専用DBが存在している
+
+- **本番環境用リモートDB**:
+
+  - ホスティングサイト上でビルドされた`main`ブランチ（本番環境）で使用される本番環境用のDB。
+  - NeonDBの`production`ブランチ上に本番環境用のDBを作成して接続。
+
+- **プレビュー環境用リモートDB**:
+
+  - ホスティングサイト上でビルドされた`develop`ブランチや`feature`, `fix`などの各作業ブランチで使用されるプレビュー環境用のDB。（これら`main`ではないブランチのリモートビルドをプレビュー環境と定義しています。）
+  - NeonDBの`development`ブランチ上に、プレビュー環境用の共有DBを1つ作成して接続。
+
+- **ローカル開発環境用ローカルDB**:
+
+  - `feature`, `fix`などのローカル作業ブランチで使用されるローカル開発環境用のDB。
+  - `/docker-compose.yml`で定義したPostgresのDockerコンテナをローカルPC上で立ち上げて接続。
+  - また`drizzle-kit studio`コマンドでDrizzle Studioを立ち上げることで、このローカルDBに対する操作などをGUIで簡単に実行・確認できる。
+
+- **`NODE_ENV`でDrizzleの`db`インスタンスを切り替える**: ローカル開発時はDocker Composeで立ち上げたローカルPC上のPostgresに接続し、Netlify上でビルドされたリモートの本番とプレビュー環境では同じくリモートのNeonDBに接続できるように、実行環境の`NODE_ENV`環境変数の値に応じて `db`Drizzleインスタンスの初期化方法を切り替えている。
+
+```typescript
+// src/db/index.ts
+export const db: Database =
+  process.env.NODE_ENV === "development"
+    ? createLocalDb() // Docker Compose
+    : createNeonDb(); // Neon (preview/production)
+```
+
+### 親ブランチへのマージを自動DBマイグレーションのトリガーにする
+
+親ブランチへのマージ時に、自動でDBマイグレーションが行われるようにGithub Actionsワークフローを策定する。
+
+- `feature`など各作業ブランチから`develop`へのマージプッシュ時に、`/.github/workflows/migrate-preview-db.yml`によってDBマイグレーションを実行。
+- `develop`から`main`へのマージプッシュ時に、`/.github/workflows/migrate-production-db.yml`によってDBマイグレーションを実行。
+
+## 環境変数
+
+### Netlifyダッシュボード上から設定する環境変数
+
+![Netlify上の環境変数設定](/public/netlify-env-vars.png)
+
+- **DATABASE_URL**:
+  - NeonDBダッシュボードから本番環境用、プレビュー環境用それぞれのDBインスタンスの接続URLを取得する。ダッシュボードのサイドバーでBranchを選択 -> Overview -> Computesタブ -> Connect -> モーダル内の"Connection string"から取得可能。
+  - Deploy contextに応じて接続URLを設定し分ける必要がある。`Production`には本番環境用の接続URLを設定する。一方 `Deploy Previews`（PRごとに一時的に生成される環境）、`Branch Deploys`（本番ブランチ以外の作業ブランチごとに生成される環境）、固定の`develop`ブランチにはプレビュー環境用の接続URLを設定する。
+- **BETTER_AUTH_URL**: `openssl rand -base64 32`コマンドを実行などして[自前でシークレットを用意する](https://www.better-auth.com/docs/reference/options#secret)。当然ローカル開発時に使用しているものとは別の値を設定する。
+- **Google OAuth関連**: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRETの値を取得して設定する。詳細はBetterAuth[公式ドキュメント](https://www.better-auth.com/docs/authentication/google)を参照。
+- **Github OAuth関連**: GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRETの値を取得して設定する。詳細はBetterAuth[公式ドキュメント](https://www.better-auth.com/docs/authentication/github)を参照。

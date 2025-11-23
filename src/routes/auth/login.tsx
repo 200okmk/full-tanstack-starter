@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { GalleryVerticalEnd, LoaderCircle } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
@@ -7,18 +7,20 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { signIn } from "~/lib/auth-client";
 
-export const Route = createFileRoute("/(auth)/login")({
+export const Route = createFileRoute("/auth/login")({
   validateSearch: z.object({
+    // ログイン成功後、直前にいたURLへユーザーを戻してあげるためのSearch Param
     redirect: z.string().optional(),
   }),
   component: LoginForm,
 });
 
 function LoginForm() {
-  // redirectUrlは定数として事前に設定しておいたリダイレクト先(/dashboard)
-  const { redirectUrl, queryClient } = Route.useRouteContext();
+  // defaultRedirectUrlは定数として事前に設定しておいたリダイレクト先(デフォルトでは `/dashboard`)
+  const { defaultRedirectUrl, queryClient } = Route.useRouteContext();
   const search = Route.useSearch();
-  const navigate = useNavigate({ from: "/login" });
+  const navigate = useNavigate({ from: Route.fullPath });
+  const router = useRouter();
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -40,7 +42,7 @@ function LoginForm() {
         email,
         password,
         // 元のURLまたはデフォルト値を使用
-        callbackURL: search.redirect ?? redirectUrl,
+        callbackURL: search.redirect ?? defaultRedirectUrl,
       },
       {
         onError: (ctx) => {
@@ -50,8 +52,10 @@ function LoginForm() {
         onSuccess: async () => {
           // Tanstack Queryのキャッシュを無効化
           await queryClient.invalidateQueries({ queryKey: ["session-user"] });
+          // RootのbeforeLoadを再実行してContextを更新
+          await router.invalidate();
           // 元のURLまたはデフォルト値にリダイレクト
-          await navigate({ to: search.redirect ?? redirectUrl });
+          await navigate({ to: search.redirect ?? defaultRedirectUrl });
         },
       },
     );
@@ -116,7 +120,7 @@ function LoginForm() {
                 void signIn.social(
                   {
                     provider: "github",
-                    callbackURL: search.redirect ?? redirectUrl,
+                    callbackURL: search.redirect ?? defaultRedirectUrl,
                   },
                   {
                     onRequest: () => {
@@ -148,7 +152,7 @@ function LoginForm() {
                 void signIn.social(
                   {
                     provider: "google",
-                    callbackURL: search.redirect ?? redirectUrl,
+                    callbackURL: search.redirect ?? defaultRedirectUrl,
                   },
                   {
                     onRequest: () => {
@@ -177,7 +181,7 @@ function LoginForm() {
 
       <div className="text-center text-sm">
         Don&apos;t have an account?{" "}
-        <Link to="/signup" className="underline underline-offset-4">
+        <Link to="/auth/signup" className="underline underline-offset-4">
           Sign up
         </Link>
       </div>

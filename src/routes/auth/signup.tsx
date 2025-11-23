@@ -6,13 +6,13 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { signIn, signUp } from "~/lib/auth-client";
 
-export const Route = createFileRoute("/(auth)/signup")({
+export const Route = createFileRoute("/auth/signup")({
   component: SignupForm,
 });
 
 function SignupForm() {
-  const { redirectUrl, queryClient } = Route.useRouteContext();
-  const navigate = useNavigate({ from: "/signup" });
+  const { defaultRedirectUrl, queryClient } = Route.useRouteContext();
+  const navigate = useNavigate({ from: Route.fullPath });
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -42,7 +42,7 @@ function SignupForm() {
         name,
         email,
         password,
-        callbackURL: redirectUrl,
+        callbackURL: defaultRedirectUrl,
       },
       {
         onError: (ctx) => {
@@ -52,7 +52,7 @@ function SignupForm() {
         onSuccess: async () => {
           // Tanstack Queryのキャッシュを無効化
           await queryClient.invalidateQueries({ queryKey: ["session-user"] });
-          void navigate({ to: redirectUrl });
+          void navigate({ to: defaultRedirectUrl });
         },
       },
     );
@@ -139,7 +139,7 @@ function SignupForm() {
                 void signIn.social(
                   {
                     provider: "github",
-                    callbackURL: redirectUrl,
+                    callbackURL: defaultRedirectUrl,
                   },
                   {
                     onRequest: () => {
@@ -171,7 +171,7 @@ function SignupForm() {
                 void signIn.social(
                   {
                     provider: "google",
-                    callbackURL: redirectUrl,
+                    callbackURL: defaultRedirectUrl,
                   },
                   {
                     onRequest: () => {
@@ -200,7 +200,7 @@ function SignupForm() {
 
       <div className="text-center text-sm">
         Already have an account?{" "}
-        <Link to="/login" className="underline underline-offset-4">
+        <Link to="/auth/login" className="underline underline-offset-4">
           Login
         </Link>
       </div>
