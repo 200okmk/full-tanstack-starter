@@ -4,7 +4,6 @@ import {
   createRootRouteWithContext,
   HeadContent,
   Outlet,
-  ScriptOnce,
   Scripts,
 } from "@tanstack/react-router";
 
@@ -36,11 +35,11 @@ export const Route = createRootRouteWithContext<{
         content: "width=device-width, initial-scale=1",
       },
       {
-        title: "React TanStarter",
+        title: "TanStack Starter: Netlify Neon",
       },
       {
         name: "description",
-        content: "A minimal starter template for 🏝️ TanStack Start.",
+        content: "TanStack Start 🏝️ をNetlifyとNeonDBにデプロイするためのテンプレート",
       },
     ],
     links: [{ rel: "stylesheet", href: appCss }],
@@ -58,19 +57,11 @@ function RootComponent() {
 
 function RootDocument({ children }: { readonly children: React.ReactNode }) {
   return (
-    // 下記の`ScriptOnce`カスタムスクリプトで"dark"クラスを更新しているので、`suppressHydrationWarning`を使用してクライアント側のHydration警告を抑制
     <html lang="ja" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
       <body className="bg-background mx-auto p-4">
-        <ScriptOnce>
-          {`document.documentElement.classList.toggle(
-            'dark',
-            localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)
-            )`}
-        </ScriptOnce>
-
         {children}
 
         <ReactQueryDevtools buttonPosition="bottom-left" />
