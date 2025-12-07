@@ -39,14 +39,13 @@ export default defineConfig({
   ],
   // ルールの設定
   rules: {
-    // === TanStack ===
-    // throw redirect()は正常なパターンなのでオフ
-    "@typescript-eslint/only-throw-error": "off",
+    // === JavaScript ===
+    // console.log使用制限（warn/errorのみ許可）
+    "no-console": ["warn", { allow: ["warn", "error"] }],
 
-    // === React Hooks ===
-
-    // === TypeScript ルール ===
+    // === TypeScript ===
     // 未使用変数エラー - アンダースコアプレフィックスは許可（https://typescript-eslint.io/rules/no-unused-vars）
+    "no-unused-vars": "off",
     "@typescript-eslint/no-unused-vars": [
       "error",
       {
@@ -55,16 +54,14 @@ export default defineConfig({
         caughtErrorsIgnorePattern: "^_",
       },
     ],
-    // any型使用を警告レベル（完全禁止は現実的でない）
+    // any型使用を警告レベル（https://typescript-eslint.io/rules/no-explicit-any）
     "@typescript-eslint/no-explicit-any": "warn",
 
-    // === 一般的な品質ルール ===
-    // console.log使用制限（warn/errorのみ許可）
-    "no-console": ["warn", { allow: ["warn", "error"] }],
-    // const使用を強制
-    "prefer-const": "error",
-    // var使用を禁止
-    "no-var": "error",
+    // === TanStack ===
+    // throw redirect()は正常なパターンなのでオフ
+    "@typescript-eslint/only-throw-error": "off",
+
+    // === React Hooks ===
   },
   // グローバル除外設定 - ビルド成果物と自動生成ファイルを除外
   ignores: [
@@ -73,7 +70,7 @@ export default defineConfig({
     ".vercel",
     ".netlify",
     ".output",
-    "build",
+    "build/",
     "node_modules",
     "*.config.js",
     "routeTree.gen.ts", // TanStack Routerの自動生成ファイル
