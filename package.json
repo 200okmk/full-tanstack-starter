@@ -3,10 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vinxi dev",
-    "build": "vinxi build",
-    "start": "vinxi start",
-    "lint": "eslint . --fix",
+    "dev": "vite dev",
+    "build": "vite build",
+    "lint": "eslint .",
     "format": "prettier --write .",
     "db": "drizzle-kit",
     "deps": "pnpm dlx npm-check-updates@latest --interactive --format group",
@@ -17,11 +16,10 @@
   },
   "lint-staged": {
     "*.{ts,tsx}": [
-      "eslint --fix",
-      "prettier --write"
+      "prettier --write ."
     ],
     "*.{json,css,md}": [
-      "prettier --write"
+      "prettier --write ."
     ]
   },
   "dependencies": {
