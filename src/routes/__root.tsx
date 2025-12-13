@@ -11,20 +11,17 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
 import { ThemeProvider } from "~/components/ThemeProvider";
-import { User } from "~/db/schema";
-import { getSessionUser } from "~/lib/auth/auth-client";
+import { authQueryOptions, SessionUser } from "~/lib/auth/queries";
 import appCss from "~/styles/app.css?url";
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
-  sessionUser: User | null;
+  sessionUser: SessionUser;
 }>()({
-  beforeLoad: async ({ context }) => {
-    const sessionUser = await context.queryClient.ensureQueryData<User | null>({
-      queryKey: ["session-user"],
-      queryFn: () => getSessionUser() as Promise<User | null>,
-    });
-    return { sessionUser };
+  beforeLoad: async ({ context: { queryClient } }) => {
+    // 一般的にランディングページではログインユーザーを必要としないため、awaitせずにプリフェッチのみを行っている。
+    // 認証保護されたルートは、~/routes/_authenticated/ 配下に配置していく。
+    queryClient.prefetchQuery(authQueryOptions());
   },
   head: () => ({
     meta: [

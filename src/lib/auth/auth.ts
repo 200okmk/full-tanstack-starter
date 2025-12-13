@@ -17,9 +17,14 @@ export const auth = betterAuth({
   baseURL: process.env.URL ?? "http://localhost:3000",
   secret: process.env.BETTER_AUTH_SECRET!,
   session: {
+    // DBへのリクエスト回数を減らすための、セッションのキャッシュ設定（https://www.better-auth.com/docs/concepts/session-management#session-caching）。
+    cookieCache: {
+      enabled: true,
+      maxAge: 60 * 5, // 5分間
+    },
     // セッションが使用され、updateAge に達すると、セッションの有効期限は現在時刻に expiresIn 値を加えた値に延長される（https://www.better-auth.com/docs/concepts/session-management#session-expiration）。
-    expiresIn: 60 * 60 * 24 * 30, // デフォルトは7日間
-    updateAge: 60 * 60 * 24, // セッションを更新する頻度
+    expiresIn: 60 * 60 * 24 * 30, // 30日間（デフォルトは7日間）
+    updateAge: 60 * 60 * 24, // 1日ごとにセッションを更新する
   },
   database: drizzleAdapter(db, {
     provider: "pg",
