@@ -12,7 +12,7 @@ import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
 import { ThemeProvider } from "~/components/ThemeProvider";
 import { User } from "~/db/schema";
-import { getSessionUser } from "~/lib/auth-client";
+import { getSessionUser } from "~/lib/auth/auth-client";
 import appCss from "~/styles/app.css?url";
 
 export const Route = createRootRouteWithContext<{

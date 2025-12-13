@@ -7,7 +7,7 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 import { Button } from "~/components/ui/button";
-import { signOut } from "~/lib/auth-client";
+import { signOut } from "~/lib/auth/auth-client";
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
