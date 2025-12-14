@@ -17,7 +17,7 @@ export const auth = betterAuth({
   baseURL: process.env.URL ?? "http://localhost:3000",
   secret: process.env.BETTER_AUTH_SECRET!,
   session: {
-    // DBへのリクエスト回数を減らすための、セッションのキャッシュ設定（https://www.better-auth.com/docs/concepts/session-management#session-caching）。
+    // DBへのリクエスト回数を減らすためのセッションキャッシュ設定（https://www.better-auth.com/docs/concepts/session-management#session-caching）。
     cookieCache: {
       enabled: true,
       maxAge: 60 * 5, // 5分間
