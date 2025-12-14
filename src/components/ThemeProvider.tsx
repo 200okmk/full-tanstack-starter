@@ -4,16 +4,16 @@ import { createContext, use, useCallback, useEffect, useMemo, useState } from "r
 type Theme = "dark" | "light" | "system";
 const MEDIA = "(prefers-color-scheme: dark)";
 
-type ThemeProviderProps = {
+interface ThemeProviderProps {
   children: React.ReactNode;
   defaultTheme?: Theme;
   storageKey?: string;
-};
+}
 
-type ThemeProviderState = {
+interface ThemeProviderState {
   theme: Theme;
   setTheme: (theme: Theme) => void;
-};
+}
 
 const initialState: ThemeProviderState = {
   theme: "system",

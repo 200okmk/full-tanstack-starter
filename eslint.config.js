@@ -70,8 +70,8 @@ export default defineConfig([
       ],
       // any型使用を警告レベル（https://typescript-eslint.io/rules/no-explicit-any）
       "@typescript-eslint/no-explicit-any": "warn",
-      // 型定義が`interface`ではなく`type`でも許容する（https://typescript-eslint.io/rules/consistent-type-definitions）。
-      "@typescript-eslint/consistent-type-definitions": "off",
+      // 「【結論】TypeScriptの型定義はtypeよりinterfaceを使うべき理由」（https://zenn.dev/bmth/articles/interface-props-extends）というこのZennの記事を根拠に、基本的に`interface`での運用を目指してみる。ただし、Union型など`type`でしか表現できない型定義も当然あるので警告レベルで留める（https://typescript-eslint.io/rules/consistent-type-definitions）。
+      "@typescript-eslint/consistent-type-definitions": "warn",
 
       // === TanStack ===
       // throw redirect()は正常なパターンなのでオフ
