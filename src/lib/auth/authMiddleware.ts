@@ -31,7 +31,7 @@ export const authMiddleware = createMiddleware().server(async ({ next }) => {
     setResponseStatus(401);
     // 認証状態でない場合はリダイレクトしてログイン画面に遷移する。
     throw redirect({
-      to: "/auth/login",
+      to: "/login",
       // ログイン後に元のページに戻れるようにリダイレクト先を保存。
       search: {
         redirect: getRequest().url,

@@ -14,7 +14,7 @@ export const Route = createFileRoute("/_authenticated")({
   beforeLoad: ({ context: { sessionUser }, location }) => {
     if (!sessionUser) {
       throw redirect({
-        to: "/auth/login",
+        to: "/login",
         search: {
           redirect: location.href,
         },
@@ -55,7 +55,7 @@ function AuthenticatedLayout() {
               // Tanstack Queryのキャッシュを無効化
               await queryClient.invalidateQueries({ queryKey: ["session-user"] });
               await router.invalidate();
-              void navigate({ to: "/auth/login" });
+              void navigate({ to: "/login" });
             })();
           }}
           type="button"
