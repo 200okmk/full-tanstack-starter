@@ -13,7 +13,6 @@ export default defineConfig({
   plugins: [
     tsConfigPaths(),
     devtools(),
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
     tanstackStart(),
     // react's vite plugin must come after start's vite plugin
     viteReact({

@@ -21,11 +21,11 @@ export default defineConfig({
   extends: [
     // JavaScriptのRecommended（https://eslint.org/docs/latest/rules/）
     js.configs.recommended,
-    // TypeScriptのRecommended + 型チェック（https://github.com/typescript-eslint/typescript-eslint/blob/main/packages/eslint-plugin/src/configs/eslintrc/recommended-type-checked.ts）
-    ...tseslint.configs.recommendedTypeChecked,
+    // TypeScriptのRecommended（https://github.com/typescript-eslint/typescript-eslint/blob/main/packages/eslint-plugin/src/configs/eslintrc/recommended.ts）
+    ...tseslint.configs.recommended,
     // Stylisticとは、TypeScriptにおけるベストプラクティスとみなされるルールであるが、プログラムロジックには影響を与えない。これらのルールは一般的に、よりシンプルなコードパターンを強制することに重点が置かれている。
-    // TypeScriptのStylistic + 型チェック（https://github.com/typescript-eslint/typescript-eslint/blob/main/packages/eslint-plugin/src/configs/eslintrc/stylistic-type-checked.ts）
-    ...tseslint.configs.stylisticTypeChecked,
+    // TypeScriptのStylistic（https://github.com/typescript-eslint/typescript-eslint/blob/main/packages/eslint-plugin/src/configs/eslintrc/stylistic.ts）
+    ...tseslint.configs.stylistic,
     // TanStack Query
     ...pluginQuery.configs["flat/recommended"],
     // TanStack Router
@@ -56,6 +56,8 @@ export default defineConfig({
     ],
     // any型使用を警告レベル（https://typescript-eslint.io/rules/no-explicit-any）
     "@typescript-eslint/no-explicit-any": "warn",
+    // 型定義が`interface`ではなく`type`でも許容する（https://typescript-eslint.io/rules/consistent-type-definitions）。
+    "@typescript-eslint/consistent-type-definitions": "off",
 
     // === TanStack ===
     // throw redirect()は正常なパターンなのでオフ
