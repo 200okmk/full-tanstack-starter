@@ -11,6 +11,7 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
 import { ThemeProvider } from "~/components/ThemeProvider";
+import { Toaster } from "~/components/ui/sonner";
 import { authQueryOptions, SessionUser } from "~/lib/auth/queries";
 import appCss from "~/styles/app.css?url";
 
@@ -61,7 +62,10 @@ function RootDocument({ children }: { readonly children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body className="bg-background mx-auto p-4">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          {children}
+          <Toaster richColors />
+        </ThemeProvider>
 
         <ReactQueryDevtools buttonPosition="bottom-left" />
         <TanStackRouterDevtools position="bottom-right" />
