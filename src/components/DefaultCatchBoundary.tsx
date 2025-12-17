@@ -28,11 +28,11 @@ export function DefaultCatchBoundary({ error }: Readonly<ErrorComponentProps>) {
             void router.invalidate();
           }}
         >
-          Try Again
+          再読み込み
         </Button>
         {isRoot ? (
           <Button asChild variant="secondary">
-            <Link to="/">Home</Link>
+            <Link to="/">トップ</Link>
           </Button>
         ) : (
           <Button asChild variant="secondary">
@@ -43,7 +43,7 @@ export function DefaultCatchBoundary({ error }: Readonly<ErrorComponentProps>) {
                 window.history.back();
               }}
             >
-              Go Back
+              戻る
             </Link>
           </Button>
         )}

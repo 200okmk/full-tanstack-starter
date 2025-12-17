@@ -11,8 +11,9 @@ export default defineConfig({
     port: 3000,
   },
   plugins: [
-    tsConfigPaths(),
-    devtools(),
+    tsConfigPaths({
+      projects: ["./tsconfig.json"],
+    }),
     tanstackStart(),
     // react's vite plugin must come after start's vite plugin
     viteReact({
@@ -29,5 +30,6 @@ export default defineConfig({
       },
     }),
     tailwindcss(),
+    devtools(),
   ],
 });

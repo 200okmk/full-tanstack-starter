@@ -10,6 +10,8 @@ import {
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
+import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary";
+import { NotFound } from "~/components/NotFound";
 import { ThemeProvider } from "~/components/ThemeProvider";
 import { Toaster } from "~/components/ui/sonner";
 import { authQueryOptions, SessionUser } from "~/lib/auth/queries";
@@ -19,7 +21,7 @@ export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
   sessionUser: SessionUser;
 }>()({
-  beforeLoad: async ({ context: { queryClient } }) => {
+  beforeLoad: ({ context: { queryClient } }) => {
     // 一般的にランディングページではログインユーザーを必要としないため、awaitせずにプリフェッチのみを行っている。
     // 認証保護されたルートは、~/routes/_authenticated/ 配下に配置していく。
     queryClient.prefetchQuery(authQueryOptions());
@@ -44,6 +46,14 @@ export const Route = createRootRouteWithContext<{
     links: [{ rel: "stylesheet", href: appCss }],
   }),
   component: RootComponent,
+  errorComponent: (props) => {
+    return (
+      <RootDocument>
+        <DefaultCatchBoundary {...props} />
+      </RootDocument>
+    );
+  },
+  notFoundComponent: NotFound,
 });
 
 function RootComponent() {

@@ -3,7 +3,7 @@ import { createRouter } from "@tanstack/react-router";
 import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
 
 import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary";
-import { DefaultNotFound } from "~/components/DefaultNotFound";
+import { NotFound } from "~/components/NotFound";
 import { routeTree } from "./routeTree.gen";
 
 export function getRouter() {
@@ -26,7 +26,7 @@ export function getRouter() {
     // 大前提としてデータキャッシュは統一的にTanstack Query側で管理する。このようにRouter側でのStale設定を0にすることで、毎回loaderが起動されるためQuery側のキャッシュに集約できるようにする。（https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#passing-all-loader-events-to-an-external-cache）
     defaultPreloadStaleTime: 0,
     defaultErrorComponent: DefaultCatchBoundary,
-    defaultNotFoundComponent: DefaultNotFound,
+    defaultNotFoundComponent: NotFound,
     scrollRestoration: true,
     // Search Params の変化によるコンポーネントの再レンダリングを最小化するために統一的にStructural Sharingを有効にする（https://tanstack.com/router/latest/docs/framework/react/guide/render-optimizations#structural-sharing）。
     defaultStructuralSharing: true,
@@ -36,8 +36,13 @@ export function getRouter() {
     router,
     queryClient,
     handleRedirects: true,
-    wrapQueryClient: true,
   });
 
   return router;
+}
+
+declare module "@tanstack/react-router" {
+  interface Register {
+    router: ReturnType<typeof getRouter>;
+  }
 }
