@@ -79,7 +79,7 @@ function RootDocument({ children }: { readonly children: React.ReactNode }) {
 
         <ReactQueryDevtools buttonPosition="bottom-left" />
         <TanStackRouterDevtools position="bottom-right" />
-
+        {/* クライアントサイド JavaScript をすべて読み込むためのタグ */}
         <Scripts />
       </body>
     </html>

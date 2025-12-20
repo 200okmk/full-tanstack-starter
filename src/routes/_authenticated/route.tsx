@@ -7,7 +7,7 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 import { Button } from "~/components/ui/button";
-import { signOut } from "~/lib/auth/auth-client";
+import { authClient } from "~/lib/auth/auth-client";
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
@@ -37,12 +37,12 @@ function AuthenticatedLayout() {
       </pre>
 
       <div className="flex flex-col items-center gap-2">
-        <p>Welcome back, {sessionUser.name}!</p>
+        <p>ようこそ、{sessionUser.name}さん！</p>
         <Button type="button" asChild className="mb-2 w-fit" size="lg">
-          <Link to="/dashboard">Go to Dashboard</Link>
+          <Link to="/dashboard">ダッシュボードへ</Link>
         </Button>
         <div className="text-center text-xs sm:text-sm">
-          Session user:
+          セッションユーザー:
           <pre className="max-w-screen overflow-x-auto px-2 text-start">
             {JSON.stringify(sessionUser, null, 2)}
           </pre>
@@ -51,7 +51,7 @@ function AuthenticatedLayout() {
         <Button
           onClick={() => {
             void (async () => {
-              await signOut();
+              await authClient.signOut();
               // Tanstack Queryのキャッシュを無効化
               await queryClient.invalidateQueries({ queryKey: ["session-user"] });
               await router.invalidate();
@@ -63,7 +63,7 @@ function AuthenticatedLayout() {
           variant="destructive"
           size="lg"
         >
-          Sign out
+          ログアウト
         </Button>
       </div>
 

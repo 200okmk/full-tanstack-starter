@@ -5,7 +5,7 @@ import { z } from "zod";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { signIn } from "~/lib/auth/auth-client";
+import { authClient } from "~/lib/auth/auth-client";
 
 export const Route = createFileRoute("/(auth-pages)/login")({
   validateSearch: z.object({
@@ -37,7 +37,7 @@ function LoginForm() {
     setIsLoading(true);
     setErrorMessage("");
 
-    void signIn.email(
+    void authClient.signIn.email(
       {
         email,
         password,
@@ -117,7 +117,7 @@ function LoginForm() {
               type="button"
               disabled={isLoading}
               onClick={() => {
-                void signIn.social(
+                void authClient.signIn.social(
                   {
                     provider: "github",
                     callbackURL: search.redirect ?? defaultRedirectUrl,
@@ -149,7 +149,7 @@ function LoginForm() {
               type="button"
               disabled={isLoading}
               onClick={() => {
-                void signIn.social(
+                void authClient.signIn.social(
                   {
                     provider: "google",
                     callbackURL: search.redirect ?? defaultRedirectUrl,
