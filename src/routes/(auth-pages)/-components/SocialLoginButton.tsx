@@ -2,7 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { LoaderCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
-import authClient from "~/lib/auth/auth-client";
+import authClient from "~/lib/auth-client";
 
 interface SocialLoginButtonProps {
   provider: string;

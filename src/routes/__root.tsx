@@ -14,7 +14,7 @@ import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary";
 import { NotFound } from "~/components/NotFound";
 import { ThemeProvider } from "~/components/ThemeProvider";
 import { Toaster } from "~/components/ui/sonner";
-import { authQueryOptions, SessionUser } from "~/lib/auth/queries";
+import { authQueryOptions, type SessionUser } from "~/queries/auth";
 import appCss from "~/styles/app.css?url";
 
 export const Route = createRootRouteWithContext<{

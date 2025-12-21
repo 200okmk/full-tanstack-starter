@@ -5,7 +5,7 @@ import {
   setResponseHeader,
   setResponseStatus,
 } from "@tanstack/react-start/server";
-import { auth } from "~/lib/auth/auth";
+import { auth } from "~/lib/auth";
 
 /**
  * 認証済み状態を必要とするServer Functionの実行時に認証チェックを行い、セッション情報をコンテキストに追加するミドルウェア。認証状態でない場合はリダイレクトしてログイン画面に遷移する(https://tanstack.com/start/latest/docs/framework/react/guide/middleware)。

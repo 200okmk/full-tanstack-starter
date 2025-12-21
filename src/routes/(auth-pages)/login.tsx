@@ -11,7 +11,7 @@ import { Label } from "~/components/ui/label";
 import { GithubDark } from "~/components/ui/svgs/githubDark";
 import { GithubLight } from "~/components/ui/svgs/githubLight";
 import { Google } from "~/components/ui/svgs/google";
-import authClient from "~/lib/auth/auth-client";
+import authClient from "~/lib/auth-client";
 import { SocialLoginButton } from "./-components/SocialLoginButton";
 
 export const Route = createFileRoute("/(auth-pages)/login")({

@@ -1,7 +1,10 @@
 import { queryOptions } from "@tanstack/react-query";
+
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { auth } from "~/lib/auth/auth";
+import { auth } from "~/lib/auth";
+
+export type SessionUser = Awaited<ReturnType<typeof getSessionUser>>;
 
 export const getSessionUser = createServerFn({ method: "GET" }).handler(async () => {
   const session = await auth.api.getSession({
@@ -24,5 +27,3 @@ export const authQueryOptions = () =>
     queryKey: ["session-user"],
     queryFn: ({ signal }) => getSessionUser({ signal }),
   });
-
-export type SessionUser = Awaited<ReturnType<typeof getSessionUser>>;
