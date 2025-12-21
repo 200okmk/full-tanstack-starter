@@ -1,4 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
+import { LoaderCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
 import authClient from "~/lib/auth/auth-client";
@@ -16,7 +17,6 @@ export function SocialLoginButton({
   callbackURL,
   disabled,
 }: SocialLoginButtonProps) {
-  // プロバイダーのラベルを取得
   const providerLabel =
     provider === "google"
       ? "Google"
@@ -35,6 +35,7 @@ export function SocialLoginButton({
             toast.error(`${providerLabel}でのログインに失敗しました。`, {
               description: error.message,
             });
+            console.error(error);
           },
         },
       ),
@@ -50,8 +51,17 @@ export function SocialLoginButton({
       }
       onClick={() => socialLoginMutation.mutate()}
     >
-      {icon}
-      {providerLabel}でログイン
+      {socialLoginMutation.isPending ? (
+        <>
+          <LoaderCircle className="animate-spin" />
+          ログイン中...
+        </>
+      ) : (
+        <>
+          {icon}
+          {providerLabel}でログイン
+        </>
+      )}
     </Button>
   );
 }
