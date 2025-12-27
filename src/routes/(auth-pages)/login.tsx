@@ -1,7 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { ClientOnly, createFileRoute, Link } from "@tanstack/react-router";
 import { LoaderCircle } from "lucide-react";
-import { useMemo } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { useTheme } from "~/components/ThemeProvider";
@@ -27,10 +26,6 @@ function LoginForm() {
   const { defaultRedirectUrl } = Route.useRouteContext();
   const search = Route.useSearch();
   const { theme } = useTheme();
-  const githubIcon: React.ReactNode = useMemo(
-    () => (theme === "dark" ? <GithubDark /> : <GithubLight />),
-    [theme],
-  );
 
   const emailLoginMutation = useMutation({
     mutationFn: async (data: { email: string; password: string }) =>
@@ -114,7 +109,11 @@ function LoginForm() {
               provider="github"
               callbackURL={search.redirect ?? defaultRedirectUrl}
               disabled={emailLoginMutation.isPending}
-              icon={githubIcon}
+              icon={
+                <ClientOnly>
+                  {theme === "dark" ? <GithubDark /> : <GithubLight />}
+                </ClientOnly>
+              }
             />
           </div>
         </div>
