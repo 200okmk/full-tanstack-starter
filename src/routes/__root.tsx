@@ -53,7 +53,7 @@ export const Route = createRootRouteWithContext<{
       </RootDocument>
     );
   },
-  notFoundComponent: NotFound,
+  notFoundComponent: () => <NotFound />,
 });
 
 function RootComponent() {
