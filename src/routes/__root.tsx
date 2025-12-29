@@ -12,7 +12,7 @@ import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
 import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary";
 import { NotFound } from "~/components/NotFound";
-import { ThemeProvider } from "~/components/ThemeProvider";
+import { getThemeCookie, ThemeProvider } from "~/components/ThemeProvider";
 import { Toaster } from "~/components/ui/sonner";
 import { authQueryOptions, type SessionUser } from "~/queries/auth";
 import appCss from "~/styles/app.css?url";
@@ -21,10 +21,14 @@ export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
   sessionUser: SessionUser;
 }>()({
-  beforeLoad: ({ context: { queryClient } }) => {
+  beforeLoad: async ({ context: { queryClient } }) => {
     // 一般的にランディングページではログインユーザーを必要としないため、awaitせずにプリフェッチのみを行っている。
     // 認証保護されたルートは、~/routes/_authenticated/ 配下に配置していく。
     queryClient.prefetchQuery(authQueryOptions());
+
+    // SSR時にCookieからThemeを取得
+    const theme = await getThemeCookie();
+    return { theme };
   },
   head: () => ({
     meta: [
@@ -44,6 +48,13 @@ export const Route = createRootRouteWithContext<{
       },
     ],
     links: [{ rel: "stylesheet", href: appCss }],
+    // FOUC防止: HTMLパース時に即座にテーマクラスを適用するブロッキングスクリプト
+    scripts: [
+      {
+        id: "theme-init",
+        children: `(function(){var t=document.cookie.match(/ui-theme=([^;]+)/);t=t?t[1]:"dark";document.documentElement.classList.add(t)})();`,
+      },
+    ],
   }),
   component: RootComponent,
   errorComponent: (props) => {
