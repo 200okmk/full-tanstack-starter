@@ -7,7 +7,7 @@ export type Theme = "dark" | "light";
 
 interface ThemeProviderProps {
   children: React.ReactNode;
-  defaultTheme?: Theme;
+  initialTheme: Theme;
 }
 
 interface ThemeProviderState {
@@ -25,22 +25,22 @@ const initialState: ThemeProviderState = {
 const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
 
 // Server Function: CookieからThemeを取得
-export const getThemeCookie = createServerFn().handler(async () => {
+export const getThemeFromCookie = createServerFn().handler(async () => {
   const theme = getCookie(THEME_COOKIE_NAME);
   // light以外はすべてdarkとして扱う（デフォルトdark）
   return (theme === "light" ? "light" : "dark") as Theme;
 });
 
 // Server Function: CookieにThemeを保存
-export const setThemeCookie = createServerFn({ method: "POST" })
+export const setThemeToCookie = createServerFn({ method: "POST" })
   .inputValidator(z.object({ theme: z.enum(["dark", "light"]) }))
   .handler(async ({ data }) => {
     setCookie(THEME_COOKIE_NAME, data.theme);
     return data.theme;
   });
 
-export function ThemeProvider({ children, defaultTheme }: ThemeProviderProps) {
-  const [themeState, setThemeState] = useState<Theme>(defaultTheme ?? "dark");
+export function ThemeProvider({ children, initialTheme }: ThemeProviderProps) {
+  const [themeState, setThemeState] = useState<Theme>(initialTheme ?? "dark");
 
   const setTheme = (newTheme: Theme) => {
     // 1. DOM更新（即座に反映）
@@ -49,7 +49,7 @@ export function ThemeProvider({ children, defaultTheme }: ThemeProviderProps) {
     // 2. State更新
     setThemeState(newTheme);
     // 3. Cookie更新（非同期）
-    setThemeCookie({ data: { theme: newTheme } });
+    setThemeToCookie({ data: { theme: newTheme } });
   };
 
   return (

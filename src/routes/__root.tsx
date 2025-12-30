@@ -12,7 +12,11 @@ import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
 import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary";
 import { NotFound } from "~/components/NotFound";
-import { getThemeCookie, ThemeProvider } from "~/components/ThemeProvider";
+import {
+  getThemeFromCookie,
+  ThemeProvider,
+  type Theme,
+} from "~/components/ThemeProvider";
 import { Toaster } from "~/components/ui/sonner";
 import { authQueryOptions, type SessionUser } from "~/queries/auth";
 import appCss from "~/styles/app.css?url";
@@ -26,8 +30,8 @@ export const Route = createRootRouteWithContext<{
     // 認証保護されたルートは、~/routes/_authenticated/ 配下に配置していく。
     queryClient.prefetchQuery(authQueryOptions());
 
-    // SSR時にCookieからThemeを取得
-    const theme = await getThemeCookie();
+    // SSR時にCookieからThemeを取得し、ThemeProviderの初期値として使用
+    const theme = await getThemeFromCookie();
     return { theme };
   },
   head: () => ({
@@ -48,7 +52,7 @@ export const Route = createRootRouteWithContext<{
       },
     ],
     links: [{ rel: "stylesheet", href: appCss }],
-    // FOUC防止: HTMLパース時に即座にテーマクラスを適用するブロッキングスクリプト
+    // FOUCの防止のため、HTMLパース時に即座にテーマクラスを適用するブロッキングスクリプト。(Flash of Unstyled Content: 選択したダーク・ライトテーマをクライアントサイドで初期適用する際の一瞬のちらつき)
     scripts: [
       {
         id: "theme-init",
@@ -76,14 +80,17 @@ function RootComponent() {
 }
 
 function RootDocument({ children }: { readonly children: React.ReactNode }) {
+  // beforeLoadで取得したthemeをRoute.contextから参照
+  const { theme } = Route.useRouteContext();
+
   return (
-    // ThemeProviderにて"dark"クラスを更新しているので、`suppressHydrationWarning`を使用してクライアント側のHydration警告を抑制
+    // ブロッキングスクリプトにて"dark"/"light"クラスを更新しているので、`suppressHydrationWarning`を使用してHydration警告を抑制
     <html lang="ja" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
       <body className="bg-background mx-auto p-4">
-        <ThemeProvider>
+        <ThemeProvider initialTheme={theme as Theme}>
           {children}
           <Toaster richColors />
         </ThemeProvider>
