@@ -30,7 +30,7 @@ export const Route = createRootRouteWithContext<{
     // 認証保護されたルートは、~/routes/_authenticated/ 配下に配置していく。
     queryClient.prefetchQuery(authQueryOptions());
 
-    // SSR時にCookieからThemeを取得し、ThemeProviderの初期値として使用
+    // SSR時にCookieからThemeを取得し、ThemeProviderの初期値として使用。初回のみ実行。子ルートナビゲーションでは再実行されない
     const theme = await getThemeFromCookie();
     return { theme };
   },
