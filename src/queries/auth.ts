@@ -25,5 +25,5 @@ export const getSessionUser = createServerFn({ method: "GET" }).handler(async ()
 export const authQueryOptions = () =>
   queryOptions({
     queryKey: ["session-user"],
-    queryFn: ({ signal }) => getSessionUser({ signal }),
+    queryFn: () => getSessionUser(),
   });

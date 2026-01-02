@@ -21,7 +21,7 @@ export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
   sessionUser: SessionUser;
 }>()({
-  beforeLoad: async ({ context: { queryClient } }) => {
+  beforeLoad: ({ context: { queryClient } }) => {
     // 一般的にランディングページではログインユーザーを必要としないため、awaitせずにプリフェッチのみを行っている。
     // 認証保護されたルートは、~/routes/_authenticated/ 配下に配置していく。
     queryClient.prefetchQuery(authQueryOptions());
