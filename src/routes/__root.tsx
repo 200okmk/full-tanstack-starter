@@ -14,16 +14,14 @@ import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary";
 import { NotFound } from "~/components/NotFound";
 import { ThemeProvider } from "~/components/ThemeProvider";
 import { Toaster } from "~/components/ui/sonner";
-import { authQueryOptions, type SessionUser } from "~/queries/auth";
+import { authQueryOptions } from "~/queries/auth";
 import appCss from "~/styles/app.css?url";
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
-  sessionUser: SessionUser;
 }>()({
   beforeLoad: ({ context: { queryClient } }) => {
     // 一般的にランディングページではログインユーザーを必要としないため、awaitせずにプリフェッチのみを行っている。
-    // 認証保護されたルートは、~/routes/_authenticated/ 配下に配置していく。
     queryClient.prefetchQuery(authQueryOptions());
   },
   head: () => ({

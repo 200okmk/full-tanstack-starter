@@ -20,7 +20,7 @@ export function getRouter() {
 
   const router = createRouter({
     routeTree,
-    context: { queryClient, sessionUser: null },
+    context: { queryClient },
     // ホバー時にプリロード
     defaultPreload: "intent",
     // 大前提としてデータキャッシュは統一的にTanstack Query側で管理する。このようにRouter側でのStale設定を0にすることで、毎回loaderが起動されるためQuery側のキャッシュに集約できるようにする。（https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#passing-all-loader-events-to-an-external-cache）

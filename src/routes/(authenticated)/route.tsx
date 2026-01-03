@@ -6,19 +6,19 @@ import {
   useNavigate,
   useRouter,
 } from "@tanstack/react-router";
+import { setResponseStatus } from "@tanstack/react-start/server";
 import { Button } from "~/components/ui/button";
 import authClient from "~/lib/auth-client";
+import { authQueryOptions } from "~/queries/auth";
 
+// 認証保護するルートは、この `~/(authenticated)/`ディレクトリ配下に配置していく。
 export const Route = createFileRoute("/(authenticated)")({
   component: AuthenticatedLayout,
-  beforeLoad: ({ context: { sessionUser }, location }) => {
+  beforeLoad: async ({ context: { queryClient }, location }) => {
+    const sessionUser = await queryClient.ensureQueryData(authQueryOptions());
     if (!sessionUser) {
-      throw redirect({
-        to: "/login",
-        search: {
-          redirect: location.href,
-        },
-      });
+      setResponseStatus(401);
+      throw redirect({ to: "/login", search: { redirect: location.href } });
     }
     return { sessionUser };
   },
@@ -33,11 +33,11 @@ function AuthenticatedLayout() {
     <div className="flex w-full flex-col items-center justify-center gap-4 rounded-md p-4 outline-2 outline-gray-200">
       <h1 className="text-2xl font-bold md:text-4xl">認証保護 Layout</h1>
       <pre className="bg-card text-card-foreground rounded-md border p-1">
-        routes/_authenticated/route.tsx
+        routes/(authenticated)/route.tsx
       </pre>
 
       <div className="flex flex-col items-center gap-2">
-        <p>ようこそ、{sessionUser.name}さん！</p>
+        <p>{sessionUser?.name}</p>
         <Button type="button" asChild className="mb-2 w-fit" size="lg">
           <Link to="/dashboard">ダッシュボードへ</Link>
         </Button>

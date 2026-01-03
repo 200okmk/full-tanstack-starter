@@ -13,11 +13,11 @@ import { auth } from "~/lib/auth";
 export const authMiddleware = createMiddleware().server(async ({ next }) => {
   const session = await auth.api.getSession({
     headers: getRequest().headers,
+    returnHeaders: true,
     query: {
       // ミドルウェアとして厳格に認証状態を保証するため、Cookieキャッシュからではなくデータベースから直接セッションを取得する。Cookieキャッシュも更新される（https://www.better-auth.com/docs/concepts/session-management#session-caching）。
       disableCookieCache: true,
     },
-    returnHeaders: true,
   });
 
   // セッション有効期限の延長、Cookieキャッシュの更新などのため、Set-Cookie ヘッダーをTanStack Startのレスポンスヘッダー（クライアント）に転送する。
