@@ -8,11 +8,11 @@ pnpm-lock.yaml
 .DS_Store
 .cache
 .env
+.env.local
 
 .data
 .vercel
 .output
-.vinxi
 .wrangler
 .netlify
 dist

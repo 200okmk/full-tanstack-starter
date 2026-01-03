@@ -11,11 +11,12 @@ import { Button } from "~/components/ui/button";
 import authClient from "~/lib/auth-client";
 import { authQueryOptions } from "~/queries/auth";
 
-// 認証保護するルートは、この `~/(authenticated)/`ディレクトリ配下に配置していく。
+// 認証保護するルートはこの `~/(authenticated)`ディレクトリ配下に配置していく。
 export const Route = createFileRoute("/(authenticated)")({
   component: AuthenticatedLayout,
   beforeLoad: async ({ context: { queryClient }, location }) => {
     const sessionUser = await queryClient.ensureQueryData(authQueryOptions());
+    // ログインページへのリダイレクトは一括ではなくページごとでも可能。
     if (!sessionUser) {
       setResponseStatus(401);
       throw redirect({ to: "/login", search: { redirect: location.href } });
