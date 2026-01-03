@@ -3,12 +3,11 @@ import { useTheme } from "./ThemeProvider";
 import { Button } from "./ui/button";
 
 export default function ThemeToggle() {
-  const { setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
 
-  // ThemeProviderのsetThemeに委譲し、DOM操作・localStorage更新はProvider側のuseEffectが担当
+  // Contextのtheme値を参照してトグル
   const toggleTheme = () => {
-    const isDark = document.documentElement.classList.contains("dark");
-    setTheme(isDark ? "light" : "dark");
+    setTheme(theme === "dark" ? "light" : "dark");
   };
 
   return (

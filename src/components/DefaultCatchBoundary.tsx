@@ -2,20 +2,18 @@ import {
   ErrorComponent,
   type ErrorComponentProps,
   Link,
-  rootRouteId,
-  useMatch,
   useRouter,
+  useRouterState,
 } from "@tanstack/react-router";
 import { Button } from "./ui/button";
 
 export function DefaultCatchBoundary({ error }: Readonly<ErrorComponentProps>) {
   const router = useRouter();
-  const isRoot = useMatch({
-    strict: false,
-    select: (state) => state.id === rootRouteId,
-  });
+  const { location } = useRouterState();
 
-  console.error(error);
+  const isInAuthPages: boolean = ["/login", "/signup"].includes(location.pathname);
+
+  console.error("エラーが発生しました:", error);
 
   return (
     <div className="flex min-w-0 flex-1 flex-col items-center justify-center gap-6 p-4">
@@ -28,23 +26,15 @@ export function DefaultCatchBoundary({ error }: Readonly<ErrorComponentProps>) {
             void router.invalidate();
           }}
         >
-          Try Again
+          再読み込み
         </Button>
-        {isRoot ? (
+        {isInAuthPages ? (
           <Button asChild variant="secondary">
-            <Link to="/">Home</Link>
+            <Link to="/">トップ</Link>
           </Button>
         ) : (
           <Button asChild variant="secondary">
-            <Link
-              to="/"
-              onClick={(e) => {
-                e.preventDefault();
-                window.history.back();
-              }}
-            >
-              Go Back
-            </Link>
+            <Link to="/dashboard">ダッシュボード</Link>
           </Button>
         )}
       </div>
