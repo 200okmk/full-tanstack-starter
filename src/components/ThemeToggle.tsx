@@ -1,20 +1,14 @@
 import { MoonIcon, SunIcon } from "lucide-react";
+import { useTheme } from "./ThemeProvider";
 import { Button } from "./ui/button";
 
 export default function ThemeToggle() {
-  function toggleTheme() {
-    if (
-      document.documentElement.classList.contains("dark") ||
-      (!("theme" in localStorage) &&
-        window.matchMedia("(prefers-color-scheme: dark)").matches)
-    ) {
-      document.documentElement.classList.remove("dark");
-      localStorage.theme = "light";
-    } else {
-      document.documentElement.classList.add("dark");
-      localStorage.theme = "dark";
-    }
-  }
+  const { theme, setTheme } = useTheme();
+
+  // Contextのtheme値を参照してトグル
+  const toggleTheme = () => {
+    setTheme(theme === "dark" ? "light" : "dark");
+  };
 
   return (
     <Button variant="outline" size="icon" type="button" onClick={toggleTheme}>

@@ -15,7 +15,7 @@
     "bun.lock": true
   },
 
-  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.enabled": false,
   "explorer.fileNesting.patterns": {
     "tsconfig.json": "tsconfig.*.json, env.d.ts",
     "app.config.*": "jsconfig*, vitest.config.*, cypress.config.*, playwright.config.*",

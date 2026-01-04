@@ -1,16 +1,22 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { authQueryOptions } from "~/queries/auth";
 
-export const Route = createFileRoute("/auth")({
+export const Route = createFileRoute("/(auth-pages)")({
   component: RouteComponent,
-  beforeLoad: ({ context }) => {
+  beforeLoad: async ({ context: { queryClient } }) => {
     const DEFAULT_REDIRECT_URL = "/dashboard";
+
+    const sessionUser = await queryClient.ensureQueryData({
+      ...authQueryOptions(),
+      revalidateIfStale: true,
+    });
     // セッションユーザーが存在する場合はデフォルトのリダイレクト先へ
-    if (context.sessionUser) {
+    if (sessionUser) {
       redirect({
         to: DEFAULT_REDIRECT_URL,
       });
     }
-    // `/auth`配下でDEFAULT_REDIRECT_URLを使い回すためにcontextに含める
+    // `/(auth-pages)`配下でDEFAULT_REDIRECT_URLを使い回すためにcontextに含める
     return {
       defaultRedirectUrl: DEFAULT_REDIRECT_URL,
     };

@@ -6,19 +6,20 @@ import {
   useNavigate,
   useRouter,
 } from "@tanstack/react-router";
+import { setResponseStatus } from "@tanstack/react-start/server";
 import { Button } from "~/components/ui/button";
-import { signOut } from "~/lib/auth-client";
+import authClient from "~/lib/auth-client";
+import { authQueryOptions } from "~/queries/auth";
 
-export const Route = createFileRoute("/_authenticated")({
+// 認証保護するルートはこの `~/(authenticated)`ディレクトリ配下に配置していく。
+export const Route = createFileRoute("/(authenticated)")({
   component: AuthenticatedLayout,
-  beforeLoad: ({ context: { sessionUser }, location }) => {
+  beforeLoad: async ({ context: { queryClient }, location }) => {
+    const sessionUser = await queryClient.ensureQueryData(authQueryOptions());
+    // ログインページへのリダイレクトは一括ではなくページごとでも可能。
     if (!sessionUser) {
-      throw redirect({
-        to: "/auth/login",
-        search: {
-          redirect: location.href,
-        },
-      });
+      setResponseStatus(401);
+      throw redirect({ to: "/login", search: { redirect: location.href } });
     }
     return { sessionUser };
   },
@@ -33,16 +34,16 @@ function AuthenticatedLayout() {
     <div className="flex w-full flex-col items-center justify-center gap-4 rounded-md p-4 outline-2 outline-gray-200">
       <h1 className="text-2xl font-bold md:text-4xl">認証保護 Layout</h1>
       <pre className="bg-card text-card-foreground rounded-md border p-1">
-        routes/_authenticated/route.tsx
+        routes/(authenticated)/route.tsx
       </pre>
 
       <div className="flex flex-col items-center gap-2">
-        <p>Welcome back, {sessionUser.name}!</p>
+        <p>{sessionUser?.name}</p>
         <Button type="button" asChild className="mb-2 w-fit" size="lg">
-          <Link to="/dashboard">Go to Dashboard</Link>
+          <Link to="/dashboard">ダッシュボードへ</Link>
         </Button>
         <div className="text-center text-xs sm:text-sm">
-          Session user:
+          セッションユーザー:
           <pre className="max-w-screen overflow-x-auto px-2 text-start">
             {JSON.stringify(sessionUser, null, 2)}
           </pre>
@@ -51,11 +52,11 @@ function AuthenticatedLayout() {
         <Button
           onClick={() => {
             void (async () => {
-              await signOut();
+              await authClient.signOut();
               // Tanstack Queryのキャッシュを無効化
               await queryClient.invalidateQueries({ queryKey: ["session-user"] });
               await router.invalidate();
-              void navigate({ to: "/auth/login" });
+              void navigate({ to: "/login" });
             })();
           }}
           type="button"
@@ -63,7 +64,7 @@ function AuthenticatedLayout() {
           variant="destructive"
           size="lg"
         >
-          Sign out
+          ログアウト
         </Button>
       </div>
 

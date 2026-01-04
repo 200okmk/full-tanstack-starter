@@ -1,29 +1,28 @@
+/// <reference types="vite/client" />
 import type { QueryClient } from "@tanstack/react-query";
 import {
   createRootRouteWithContext,
   HeadContent,
   Outlet,
-  ScriptOnce,
   Scripts,
 } from "@tanstack/react-router";
 
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
-import { User } from "~/db/schema";
-import { getSessionUser } from "~/lib/auth-client";
+import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary";
+import { NotFound } from "~/components/NotFound";
+import { ThemeProvider } from "~/components/ThemeProvider";
+import { Toaster } from "~/components/ui/sonner";
+import { authQueryOptions } from "~/queries/auth";
 import appCss from "~/styles/app.css?url";
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
-  sessionUser: User | null;
 }>()({
-  beforeLoad: async ({ context }) => {
-    const sessionUser = await context.queryClient.ensureQueryData<User | null>({
-      queryKey: ["session-user"],
-      queryFn: () => getSessionUser() as Promise<User | null>,
-    });
-    return { sessionUser };
+  beforeLoad: ({ context: { queryClient } }) => {
+    // 一般的にランディングページではログインユーザーを必要としないため、awaitせずにプリフェッチのみを行っている。
+    queryClient.prefetchQuery(authQueryOptions());
   },
   head: () => ({
     meta: [
@@ -35,16 +34,31 @@ export const Route = createRootRouteWithContext<{
         content: "width=device-width, initial-scale=1",
       },
       {
-        title: "React TanStarter",
+        title: "TanStack Starter: Netlify Neon",
       },
       {
         name: "description",
-        content: "A minimal starter template for 🏝️ TanStack Start.",
+        content: "TanStack Start 🏝️ をNetlifyとNeonDBにデプロイするためのテンプレート",
       },
     ],
     links: [{ rel: "stylesheet", href: appCss }],
+    scripts: [
+      {
+        // FOUCを防止するためのブロッキングスクリプト。（Flash of Unstyled Content: 選択したダーク・ライトテーマをクライアントサイドで適用する際の一瞬のちらつき）
+        // ReactのHydration前にlocalStorageから直接テーマを読み取り、<html>要素にクラスを適用する。
+        children: `(function(){try{var t=localStorage.getItem("ui-theme");document.documentElement.classList.add(t==="light"||t==="dark"?t:"dark")}catch(e){document.documentElement.classList.add("dark")}})();`,
+      },
+    ],
   }),
   component: RootComponent,
+  errorComponent: (props) => {
+    return (
+      <RootDocument>
+        <DefaultCatchBoundary {...props} />
+      </RootDocument>
+    );
+  },
+  notFoundComponent: () => <NotFound />,
 });
 
 function RootComponent() {
@@ -57,24 +71,20 @@ function RootComponent() {
 
 function RootDocument({ children }: { readonly children: React.ReactNode }) {
   return (
-    // 下記の`ScriptOnce`カスタムスクリプトで"dark"クラスを更新しているので、`suppressHydrationWarning`を使用してクライアント側のHydration警告を抑制
+    // ブロッキングスクリプトにて"dark"/"light"クラスを更新しているので、SSR時とHydration時のDOMに差異が生じるのは意図的なもの。そのため`suppressHydrationWarning`を使用して警告を抑制している。
     <html lang="ja" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
       <body className="bg-background mx-auto p-4">
-        <ScriptOnce>
-          {`document.documentElement.classList.toggle(
-            'dark',
-            localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)
-            )`}
-        </ScriptOnce>
-
-        {children}
+        <ThemeProvider>
+          {children}
+          <Toaster richColors />
+        </ThemeProvider>
 
         <ReactQueryDevtools buttonPosition="bottom-left" />
         <TanStackRouterDevtools position="bottom-right" />
-
+        {/* クライアントサイド JavaScript をすべて読み込むためのタグ */}
         <Scripts />
       </body>
     </html>

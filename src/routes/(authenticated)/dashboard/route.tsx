@@ -1,7 +1,7 @@
 import { Link, Outlet, createFileRoute } from "@tanstack/react-router";
 import { Button } from "~/components/ui/button";
 
-export const Route = createFileRoute("/_authenticated/dashboard")({
+export const Route = createFileRoute("/(authenticated)/dashboard")({
   component: DashboardLayout,
 });
 

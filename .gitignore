@@ -1,14 +1,18 @@
 node_modules
 
+# package-lock.json
+# yarn.lock
+pnpm-lock.yaml
+# bun.lock
+
 .DS_Store
 .cache
 .env
-.env.*
+.env.local
 
 .data
 .vercel
 .output
-.vinxi
 .wrangler
 .netlify
 dist
@@ -17,5 +21,4 @@ dist
 /server/build
 /public/build
 
-# TanStack Router
-src/routeTree.gen.ts
+.tanstack
