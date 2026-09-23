@@ -32,11 +32,11 @@ function Home() {
         <ThemeToggle />
         <a
           className="text-muted-foreground hover:text-foreground underline"
-          href="https://github.com/maakintosh/tsstart-betterauth-drizzle-neon-netlify"
+          href="https://github.com/200okmk/full-tanstack-starter"
           target="_blank"
           rel="noreferrer noopener"
         >
-          maakintosh/full-tanstack-template
+          200okmk/full-tanstack-starter
         </a>
       </div>
     </div>
