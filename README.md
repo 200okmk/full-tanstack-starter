@@ -1,4 +1,4 @@
-# [Tanstack Start テンプレート🏝️]()
+# Tanstack Start テンプレート🏝️
 
 フルスタックReactフレームワークのTanstack Startを下記の技術スタックで立ち上げ、Netlifyにデプロイするためのテンプレート
 
