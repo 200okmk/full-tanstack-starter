@@ -9,36 +9,36 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as authenticatedRouteRouteImport } from './routes/(authenticated)/route'
-import { Route as authPagesRouteRouteImport } from './routes/(auth-pages)/route'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as authPagesSignupRouteImport } from './routes/(auth-pages)/signup'
+import { Route as authPagesRouteRouteImport } from './routes/(auth-pages)/route'
+import { Route as authenticatedRouteRouteImport } from './routes/(authenticated)/route'
 import { Route as authPagesLoginRouteImport } from './routes/(auth-pages)/login'
+import { Route as authPagesSignupRouteImport } from './routes/(auth-pages)/signup'
 import { Route as authenticatedDashboardRouteRouteImport } from './routes/(authenticated)/dashboard/route'
 import { Route as authenticatedDashboardIndexRouteImport } from './routes/(authenticated)/dashboard/index'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
-const authenticatedRouteRoute = authenticatedRouteRouteImport.update({
-  id: '/(authenticated)',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const authPagesRouteRoute = authPagesRouteRouteImport.update({
   id: '/(auth-pages)',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const authenticatedRouteRoute = authenticatedRouteRouteImport.update({
+  id: '/(authenticated)',
   getParentRoute: () => rootRouteImport,
-} as any)
-const authPagesSignupRoute = authPagesSignupRouteImport.update({
-  id: '/signup',
-  path: '/signup',
-  getParentRoute: () => authPagesRouteRoute,
 } as any)
 const authPagesLoginRoute = authPagesLoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => authPagesRouteRoute,
+} as any)
+const authPagesSignupRoute = authPagesSignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
   getParentRoute: () => authPagesRouteRoute,
 } as any)
 const authenticatedDashboardRouteRoute =
@@ -88,12 +88,7 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    | '/'
-    | '/dashboard'
-    | '/login'
-    | '/signup'
-    | '/api/auth/$'
-    | '/dashboard/'
+    '/' | '/dashboard' | '/login' | '/signup' | '/api/auth/$' | '/dashboard/'
   fileRoutesByTo: FileRoutesByTo
   to: '/' | '/login' | '/signup' | '/api/auth/$' | '/dashboard'
   id:
@@ -117,11 +112,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/(authenticated)': {
-      id: '/(authenticated)'
-      path: ''
-      fullPath: ''
-      preLoaderRoute: typeof authenticatedRouteRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/(auth-pages)': {
@@ -131,25 +126,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof authPagesRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/(authenticated)': {
+      id: '/(authenticated)'
+      path: ''
+      fullPath: ''
+      preLoaderRoute: typeof authenticatedRouteRouteImport
       parentRoute: typeof rootRouteImport
-    }
-    '/(auth-pages)/signup': {
-      id: '/(auth-pages)/signup'
-      path: '/signup'
-      fullPath: '/signup'
-      preLoaderRoute: typeof authPagesSignupRouteImport
-      parentRoute: typeof authPagesRouteRoute
     }
     '/(auth-pages)/login': {
       id: '/(auth-pages)/login'
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof authPagesLoginRouteImport
+      parentRoute: typeof authPagesRouteRoute
+    }
+    '/(auth-pages)/signup': {
+      id: '/(auth-pages)/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof authPagesSignupRouteImport
       parentRoute: typeof authPagesRouteRoute
     }
     '/(authenticated)/dashboard': {
