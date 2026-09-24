@@ -1,33 +1,30 @@
----
-description: データの参照・追加・更新などにおいては、常にDrizzleスキーマと生成されるZodスキーマ定義をSSOTとして扱い、一貫してそれらを参照元として運用することを定義したもの。具体的には SSOT原則、Drizzleスキーマのセクションや命名規則などの具体的な実装指針、Server Functionsの運用指針、データアクセス層、などを定義している。
-alwaysApply: false
----
+# DBスキーマを中心とするデータモデル運用戦略
 
-# Drizzleスキーマを中心とするデータモデル運用戦略
+データの参照・追加・更新などにおいては、常にDBスキーマと生成されるZodスキーマ定義をSSOTとして扱い、一貫してそれらを参照元として運用することを定義したもの。具体的には SSOT原則、DBスキーマのセクションや命名規則などの具体的な実装指針、Server Functionsの運用指針、データアクセス層などを定義している。
 
 ## 💎 SSOT原則の徹底
 
-- **DrizzleスキーマをSSOTとして位置付ける**: 一貫してDrizzleスキーマ（`~/db/schema.ts`）を Single Source of Truth （”信頼できる唯一の情報源”）として扱う。すなわち既にそこで定義されたエンティティ情報に重複するようなZodスキーマ定義やTS型定義などは、データ定義が分散してしまうため新たに作成しない。
-- **ZodスキーマとTS型はDrizzleスキーマからインポートして使用する**: `drizzle-zod`ライブラリを使用して、Drizzleスキーマで定義したエンティティ専用のZodスキーマ定義とそれに対応するTS型を生成する（以下詳細）。コード上では一貫してそれらをインポートし、`pick(), omit()`などを用いて必要に応じてフィールドを追加・削除したものを使用する。ただし、当然Drizzleスキーマに定義されたエンティティに関するものに限るため、フロントエンドでのみ使用するようなZodスキーマ（例えばSearch Paramsを定義するZodスキーマなど）は必要な箇所にその都度定義して良い。
+- **DBスキーマをSSOTとして位置付ける**: 一貫してDBスキーマ（`~/db/schema.ts`）を Single Source of Truth （”信頼できる唯一の情報源”）として扱う。すなわち既にそこで定義されたエンティティ情報に重複するようなZodスキーマ定義やTS型定義などは、データ定義が分散してしまうため新たに作成しない。
+- **ZodスキーマとTS型はDBスキーマからインポートして使用する**: `drizzle-zod`ライブラリを使用して、DBスキーマで定義したエンティティ専用のZodスキーマ定義とそれに対応するTS型を生成する（以下詳細）。コード上では一貫してそれらをインポートし、`pick(), omit()`などを用いて必要に応じてフィールドを追加・削除したものを使用する。ただし、当然DBスキーマに定義されたエンティティに関するものに限るため、フロントエンドでのみ使用するようなZodスキーマ（例えばSearch Paramsを定義するZodスキーマなど）は必要な箇所にその都度定義して良い。
 
   - **Zodスキーマ定義**: `drizzle-zod`ライブラリから提供されるメソッドを使用して、CREATE（INSERT）用、READ（SELECT）用、UPDATE（DELETE）用の3つの基本Zodスキーマを、すべてのアプリ本体エンティティごとに生成する。認証関連のテーブル定義などに対してはおそらく必要なさそう。
   - **TS型定義**: 上記の基本Zodスキーマ定義から、`z.infer<typeof ...>`などを使用してそれぞれTS型を生成する。Zodスキーマが必要ない認証関連のエンティティは`typeof {entities}Table.$inferSelect`などを使用して、テーブル定義から直接TS型を生成する。
 
-## Drizzleスキーマ実装指針
+## DBスキーマ実装指針
 
-### Drizzleスキーマの全体的な構造
+### DBスキーマの全体的な構造
 
-1つのDrizzleスキーマファイル（`~/db/schema.ts`）内にて、以下のセクションごとに記述していく。
+1つのDBスキーマファイル（`~/db/schema.ts`）内にて、以下のセクションごとに記述していく。
 
 - Schema Factory設定（`drizzle-zod`ライブラリのもの）
-  - Drizzleスキーマ全体に統一的に適用したいルールを記述するもの。日時を文字列からDate型に自動変換するなど、Zodの `coerce`を一括で適用できる。
+  - DBスキーマ全体に統一的に適用したいルールを記述するもの。日時を文字列からDate型に自動変換するなど、Zodの `coerce`を一括で適用できる。
 - テーブル定義
   - 認証関連のテーブルを切り出して複数スキーマ構成にできなかったため、実質1つのPublicスキーマ内にすべてのテーブルを定義している。
 - リレーション定義
 - 生成したZodスキーマ
 - 生成したTS型
 
-### Drizzleスキーマ内の命名規則
+### DBスキーマ内の命名規則
 
 それぞれのセクション固有の命名規則を厳守する。
 
@@ -40,7 +37,7 @@ alwaysApply: false
 
 - **日時カラムはtimestamptz（Timestamp with Timezone）型を使用する**: DB上の日時情報がすべてUTCに統一される。アプリ側は、DBから取得したDate型情報をユーザーのタイムゾーンに合わせて表示することだけに集中できる。
 
-### 具体的なDrizzleスキーマ例
+### 具体的なDBスキーマ例
 
 ```ts
 // src/db/schema.ts
@@ -50,7 +47,7 @@ import { createSchemaFactory } from "drizzle-zod";
 import { z } from "zod";
 
 // ===========================================================================
-// Schema Factory設定（`drizzle-zod`ライブラリによってDrizzleスキーマ全体に適用される統一的なルール。型強制coerceの自動適用など）
+// Schema Factory設定（`drizzle-zod`ライブラリによってDBスキーマ全体に適用される統一的なルール。型強制coerceの自動適用など）
 // ===========================================================================
 const { createInsertSchema, createSelectSchema, createUpdateSchema } =
   createSchemaFactory({
@@ -202,7 +199,7 @@ export type CommentUpdate = z.infer<typeof commentUpdateSchema>;
 
 ## Server Functions運用指針
 
-- **DALにてエンティティごとにCRUD操作とqueryOptionを定義する**: Drizzleスキーマで定義したエンティティ（テーブル定義）ごとに、DALにてファイルを作成する（`~/data-access/{entities}.ts`）。そのファイル内で、主にCRUD操作をするServer Functionとそれに対応するTanStack Query用のqueryOption `（xxxQuery, xxxMutation）`を定義してコロケーションする。
+- **DALにてエンティティごとにCRUD操作とqueryOptionを定義する**: DBスキーマで定義したエンティティ（テーブル定義）ごとに、DALにてファイルを作成する（`~/data-access/{entities}.ts`）。そのファイル内で、主にCRUD操作をするServer Functionとそれに対応するTanStack Query用のqueryOption `（xxxQuery, xxxMutation）`を定義してコロケーションする。
   - ディレクトリ例：
     ```
     src/
@@ -215,7 +212,7 @@ export type CommentUpdate = z.infer<typeof commentUpdateSchema>;
     ```
 - **inputValidator()内での検証には、既にどこかで定義されているはずのZodスキーマをインポートして使用する（SSOT原則）**:
   - 大前提として、サーバーサイドでも基本的に入力値に対してバリデーションを行う。
-  - テーブルとして定義したエンティティに関するCRUDメソッド（`getPostById()`など）では、Drizzleスキーマから該当のZodスキーマをインポートする。
+  - テーブルとして定義したエンティティに関するCRUDメソッド（`getPostById()`など）では、DBスキーマから該当のZodスキーマをインポートする。
   - あるいは、そのServer Functionが依存している要素のバリデーションのために定義したZodスキーマ（例えば `getPosts()`のloaderDepsとなる Search Paramsを定義しているZodスキーマ）があれば、該当のRouteパスなどからインポートする。
 - **認証が必要なServer Functionには必ず認証ミドルウェアを適用する**: 主にCREATE, UPDATE, DELETE操作を想定。ミドルウェア定義は `~/lib/middlewares.ts`などにて行う。
 - **SQLライク方式でクエリビルドを記述する**: 特に理由なし。SQL自体の学習も兼ねることができるため。
