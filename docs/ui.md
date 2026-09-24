@@ -1,15 +1,13 @@
----
-description: Reactコンポーネント実装・運用指針を定義したもの。具体的にはShadcn/uiの基礎UIコンポーネント群やエコシステムを中心にコンポーネントを構築していくこと、Tailwindのデザインシステム運用指針、アクセシビリティのためのセマンティックHTMLやキーボード操作などに関する指針などを定義している。
-globs: src/styles/**/*.css,components.json,src/routes/**/*.tsx,src/components/**/*.tsx
-alwaysApply: false
----
-
 # UI構築・運用戦略
+
+Reactコンポーネント実装・運用指針を定義したもの。具体的にはShadcn/uiの基礎UIコンポーネント群やエコシステムを中心にコンポーネントを構築していくこと、Tailwindのデザインシステム運用指針、アクセシビリティのためのセマンティックHTMLやキーボード操作などに関する指針などを定義している。
 
 ## Shadcn/uiを基礎にしたUI構築
 
 - **Shadcn/uiを中心にUIを構築していく**: `~/components/ui`内に配置されていくShadcn/uiの[基礎UIコンポーネント群](https://ui.shadcn.com/docs/components)を組み合わせてアプリのUIを構築していく。
+
 <!-- - **Shadcn/uiと互換を持つレジストリも活用する**:  -->
+
 - **基礎UIコンポーネントに対するスタイリング**: アプリ内で常に統一的に適用されるべきデザインである場合のみ、 `~/components/ui`内に配置された基礎UIコンポーネントのデフォルトTailwindユーティリティを直接編集する。それ以外の一時的なスタイル変更は基本的に className属性に対して `cn()`便利関数(`~/lib/utils.ts`)を使用して上書きする。
 - **アイコンライブラリ**: プロジェクト内で使用するアイコンライブラリは基本的に `lucide-react`を使用する。
 - **フォールバックUI**: ペンディング状態中のコンポーネントのフォールバックUIの作成には、基本的に[Shadcn/uiの`Skeleton`コンポーネント](https://ui.shadcn.com/docs/components/skeleton)を使用する（`./tanstack-router.mdc`で詳述）。

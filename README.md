@@ -49,13 +49,13 @@ src/
     └── */**/*.tsx           # カスタムコンポーネント
 ```
 
-## 📁 Rule構成
+## 📁 プロジェクトドキュメント構成
 
 ```text
-.cursor/rules/
+docs/
 ├── tanstack-router.mdc        # ルーティング、データフェッチ、SuspenseとストリーミングUI、Search ParamsなどTanStack Routerの運用について
 ├── drizzle-zod-ssot.mdc       # DrizzleスキーマをSSOTした一貫したデータアクセス戦略について
 ├── ui.mdc                     # Shadcn/uiエコシステム、Tailwind運用、アクセシビリテについて
 ├── gitflow-hosting-cd.mdc     # Gitflowブランチ運用、アプリ本体とDBのホスティング、CDについて
-└── testing.mdc                # （未実装）Vitest テスト戦略
+└── testing.mdc                # （未作成）Vitest テスト戦略
 ```
