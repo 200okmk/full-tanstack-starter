@@ -1,6 +1,16 @@
 # Tanstack Start テンプレート🏝️
 
-フルスタックReactフレームワークのTanstack Startを下記の技術スタックで立ち上げ、Netlifyにデプロイするためのテンプレート
+## 概要
+
+主な機能：
+- 初期RDBスキーマとORM設定
+- OAuth認証とメアドパスワード認証
+- アプリ本体とDBの即デプロイ設定
+- 自動マイグレーションとホスト先PaaS自動ビルドのCD（ステージングと本番の2環境）
+- フルレスポンシブUI
+- ダークモード
+- 404と例外キャッチ
+- アーキテクチャや実装方針を定義したドキュメントなど
 
 ## 使用技術
 
@@ -9,9 +19,29 @@
 - [Tailwind CSS v4](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/)
 - [Drizzle ORM](https://orm.drizzle.team/) + PostgreSQL on [Neon DB](https://neon.com/)
 - [Better Auth](https://www.better-auth.com/)
-- deployed on [Netlify](https://www.netlify.com/)
+- [Netlify](https://www.netlify.com/)
+
+## 📁 プロジェクトドキュメント構成
+
+アーキテクチャや実装方針を明文化
+
+1. 常にDBスキーマを唯一の情報源（Single Source of Truth）とし、エンティティ関連の多重定義と分散を防ぐ[SSOT戦略](https://github.com/200okmk/full-tanstack-starter/blob/main/docs/drizzle-zod-ssot.md)。具体的にはRDBスキーマからZodスキーマとTS型を自動生成して使いまわすもの
+2. 親コンポーネントのUIレンダリングをブロックしない非同期データフェッチとキャッシュ設計、ディレクトリ設計、UI状態管理ソースとしてのクエリパラメータ活用などを定義した[`TanStack`運用戦略](https://github.com/200okmk/full-tanstack-starter/blob/main/docs/tanstack-router.md)
+3. `本番`, `開発統合`, `各作業`の3層ブランチ構造に連動させた各環境自動ビルド[CD戦略](https://github.com/200okmk/full-tanstack-starter/blob/main/docs/gitflow-hosting-cd.md)
+4. デザインシステム、アクセシビリティなどの[UI構築戦略](https://github.com/200okmk/full-tanstack-starter/blob/main/docs/ui.md)
+
+```text
+docs/
+├── tanstack-router.mdc        # ルーティング、データフェッチ、SuspenseとストリーミングUI、Search ParamsなどTanStack Routerの運用について
+├── drizzle-zod-ssot.mdc       # DrizzleスキーマをSSOTした一貫したデータアクセス戦略について
+├── ui.mdc                     # Shadcn/uiエコシステム、Tailwind運用、アクセシビリテについて
+├── gitflow-hosting-cd.mdc     # Gitflowブランチ運用、アプリ本体とDBのホスティング、CDについて
+└── testing.mdc                # （未作成）Vitest テスト戦略
+```
 
 ## ディレクトリ構造
+
+あくまでパスやコンポーネント、エンティティはスターター例として実装
 
 ```
 src/
@@ -47,15 +77,4 @@ src/
 └── components/              # コンポーネント
     ├── ui/                  # 再利用可能でPrimitiveなUIコンポーネント群（主にShadcn/uiなどを直接配置）
     └── */**/*.tsx           # カスタムコンポーネント
-```
-
-## 📁 プロジェクトドキュメント構成
-
-```text
-docs/
-├── tanstack-router.mdc        # ルーティング、データフェッチ、SuspenseとストリーミングUI、Search ParamsなどTanStack Routerの運用について
-├── drizzle-zod-ssot.mdc       # DrizzleスキーマをSSOTした一貫したデータアクセス戦略について
-├── ui.mdc                     # Shadcn/uiエコシステム、Tailwind運用、アクセシビリテについて
-├── gitflow-hosting-cd.mdc     # Gitflowブランチ運用、アプリ本体とDBのホスティング、CDについて
-└── testing.mdc                # （未作成）Vitest テスト戦略
 ```
